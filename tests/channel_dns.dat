@@ -1,0 +1,129 @@
+&input_list
+
+	! x interval
+	xmin = -3.14159265359
+	xmax = +3.14159265359
+	
+	! y interval 
+	ymin = -1.0
+	ymax =  1.0
+
+	! z interval 
+	zmin = -1.57079632679
+	zmax = +1.57079632679
+
+        ! grid type
+        gridpoint_x = 'uniform'
+        gridpoint_y = 'grids/TurbulentCHGridRe180_DNS/Ygrid.txt'
+        gridpoint_z = 'uniform'
+        ! streching parameter
+        stretching_par = 3.5
+
+        ! dimensions
+        dims = 3
+	
+	! total simulation time
+	tmax = 10000.0
+        itmax = 0
+	
+	! number of nodes in each direction
+	nx = 128
+	ny = 128
+	nz = 128
+
+        ! number of procs per direction
+        cart_dims(1) = 2
+        cart_dims(2) = 1
+        cart_dims(3) = 2
+	
+	! CFL value and time-step value
+	CFL  = 0.5
+	Dt   = 1.E-04
+
+	! boundary conditions
+	bc(1) = 'periodic'
+	bc(2) = 'periodic'
+	bc(3) = 'isothermal_wall'
+	bc(4) = 'isothermal_wall'
+	bc(5) = 'periodic'
+	bc(6) = 'periodic'
+
+        sponge(1) = .false.
+        sponge(2) = .false.
+        sponge(3) = .false.
+        sponge(4) = .false.
+        sponge(5) = .false.
+        sponge(6) = .false.
+
+        Trat = 1.0
+	
+	inflow_profile = 'none'
+        smooth_inflow  = .false.
+        turb_inflow    = .false.
+
+	! Reynolds number
+	Reynolds = 180.0
+
+	! Mach number
+	Mach = 0.1
+
+	! Prandtl number
+	Prandtl = 0.71
+	
+	! flag to launch with CFL (true) or without CFL (false)
+	logical_CFL = .true.
+        scheme      = 'energy_preserving'
+        sensor      = 'density'
+        L1_wave     = 'pirozzoli_model'
+        fd_order    = 6
+        LES         = .false.
+        sgs_model   = 'WALE'
+
+	! Viscous therms flag
+ 	viscous = .true.
+	
+	! Runge-Kutta sub-steps number
+	n_step = 3
+	
+	! output interation
+	itout = 50000
+        StOut = 5000
+        StFlg = .true.
+	
+	! initial condition
+	ic = "turbulent_channel"
+	
+	! output file name
+	output_file_name = "tch"
+	
+	! data sub-directory name
+	data_dir = "CHANNEL_DNS"
+        
+        ! skip file
+        skip_file = 1
+
+	! Flags for output (true to print it out, false for not)
+	density         = .true.
+	pressure        = .true.
+	velocity        = .true.
+	temperature     = .true.
+	mach_           = .false.
+ 	sdensity        = .false.
+ 	vorticity       = .true.
+        speed_div       = .false.
+	charactheristic = .false.
+        hw_sensor       = .false.
+        hweno_flag      = .false.
+        bulk_quantities = .true.
+        qcriterion      = .true.
+        Rey_average     = .true.
+        Fav_average     = .false.
+        vorticity_magnitude = .true.
+	
+	! Flag for output format
+	BINARY      = .true.
+	GNUPLOT     = .true.
+	VTK         = .true.
+	LIFT_DRAG   = .false.
+
+&end

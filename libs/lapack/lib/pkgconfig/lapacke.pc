@@ -1,0 +1,10 @@
+libdir=/usr/local/Cellar/lapack/3.8.0_1/lib
+includedir=/usr/local/Cellar/lapack/3.8.0_1/include
+
+Name: LAPACKE
+Description: C Standard Interface to LAPACK Linear Algebra PACKage
+Version: 3.8.0
+URL: http://www.netlib.org/lapack/#_standard_c_language_apis_for_lapack
+Libs: -L${libdir} -llapacke
+Cflags: -I${includedir}
+Requires.private: lapack

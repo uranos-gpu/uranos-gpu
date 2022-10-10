@@ -1,0 +1,62 @@
+reated by https://www.gitignore.io/api/fortran
+### Folder ###
+DATA
+DATA/
+DATA_IcraCUranos3D
+DATA_IcraCUranos3D/
+DATA2_RAID
+DATA2_RAID/
+grids/
+DATABIN/
+utils/fft1D/res*
+utils/interpolator_res/
+log_files
+run
+mods/
+objs/
+*.dSYM/
+tests/log_files
+*.pdf
+*.optrpt
+
+### Fortran ###
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+*.eps
+#files
+*.swp
+*.bin
+#*.dat
+.DS_Store
+input.dat
+# End of https://www.gitignore.io/api/fortran

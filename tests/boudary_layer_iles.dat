@@ -1,0 +1,129 @@
+&input_list
+
+	! x interval
+	xmin = 0.0
+	xmax = 90.0
+	
+	! y interval 
+	ymin = 0.
+	ymax = 10.0
+
+	! z interval 
+	zmin = -3.0
+	zmax =  3.0
+
+        ! grid type
+        gridpoint_x = 'uniform'
+        gridpoint_y = 'DATA/BOUNDARY_LAYER/GRID/Ygrid.txt'
+        gridpoint_z = 'uniform'
+        ! streching parameter
+        stretching_par = 3.0
+
+        ! dimensions
+        dims = 3
+	
+	! total simulation time
+	tmax = 1000.
+        itmax = 0
+	
+	! number of nodes in each direction
+	nx = 512
+	ny = 128
+	nz = 64
+
+        ! number of procs per direction
+        cart_dims(1) = 2
+        cart_dims(2) = 1
+        cart_dims(3) = 2
+	
+	! CFL value and time-step value
+	CFL  = 0.5
+	Dt   = 1.E-04
+
+	! boundary conditions
+	bc(1) = 'supersonic_inflow'
+	bc(2) = 'nscbc_outflow'
+	bc(3) = 'nscbc_adiabatic_wall'
+	bc(4) = 'nscbc_outflow'
+	bc(5) = 'periodic'
+	bc(6) = 'periodic'
+
+        sponge(1) = .false.
+        sponge(2) = .false.
+        sponge(3) = .false.
+        sponge(4) = .false.
+        sponge(5) = .false.
+        sponge(6) = .false.
+
+        Trat = 1.0
+	
+	inflow_profile = 'TurbulentBoundaryLayerInflow'
+        smooth_inflow  = .false.
+        turb_inflow    = .true.
+
+	! Reynolds number
+	Reynolds = 180.0
+
+	! Mach number
+	Mach = 2.0
+
+	! Prandtl number
+	Prandtl = 0.72
+	
+	! flag to launch with CFL (true) or without CFL (false)
+	logical_CFL = .true.
+        scheme      = 'hybrid_wenoEP'
+        sensor      = 'ducros_sensor'
+        L1_wave     = 'zero_reflection'
+        fd_order    = 6
+        LES         = .false.
+        sgs_model   = 'WALE'
+
+	! Viscous therms flag
+ 	viscous = .true.
+	
+	! Runge-Kutta sub-steps number
+	n_step = 3
+	
+	! output interation
+	itout = 10000
+        StOut = 500
+        StFlg = .true.
+	
+	! initial condition
+	ic = "turbulent_BL"
+	
+	! output file name
+	output_file_name = "tbl"
+	
+	! data sub-directory name
+	data_dir = "BOUNDARY_LAYER"
+
+        ! skip file
+        skip_file = 1
+	
+	! Flags for output (true to print it out, false for not)
+	density         = .true.
+	pressure        = .true.
+	velocity        = .true.
+	temperature     = .true.
+	mach_           = .true.
+ 	sdensity        = .true.
+ 	vorticity       = .true.
+        speed_div       = .false.
+	charactheristic = .false.
+        hw_sensor       = .false.
+        hweno_flag      = .true.
+        bulk_quantities = .false.
+        qcriterion      = .true.
+        Rey_average     = .true.
+        Fav_average     = .false.
+        vorticity_magnitude = .false.
+	
+	! Flag for output format
+	BINARY      = .true.
+	GNUPLOT     = .false.
+	VTK         = .true.
+	LIFT_DRAG   = .false.
+
+&end

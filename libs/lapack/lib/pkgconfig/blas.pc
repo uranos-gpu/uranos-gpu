@@ -1,0 +1,8 @@
+libdir=/usr/local/Cellar/lapack/3.8.0_1/lib
+includedir=/usr/local/Cellar/lapack/3.8.0_1/include
+
+Name: BLAS
+Description: FORTRAN reference implementation of BLAS Basic Linear Algebra Subprograms
+Version: 3.8.0
+URL: http://www.netlib.org/blas/
+Libs: -L${libdir} -lblas
