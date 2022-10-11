@@ -14,7 +14,7 @@
 
         ! grid type
         gridpoint_x = 'uniform'
-        gridpoint_y = 'grids/TurbulentCHGridRe180_DNS/Ygrid.txt'
+        gridpoint_y = 'GRIDS/YgridTC.txt'
         gridpoint_z = 'uniform'
         ! streching parameter
         stretching_par = 3.5

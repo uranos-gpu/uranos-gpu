@@ -14,7 +14,7 @@
 
         ! grid type
         gridpoint_x = 'uniform'
-        gridpoint_y = 'DATA/BOUNDARY_LAYER/GRID/Ygrid.txt'
+        gridpoint_y = 'GRIDS/YgridBL.txt'
         gridpoint_z = 'uniform'
         ! streching parameter
         stretching_par = 3.0
