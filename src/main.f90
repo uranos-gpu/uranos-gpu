@@ -77,7 +77,6 @@ program uranos
         !$acc copyin(fward_1, bward_1) &
         !$acc copyin(aweno,cweno,weno,my_neighbour,bc) &
         !$acc copyin(a_rk,b_rk,c_rk) &
-        !$acc copyin(mask,mask%field) &
         !$acc copyin(tilde_op_x, tilde_op_y, tilde_op_z) &
         !$acc copyin(pri_1D_x, pri_1D_y, pri_1D_z) &
         !$acc copyin(phi_arr_x, phi_arr_y, phi_arr_z) &
