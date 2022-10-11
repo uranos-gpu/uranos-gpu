@@ -2,8 +2,6 @@
 MAINPROG = Uranos.exe
 MAINPOST = PostUranos.exe
 MAINSTAT = PostUranosStat.exe
-DEBUGGER = utils/debugger/Debugger.exe
-GRSCALER = utils/interpolator/Interpolator.exe
 
 # Directories
 DIRECTORIES = .objs .mods DATA
@@ -13,8 +11,6 @@ SRCDIR = src/
 PSTDIR = pst_src/
 STADIR = pst_src_stat/
 LIBDIR = libs/
-DEBDIR = utils/debugger/
-INTDIR = utils/interpolator/src/
 
 # Compiler
 FC = mpif90
@@ -277,25 +273,6 @@ $(MAINSTAT): $(OBJECTS) $(STADIR)post_stat_main.f90 Makefile
 
 
 # -------------------------------------------------------
-# Compile debugger
-# -------------------------------------------------------
-$(DEBUGGER): $(OBJECTS) $(DEBDIR)debugger.f90 Makefile
-	@echo "-------------------------------------------"
-	@echo "Creating the executable: $(DEBUGGER)"
-	@echo "-------------------------------------------"
-	$(FC) $(LDFLAGS) $(DEBDIR)debugger.f90 $(MODULES) $(OBJECTS) -o $(DEBUGGER) $(LIBS)
-
-# -------------------------------------------------------
-# Compile interpolator
-# -------------------------------------------------------
-$(GRSCALER): $(OBJECTS) $(INTDIR)interpolator_main.f90 Makefile
-	@echo "-------------------------------------------"
-	@echo "Creating the executable: $(GRSCALER)"
-	@echo "-------------------------------------------"
-	$(FC) $(LDFLAGS) $(INTDIR)interpolator_main.f90 $(MODULES) $(OBJECTS) -o $(GRSCALER) $(LIBS)
-
-
-# -------------------------------------------------------
 # Compiling modules in SRC
 # -------------------------------------------------------
 $(OBJDIR)%.o : $(SRCDIR)%.f90 Makefile 
@@ -319,12 +296,6 @@ $(OBJDIR)%.o : $(STADIR)%.f90 Makefile
 $(OBJDIR)%.o : $(LIBDIR)%.f90 Makefile
 	$(FC) $(FFLAGS) -c $< -o $@ $(MODULES) $(LIBS)
 
-# -------------------------------------------------------
-# Compiling modules in utils/interpolator
-# -------------------------------------------------------
-$(OBJDIR)%.o : $(INTDIR)%.f90 Makefile
-	$(FC) $(FFLAGS) -c $< -o $@ $(MODULES) $(LIBS)
-
 	
 # Clean everything up
 .PHONY: clean
@@ -333,13 +304,7 @@ clean:
 	@echo "Cleaning everything up"
 	@echo "---------------------------------------"
 	rm -rf *.exe *.o *.mod rm -rf *dSYM
-	rm -rf utils/*.exe utils/*.o utils/*.mod rm -rf utils/*dSYM
-	rm -rf utils/*.exe
-	rm -rf *.optrpt utils/*.optrpt
-	rm -rf utils/interpolator/*.exe
-	rm -rf utils/interpolator/*dSYM
-	rm -rf utils/debugger/*.exe
-	rm -rf utils/debugger/*dSYM
+	rm -rf *.optrpt
 	rm -rf $(OBJDIR)
 	rm -rf $(MODDIR)
 
@@ -414,16 +379,6 @@ $(OBJDIR)vtk_utils_module.o			: $(LIBDIR)vtk_utils_module.f90 $(addprefix $(OBJD
 $(OBJDIR)statistics_module.o			: $(LIBDIR)statistics_module.f90 $(addprefix $(OBJDIR), parameters_module.o)
 $(OBJDIR)onlineStats.o	   			: $(LIBDIR)onlineStats.f90 $(addprefix $(OBJDIR), parameters_module.o statistics_module.o fluid_functions_module.o)
 $(OBJDIR)npy.o	                     		: $(LIBDIR)npy.f90 
-
-
-#---------------------------------------------------------------------------
-# Debugger 
-#---------------------------------------------------------------------------
-
-
-
-$(OBJDIR)interpolator_input_module.o			: $(INTDIR)interpolator_input_module.f90 $(addprefix $(OBJDIR), parameters_module.o)
-$(OBJDIR)interpolator_compare_grids_module.o		: $(INTDIR)interpolator_compare_grids_module.f90 $(addprefix $(OBJDIR), interpolator_input_module.o norm_module.o real_to_integer_module.o interpolation_module.o mesh_module.o file_module.o real_to_integer_module.o)
 
 
 
