@@ -114,24 +114,24 @@ ifeq ($(comp),pgi)
 		TIME   = -DTIME
 		OPENMP =
 	else ifeq ($(mode),gpu)
-		OPT    = -O3 -g -acc -ta=tesla#,lineinfo
+		OPT    = -O3 -cudalib=curand -g -acc -ta=tesla#,lineinfo
 		DEBUG  = 
 		TIME   =
 		OPENMP =
 	else ifeq ($(mode),debug_gpu)
-		OPT    = -O3 -acc -ta=tesla
+		OPT    = -O3 -acc -ta=tesla -cudalib=curand
 		DEBUG  = -Minfo=accel -g
 		TIME   = -DNVTX -lnvToolsExt
 		OPENMP =
 	else ifeq ($(mode),debug_gpu_marconi100)
 		FC     = mpipgifort
-		OPT    = -O3 -acc -ta=tesla
+		OPT    = -O3 -acc -ta=tesla -cudalib=curand
 		DEBUG  = -Minfo=accel -g
 		TIME   = -DNVTX -lnvToolsExt -Mcuda=cuda11.0
 		OPENMP =
 	else ifeq ($(mode),marconi100)
 		FC     = mpipgifort
-		OPT    = -O3 
+		OPT    = -O3 -cudalib=curand
 		DEBUG  = 
 		TIME   = 
 		OPENMP =
