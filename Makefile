@@ -219,13 +219,11 @@ OBJECTS = $(addprefix $(OBJDIR), mpi_module.o \
 	  norm_module.o \
 	  integration_module.o \
 	  real_to_integer_module.o \
+	  interpolation_module.o \
 	  dirac_delta_module.o \
 	  math_tools_module.o \
 	  matrix_inversion_module.o \
 	  performance_module.o \
-	  interpolation_module.o \
-	  interpolator_input_module.o \
-	  interpolator_compare_grids_module.o \
 	  random_module.o \
 	  reynolds_averaged_module.o \
 	  file_module.o \
