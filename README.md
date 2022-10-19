@@ -8,9 +8,13 @@ Different compiling modes can be selected by changing "make" options. The follow
 make -j comp="option1" mode="option2"
 ```
 
-- "option1" selects the compiler among the following: gnu, gnuch, intel, pgi
+`comp` currently supports these choices:
+- `gnu`: GNU compiler
+- `gnuch`: GNU compiler in CH version
+- `intel`: INTEL compiler
+- `pgi`: NVIDIA-PGI compiler
 
-- "option2" specifies the compiler options. Each compiler has dedicated options. 
+`"option2"` specifies the compiler options. Each compiler has dedicated options
 
 Example:
 
@@ -18,6 +22,6 @@ Example:
 make -j comp=intel model=debug
 ```
 
-compiles the code with the intel compiler using the debugging flags
+compiles the code with the intel compiler using the debugging flags.
 
 
