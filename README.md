@@ -1,3 +1,9 @@
+# References
+
+De Vanna, F., Avanzi, F., Cogo, M., Sandrin, S., Bettencourt, M., Picano, F., Benini, E. (2022) URANOS: a GPU accelerated Navier-Stokes solver for compressible wall-bounded flows, under review Computer Physics Communications.
+
+
+
 # Compiling
 
 URANOS requires (1) a Fortran compiler and (2) an MPI library. For the GPU version, the NVIDIA compiler. A Makefile with
