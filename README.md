@@ -24,4 +24,21 @@ make -j comp=intel model=debug
 
 compiles the code with the intel compiler using the debugging flags.
 
+# Running
+
+URANOS can be executed with a standard MPI launcher, e.g. `mpirun`.
+In addition two files have to specified:
+* `file.dat`: file defining the physical and numerical setup of the simulation, to be customized
+according to the desired needs. Examples of input.dat files are available in the `test` folder.
+* `restart.bin`: only required for restart a simulation from previous results (optional)
+
+Thus, to run a simulation without restart, type, e.g.:
+```
+mpirun -np "number_of_procs" ./Uranos.exe path/to/file.dat
+```
+if you want to restart a the simulation from previous data just type:
+```
+mpirun -np "number_of_procs" ./Uranos.exe path/to/file.dat path/to/restart.bin
+```
+
 
