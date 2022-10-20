@@ -50,23 +50,30 @@ mpirun -np "number_of_procs" ./Uranos.exe path/to/file.dat path/to/restart.bin
 # Interpreting the file.dat file
 
 `xmin` defines the x-left boundary of the domain
+
 `xmax` defines the x-right boundary of the domain
 
 `ymin` defines the y-left boundary of the domain
+
 `ymax` defines the y-right boundary of the domain
 
 `zmin` defines the z-left boundary of the domain
+
 `zmax` defines the z-right boundary of the domain
 
 
 `gridpoint_x` specifies the path/to/the/gridX/file
+
 `gridpoint_y` specifies the path/to/the/gridY/file
+
 `gridpoint_z` specifies the path/to/the/gridZ/file
+
 `uniform` grid is readely available without requiring an external grid file
 
 `dims` specifies the problem dimensions and could 2 or 3
 
 `tmax` is the total simulation time (in code units). 
+
 `itmax` is the maximum number of iterations
 
 `nx`, `ny`, `nz` are the number of point along the X, Y, Z coordinates. 
@@ -80,12 +87,15 @@ X, Y, and Z directions. Some problems (channel flow and boundary layer) split th
 `Dt` is a fixed time step is you dont want adaptive time-stepping (logical\_CFL must be .false.)
 
 `bc(1)` = boundary condition at the x-left side
+
 `bc(2)` = boundary condition at the x-right side
 
 `bc(3)` = boundary condition at the y-left side
+
 `bc(4)` = boundary condition at the y-right side
 
 `bc(5)` = boundary condition at the z-left side
+
 `bc(6)` = boundary condition at the z-right side
 
 bc\_module.f90 provide a list of several boundary conditions
