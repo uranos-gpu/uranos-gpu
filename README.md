@@ -25,10 +25,10 @@ make -j comp="option1" mode="option2"
 Example:
 
 ```
-make -j comp=intel model=debug
+make -j comp=gnu model=debug
 ```
 
-compiles the code with the intel compiler using the debugging flags.
+compiles the code with the gnu compiler using the debugging flags.
 
 # Running
 
