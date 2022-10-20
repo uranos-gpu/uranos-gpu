@@ -101,20 +101,29 @@ X, Y, and Z directions. Some problems (channel flow and boundary layer) split th
 bc\_module.f90 provide a list of several boundary conditions
 
 `sponge(1)` activate a sponge zone for the x-left side
+
 `sponge(2)` activate a sponge zone for the x-right side
+
 `sponge(3)` activate a sponge zone for the y-left side
+
 `sponge(4)` activate a sponge zone for the x-right side
+
 `sponge(5)` activate a sponge zone for the z-left side
+
 `sponge(6)` activate a sponge zone for the x-right side
 
 `Trat` fix the wall-to-adiabatic temperature ratio (i.e., `Trat = 1` the wall is adibatic, `Trat < 1` the wall is cold, `Trat > 1` the wall is hot)
 
 `inflow_profile` select the inflow profile (look at `inflow_module.f90`)
+
 `smooth_inflow` provides a time gradually increasing inflow condition
+
 `turb_inflow` adds turbulence at the inflow
 
 `Reynolds` is the Reynolds number of the flow
+
 `Mach` is the Mach number of the flow
+
 `Prandtl` is the Mach number of the flow
 
 `logical_CFL` is `.true.` for adaptive time-stepping, `.false.` for static time-step
@@ -142,7 +151,9 @@ bc\_module.f90 provide a list of several boundary conditions
 `viscous` activates viscous flux computation
 
 `itout` defines the output iteration of restart.bin files
+
 `StOut` defines the output iteration of statistics.bin files
+
 `StFlg` activates the output of statistics
 
 `ic` defines the initial condition (see `src/ic_module.f90`)
