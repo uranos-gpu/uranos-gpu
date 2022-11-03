@@ -30,6 +30,13 @@ make -j comp=gnu model=debug
 
 compiles the code with the gnu compiler using the debugging flags.
 
+```
+make -j comp=pgi model=gnu
+```
+
+!CAUTION! Each cluster requires specific module to be loaded before the compiling process. 
+You are address to cluster-speficic documentation concerning such issue. 
+
 # Running
 
 URANOS can be executed with a standard MPI launcher, e.g. `mpirun`.
@@ -45,6 +52,24 @@ mpirun -np "number_of_procs" ./Uranos.exe path/to/file.dat
 if you want to restart a the simulation from previous data just type:
 ```
 mpirun -np "number_of_procs" ./Uranos.exe path/to/file.dat path/to/restart.bin
+```
+
+For GPU runs you must distribute MPI processes according to the number of GPUs
+available for each node. E.g., for CINECA Marconi-100 cluster -- 4 GPUS per node --  a possible submission script using
+8 GPUs is:
+
+```
+#!/bin/bash
+#SBATCH -N 2
+#SBATCH --tasks-per-node 4
+#SBATCH --mem=64G
+#SBATCH --partition=debug
+#SBATCH --time=00:30:00
+#SBATCH --gres=gpu:4
+#SBATCH --partition=debug
+module load profile/global pgi
+
+srun ./Uranos path/to/file.dat path/to/restart.bin
 ```
 
 # Interpreting the file.dat file
@@ -164,6 +189,16 @@ bc\_module.f90 provide a list of several boundary conditions
 
 
 
+
+# Interpreting the outputs
+As default, URANOS outputs a `DATA/data_dir/BINARY` directory where `.bin` files are stored. Each file represents a possible restart of a simulation.
+Data in the `DATA/data_dir/BINARY` can be post-processed with `PostUranos.exe` via the following command
+
+```
+./PostUranos.exe path/to/file.dat (path/to/restart.bin optional)
+```
+
+PostUranos is a serial code which provide the contours plots and some video related to a simulation. You can find the visual results in `DATA/data_dir/VTK` (for 3D fields) and `DATA/data_dir/VTK2D` (for 2D fields)
 
 
 
