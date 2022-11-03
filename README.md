@@ -25,13 +25,13 @@ make -j comp="option1" mode="option2"
 Example:
 
 ```
-make -j comp=gnu model=debug
+make -j comp=gnu mode=debug
 ```
 
 compiles the code with the gnu compiler using the debugging flags.
 
 ```
-make -j comp=pgi model=gnu
+make -j comp=pgi mode=gnu
 ```
 
 !CAUTION! Each cluster requires specific module to be loaded before the compiling process. 
