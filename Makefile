@@ -231,7 +231,8 @@ OBJECTS = $(addprefix $(OBJDIR), mpi_module.o \
 	  onlineStats.o \
 	  vtk_utils_module.o\
 	  nvtx.o \
-	  npy.o)
+	  npy.o \
+	  profiling_module.o)
 
 
 
@@ -334,6 +335,7 @@ $(OBJDIR)df_module.o				: $(SRCDIR)df_module.f90 $(addprefix $(OBJDIR), paramete
 $(OBJDIR)performance_module.o			: $(SRCDIR)performance_module.f90 $(addprefix $(OBJDIR), parameters_module.o)
 $(OBJDIR)GetRetau_module.o			: $(SRCDIR)GetRetau_module.f90 $(addprefix $(OBJDIR), parameters_module.o mpi_module.o fluid_functions_module.o mesh_module.o)
 $(OBJDIR)wmles_module.o				: $(SRCDIR)wmles_module.f90 $(addprefix $(OBJDIR), parameters_module.o fluid_functions_module.o)
+$(OBJDIR)profiling_module.o	                : $(SRCDIR)profiling_module.f90 $(addprefix $(OBJDIR), nvtx.o parameters_module.o)
 $(OBJDIR)nvtx.o					: $(SRCDIR)nvtx.f90
 
 
