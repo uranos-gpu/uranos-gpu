@@ -11,7 +11,7 @@ use mpi_module
 use fluid_functions_module
 use inflow_module
 use mpi_comm_module
-use nvtx
+use profiling_module
 
 contains
 subroutine set_bc_conditions
@@ -23,9 +23,7 @@ subroutine set_bc_conditions
 #ifdef TIME
         call mpi_stime(s_bcs_time)
 #endif
-#ifdef NVTX
-        call nvtxStartRange("set_bc_conditions")
-#endif
+        call StartProfRange("set_bc_conditions")
 
 
         all_bound%node = (/ sx , ex , sy , ey , sz ,  ez/)
@@ -159,9 +157,7 @@ subroutine set_bc_conditions
            endif ! end if proc null
         enddo ! end do faces
 
-#ifdef NVTX
-        call nvtxEndRange
-#endif
+        call EndProfRange
 #ifdef TIME
         call mpi_etime(s_bcs_time,t_bcs_calls,t_bcs_time)
 #endif
@@ -174,9 +170,7 @@ subroutine mpi_bc_communications
 #ifdef TIME
         call mpi_stime(s_mpi_time)
 #endif
-#ifdef NVTX
-        call nvtxStartRange("mpi_bc_communications")
-#endif
+        call StartProfRange("mpi_bc_communications")
 
 call  mpi_share(mpi_comm_cart,type_send_cons,type_recv_cons,my_neighbour,dims, &
                 phi_bfr_send_E, phi_bfr_send_W, phi_bfr_recv_E, phi_bfr_recv_W, &
@@ -184,9 +178,7 @@ call  mpi_share(mpi_comm_cart,type_send_cons,type_recv_cons,my_neighbour,dims, &
                 phi_bfr_send_B, phi_bfr_send_F, phi_bfr_recv_B, phi_bfr_recv_F, &
                 phi)
 
-#ifdef NVTX
-        call nvtxEndRange
-#endif
+        call EndProfRange
 #ifdef TIME
         call mpi_etime(s_mpi_time,t_mpi_calls,t_mpi_time)
 #endif

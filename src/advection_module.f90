@@ -4,7 +4,7 @@ use mpi_module
 use storage_module
 use eigen_matrix_module
 use flux_module
-use nvtx
+use profiling_module
 !$ use omp_lib
 implicit none
 private
@@ -27,9 +27,7 @@ subroutine advection_fluxes(scheme)
 #ifdef TIME
         call mpi_stime(s_adv_time)
 #endif
-#ifdef NVTX
-        call nvtxStartRange("advection_fluxes") 
-#endif
+        call StartProfRange("advection_fluxes") 
 
         selectcase(trim(scheme)) 
         case('hybrid_wenoEP')
@@ -87,9 +85,8 @@ subroutine advection_fluxes(scheme)
         if(my_neighbour(N) == NoOne .and. bc(N) == 'nscbc_outflow') call BCRelax_Y(RHS)
         if(my_neighbour(W) == NoOne .and. bc(W) == 'nscbc_inflow') call BCRelax_inflowX(RHS)
 
-#ifdef NVTX
-        call nvtxEndRange
-#endif
+        call EndProfRange
+
 #ifdef TIME
         call mpi_etime(s_adv_time,t_adv_calls,t_adv_time)
 #endif
@@ -165,9 +162,7 @@ subroutine hybrid_wenoEPx(weno_num,lbx,ubx,ltot,istr,iend,shock_recon,&
 #ifdef TIME
         call mpi_stime(s_adx_time)
 #endif
-#ifdef NVTX
-        call nvtxStartRange("hybrid_wenoEPx") 
-#endif
+        call StartProfRange("hybrid_wenoEPx") 
 
         loop_size = compute_gang_size(1, ltot)
         !$omp parallel do collapse(2) default(private), & 
@@ -396,9 +391,7 @@ subroutine hybrid_wenoEPx(weno_num,lbx,ubx,ltot,istr,iend,shock_recon,&
         !$acc end parallel
 
         !$omp end parallel do
-#ifdef NVTX
-        call nvtxEndRange 
-#endif
+        call EndProfRange 
 
 #ifdef TIME
         call mpi_etime(s_adx_time,t_adx_calls,t_adx_time)
@@ -441,9 +434,7 @@ subroutine hybrid_wenoEPy(weno_num,lby,uby,ltot,jstr,jend,shock_recon,&
         real(rp) :: delta_p, weight, ff, pp, lambda_max, hGn
         integer  :: i,j,k,l,m,jl,jj, n, loop_size
 
-#ifdef NVTX
-        call nvtxStartRange("hybrid_wenoEPy") 
-#endif
+        call StartProfRange("hybrid_wenoEPy") 
 
         loop_size = compute_gang_size(2, ltot)
         !$omp parallel do collapse(2) default(private), &
@@ -673,9 +664,7 @@ subroutine hybrid_wenoEPy(weno_num,lby,uby,ltot,jstr,jend,shock_recon,&
         !$acc end parallel
         !$omp end parallel do
 
-#ifdef NVTX
-        call nvtxEndRange 
-#endif
+        call EndProfRange 
 
 #ifdef TIME
         call mpi_etime(s_ady_time,t_ady_calls,t_ady_time)
@@ -716,9 +705,7 @@ subroutine hybrid_wenoEPz(weno_num,lbz,ubz,ltot,kstr,kend,shock_recon,&
         real(rp) :: delta_p, weight, inner_sum, sqrt_rho0, sqrt_rho1
         integer  :: i,j,k,l,m,kk, kl, n, loop_size
 
-#ifdef NVTX
-        call nvtxStartRange("hybrid_wenoEPz") 
-#endif
+        call StartProfRange("hybrid_wenoEPz") 
 
         loop_size = compute_gang_size(3, ltot)
         !$omp parallel do collapse(2) default(private), &
@@ -947,9 +934,7 @@ subroutine hybrid_wenoEPz(weno_num,lbz,ubz,ltot,kstr,kend,shock_recon,&
         !$acc end parallel
         !$omp end parallel do
 
-#ifdef NVTX
-        call nvtxEndRange 
-#endif
+        call EndProfRange 
 
 #ifdef TIME
         call mpi_etime(s_adz_time,t_adz_calls,t_adz_time)
@@ -2461,9 +2446,8 @@ subroutine energy_preservingX(lbx,ubx,ltot,istr,iend,tilde_op_x,pri_1D_x,RHS)
 #ifdef TIME
         call mpi_stime(s_adx_time)
 #endif
-#ifdef NVTX
-        call nvtxStartRange("energy_preservingX") 
-#endif
+        call StartProfRange("energy_preservingX") 
+
         loop_size = compute_gang_size(1, ltot)
         !$omp parallel do collapse(2) default(private), &
         !$omp shared(sx,ex,sy,ey,sz,ez,phi,RHS,xstep_i,istr,iend),&
@@ -2557,9 +2541,7 @@ subroutine energy_preservingX(lbx,ubx,ltot,istr,iend,tilde_op_x,pri_1D_x,RHS)
         !$acc end parallel
         !$omp end parallel do
 
-#ifdef NVTX
-        call nvtxEndRange 
-#endif
+        call EndProfRange 
 #ifdef TIME
         call mpi_etime(s_adx_time,t_adx_calls,t_adx_time)
         call mpi_stime(s_ady_time)
@@ -2589,9 +2571,7 @@ subroutine energy_preservingY(lby,uby,ltot,jstr,jend,tilde_op_y,pri_1D_y,RHS)
         real(rp), parameter :: hgm = gamma0/gm1
         real(rp), parameter :: one8= 1.0_rp/8.0_rp
 
-#ifdef NVTX
-        call nvtxStartRange("energy_preservingY") 
-#endif
+        call StartProfRange("energy_preservingY") 
 
         loop_size = compute_gang_size(2, ltot)
         !$omp parallel do collapse(2) default(private), &
@@ -2685,9 +2665,7 @@ subroutine energy_preservingY(lby,uby,ltot,jstr,jend,tilde_op_y,pri_1D_y,RHS)
         !$acc end parallel
         !$omp end parallel do
 
-#ifdef NVTX
-        call nvtxEndRange 
-#endif
+        call EndProfRange 
 #ifdef TIME
         call mpi_etime(s_ady_time,t_ady_calls,t_ady_time)
         call mpi_stime(s_adz_time)
@@ -2717,9 +2695,7 @@ subroutine energy_preservingZ(lbz,ubz,ltot,kstr,kend,tilde_op_z,pri_1D_z,RHS)
         real(rp), parameter :: hgm = gamma0/gm1
         real(rp), parameter :: one8= 1.0_rp/8.0_rp
 
-#ifdef NVTX
-        call nvtxStartRange("energy_preservingZ") 
-#endif
+        call StartProfRange("energy_preservingZ") 
 
         loop_size = compute_gang_size(3, ltot)
         !$omp parallel do collapse(2) default(private), &
@@ -2813,9 +2789,7 @@ subroutine energy_preservingZ(lbz,ubz,ltot,kstr,kend,tilde_op_z,pri_1D_z,RHS)
         !$acc end parallel
         !$omp end parallel do
 
-#ifdef NVTX
-        call nvtxEndRange 
-#endif
+        call EndProfRange 
 #ifdef TIME
         call mpi_etime(s_adz_time,t_adz_calls,t_adz_time)
 #endif
@@ -3102,9 +3076,7 @@ subroutine BCRelax_X(RHS)
         real(rp) :: r_, ir, u_, v_, w_, ek, p_, T_, c, cc
         integer  :: i,j,k,l, lll, mm, m, n
 
-#ifdef NVTX
-        call nvtxStartRange("BCRelax_X") 
-#endif
+        call StartProfRange("BCRelax_X") 
 
         r0 = 1.0_rp
         u0 = sqrt(gamma0)*Mach
@@ -3338,9 +3310,7 @@ subroutine BCRelax_X(RHS)
         enddo
         !$acc end parallel loop
 
-#ifdef NVTX
-        call nvtxEndRange 
-#endif
+        call EndProfRange 
 
         return
 end subroutine BCRelax_X
@@ -3365,9 +3335,7 @@ subroutine BCRelax_InflowX(RHS)
         real(rp) :: r_, ir, u_, v_, w_, ek, p_, T_, c, cc
         integer  :: i,j,k,l, lll, mm, m, n
 
-#ifdef NVTX
-        call nvtxStartRange("BCRelax_InflowX") 
-#endif
+        call StartProfRange("BCRelax_InflowX") 
 
         cl0 = -1.5_rp
         cl1 =  2.0_rp
@@ -3595,9 +3563,7 @@ subroutine BCRelax_InflowX(RHS)
         enddo
         !$acc end parallel loop
 
-#ifdef NVTX
-        call nvtxEndRange 
-#endif
+        call EndProfRange 
         
         return
 end subroutine BCRelax_InflowX
@@ -3641,9 +3607,7 @@ subroutine BCRelax_Y(RHS)
         real(rp) :: idy, r0, u0, v0, w0, p0
         integer  :: i,j,k,l,m, mm,lll, n
 
-#ifdef NVTX
-        call nvtxStartRange("BCRelax_Y") 
-#endif
+        call StartProfRange("BCRelax_Y") 
 
         cl2 =  0.5_rp
         cl1 = -2.0_rp
@@ -3881,9 +3845,7 @@ subroutine BCRelax_Y(RHS)
         enddo
         !$acc end parallel loop
 
-#ifdef NVTX
-        call nvtxEndRange 
-#endif
+        call EndProfRange 
 
         return
 end subroutine BCRelax_Y

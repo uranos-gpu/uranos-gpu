@@ -1,7 +1,7 @@
 module rhs_module
 use parameters_module
 use storage_module
-use nvtx
+use profiling_module
 
 implicit none
 private
@@ -24,9 +24,7 @@ subroutine rhs_navier_stokes
 #ifdef TIME
         call mpi_stime(s_rhs_time)
 #endif
-#ifdef NVTX
-        call nvtxStartRange("rhs_navier_stokes") 
-#endif
+        call StartProfRange("rhs_navier_stokes") 
         !$acc parallel default(present)
         !$acc loop gang, vector collapse(4)
         do          l = 1,5
@@ -50,9 +48,7 @@ subroutine rhs_navier_stokes
         call forcing_terms
 
 
-#ifdef NVTX
-        call nvtxEndRange 
-#endif
+        call EndProfRange 
 #ifdef TIME
         call mpi_etime(s_rhs_time,t_rhs_calls,t_rhs_time)
 #endif
@@ -70,16 +66,12 @@ subroutine update_all
 #ifdef TIME
         call mpi_stime(s_upd_time)
 #endif
-#ifdef NVTX
-        call nvtxStartRange("update_all") 
-#endif
+        call StartProfRange("update_all") 
         
         !call compute_primitives(lbx,sy,sz,ubx,ey,ez)
         call compute_primitives(lbx,lby,lbz,ubx,uby,ubz)
 
-#ifdef NVTX
-        call nvtxEndRange
-#endif
+        call EndProfRange
 #ifdef TIME
         call mpi_etime(s_upd_time,t_upd_calls,t_upd_time)
 #endif
@@ -97,9 +89,7 @@ subroutine mpi_wait_conservatives
 #ifdef TIME
         call mpi_stime(s_wcs_time)
 #endif
-#ifdef NVTX
-        call nvtxStartRange("mpi_wait_conservatives") 
-#endif
+        call StartProfRange("mpi_wait_conservatives") 
 #ifdef MPIBFR
         ! MPI BUFFER IMPLEMENTATION
         call mpi_wait_procs(req_array_yz)
@@ -115,9 +105,7 @@ subroutine mpi_wait_conservatives
         call mpi_wait_procs(req_array_yz)
 
 #endif
-#ifdef NVTX
-        call nvtxEndRange
-#endif
+        call EndProfRange
 #ifdef TIME
         call mpi_etime(s_wcs_time,t_wcs_calls,t_wcs_time)
 #endif
@@ -135,9 +123,7 @@ subroutine update_all_ghosts
 #ifdef TIME
         call mpi_stime(s_upg_time)
 #endif
-#ifdef NVTX
-        call nvtxStartRange("update_all_ghosts")
-#endif
+        call StartProfRange("update_all_ghosts")
 
         ! south 
         call compute_primitives(lbx,lby,lbz,ubx,sy-1,ubz)
@@ -151,9 +137,7 @@ subroutine update_all_ghosts
           call compute_primitives(lbx,lby,ez+1,ubx,uby,ubz)
         endif
 
-#ifdef NVTX
-        call nvtxEndRange
-#endif
+        call EndProfRange
 #ifdef TIME
         call mpi_etime(s_upg_time,t_upg_calls,t_upg_time)
 #endif
@@ -169,9 +153,7 @@ subroutine compute_primitives(lo_1,lo_2,lo_3,hi_1,hi_2,hi_3)
         real(rp)            :: r_,ir,u_,v_,w_,p_,T_,mu_
         integer             :: i,j,k
 
-#ifdef NVTX
-        call nvtxStartRange("compute_primitives")
-#endif
+        call StartProfRange("compute_primitives")
 
         !$omp parallel do collapse(3) default(private), shared(lo,hi,phi) &
         !$omp shared(U,V,W,P,T)
@@ -228,9 +210,7 @@ subroutine compute_primitives(lo_1,lo_2,lo_3,hi_1,hi_2,hi_3)
 
         endif
 
-#ifdef NVTX
-        call nvtxEndRange
-#endif
+        call EndProfRange
         return
 end subroutine compute_primitives
 
@@ -241,9 +221,7 @@ subroutine forcing_terms
         real(rp) :: f
         integer  :: i,j,k
 
-#ifdef NVTX
-        call nvtxStartRange("forcing_terms") 
-#endif
+        call StartProfRange("forcing_terms") 
 
         selectcase(ic)
           case('poiseuille_x', 'poiseuille_z','inflow_poiseuille')
@@ -290,9 +268,7 @@ subroutine forcing_terms
                 
         endselect
 
-#ifdef NVTX
-        call nvtxEndRange 
-#endif
+        call EndProfRange 
 return
 end subroutine forcing_terms
 

@@ -1,5 +1,8 @@
+
+#if defined (NVTX) 
+
+#if  !(defined(__PGIF90__) && (__PGIF90__ >= 22) )
 module nvtx
-#ifdef NVTX
 
 use iso_c_binding
 implicit none
@@ -70,5 +73,13 @@ subroutine nvtxEndRange
   call nvtxRangePop
 end subroutine
 
-#endif
 end module nvtx
+#endif
+
+#else
+module nvtx
+end module nvtx
+
+
+#endif
+

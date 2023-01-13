@@ -7,13 +7,15 @@ implicit none
 contains
 
 subroutine StartProfRange(char)
+        use nvtx
         implicit none
         character(*), intent(in) :: char
 
         select case(profiler)
         case('NVTX')
-
-          call nvtxStartRange(char)
+          #ifdef NVTX
+          call nvtxStartRange('char')
+          #endif
 
         case('rocTX')
 
@@ -36,7 +38,9 @@ subroutine EndProfRange
 
         select case(profiler)
         case('NVTX')
+          #ifdef NVTX
           call nvtxEndRange
+          #endif
 
         case('rocTX')
 

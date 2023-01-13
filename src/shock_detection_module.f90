@@ -3,7 +3,7 @@ use parameters_module
 use mpi_comm_module
 use storage_module
 use omp_lib
-use nvtx
+use profiling_module
 
 implicit none
 private
@@ -13,9 +13,7 @@ contains
 subroutine compute_hybrid_weno_flag
         implicit none
 
-#ifdef NVTX
-        call nvtxStartRange("compute_hybrid_weno_flag") 
-#endif
+        call StartProfRange("compute_hybrid_weno_flag") 
 
         if    (trim(sensor) == 'density') then
           call compute_density_shock_sensor
@@ -32,10 +30,8 @@ subroutine compute_hybrid_weno_flag
 
         endif
 
-#ifdef NVTX
-        call nvtxEndRange
-        call nvtxStartRange("compute_hybrid_weno_flag_MPI") 
-#endif
+        call EndProfRange
+        call StartProfRange("compute_hybrid_weno_flag_MPI") 
 
         if(mpi_flag) then
         call mpi_share_int1(mpi_comm_cart,type_send_flag,type_recv_flag,&
@@ -47,9 +43,7 @@ subroutine compute_hybrid_weno_flag
         endif
 
         !call spread_hybrid_weno_flag
-#ifdef NVTX
-        call nvtxEndRange
-#endif
+        call EndProfRange
 
         return
 end subroutine compute_hybrid_weno_flag

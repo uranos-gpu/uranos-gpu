@@ -2,7 +2,7 @@ module viscous_module
 #ifdef TIME
 use performance_module
 #endif
-use nvtx
+use profiling_module
 use parameters_module
 use mpi_module
 use mpi_comm_module
@@ -22,9 +22,7 @@ subroutine viscous_fluxes(dims)
 #ifdef TIME
         call mpi_stime(s_vis_time)
 #endif
-#ifdef NVTX
-        call nvtxStartRange("viscous_fluxes")
-#endif
+        call StartProfRange("viscous_fluxes")
         
         !!$acc data copyin(mid_point_lele_x,mid_point_lele_y,mid_point_lele_z) &
         !!$acc copyin(xstep_i,ystep_i,zstep_i,xsteph,ysteph,zsteph) &
@@ -44,9 +42,7 @@ subroutine viscous_fluxes(dims)
         endselect
         !!$acc end data
 
-#ifdef NVTX
-        call nvtxEndRange
-#endif
+        call EndProfRange
 #ifdef TIME
         call mpi_etime(s_vis_time,t_vis_calls,t_vis_time)
 #endif
@@ -287,9 +283,7 @@ subroutine viscous_flux_2D(U,V,T,VIS,LMD,DIV,RHS)
         real(rp), parameter :: two3 = 2.0_rp/3.0_rp
         integer             :: i, j, k, fL, fR , l
 
-#ifdef NVTX
-        call nvtxStartRange("viscous_flux_2D") 
-#endif
+        call StartProfRange("viscous_flux_2D") 
 
         fL = central_fd_order/2
         fR = central_fd_order/2
@@ -477,9 +471,7 @@ subroutine viscous_flux_2D(U,V,T,VIS,LMD,DIV,RHS)
 
         !$omp end parallel do
 
-#ifdef NVTX
-        call nvtxEndRange 
-#endif
+        call EndProfRange 
 
         return
 end subroutine viscous_flux_2D
@@ -497,9 +489,7 @@ subroutine DivergencyGradient2D(U,V,VIS,DIV,RHS)
         real(rp) :: cl1, mu_, rhu_term, rhv_term, rhe_term
         integer  :: i,j,k,l,fR
 
-#ifdef NVTX
-        call nvtxStartRange("DivergencyGradient2D")
-#endif
+        call StartProfRange("DivergencyGradient2D")
         
         call mpi_share(mpi_comm_cart,type_send_prim,type_recv_prim,my_neighbour,dims, &
                 bfr_send_E, bfr_send_W, bfr_recv_E, bfr_recv_W, &
@@ -541,9 +531,7 @@ subroutine DivergencyGradient2D(U,V,VIS,DIV,RHS)
         enddo
         !$acc end parallel 
 
-#ifdef NVTX
-        call nvtxEndRange
-#endif
+        call EndProfRange
         
         return
 end subroutine DivergencyGradient2D
@@ -562,9 +550,7 @@ subroutine DivergencyGradient3D(U,V,W,VIS,DIV,RHS)
         real(rp) :: RhU_term, RhV_term, RhW_term, rhe_term
         integer  :: i,j,k,l,fR
 
-#ifdef NVTX
-        call nvtxStartRange("DivergencyGradient3D_MPI") 
-#endif
+        call StartProfRange("DivergencyGradient3D_MPI") 
 
         call mpi_share(mpi_comm_cart,type_send_prim,type_recv_prim,my_neighbour,dims, &
                 bfr_send_E, bfr_send_W, bfr_recv_E, bfr_recv_W, &
@@ -572,10 +558,8 @@ subroutine DivergencyGradient3D(U,V,W,VIS,DIV,RHS)
                 bfr_send_B, bfr_send_F, bfr_recv_B, bfr_recv_F, &
                 DIV)
 
-#ifdef NVTX
-        call nvtxEndRange 
-        call nvtxStartRange("DivergencyGradient3D") 
-#endif
+        call EndProfRange 
+        call StartProfRange("DivergencyGradient3D") 
 
         fR = central_fd_order/2
         One3MuInf = 1.0_rp/3.0_rp*mu_inf
@@ -617,9 +601,7 @@ subroutine DivergencyGradient3D(U,V,W,VIS,DIV,RHS)
         enddo
         !$acc end parallel
 
-#ifdef NVTX
-        call nvtxEndRange 
-#endif
+        call EndProfRange 
 
         return
 end subroutine DivergencyGradient3D
@@ -671,9 +653,7 @@ subroutine viscous_flux_3D_staggered(U,V,W,T,VIS,LMD,DIV,RHS)
         real(rp)               :: clxR, clxL, clyR, clyL, clzR, clzL, cl
         integer :: i,j,k,l,fR
 
-#ifdef NVTX
-        call nvtxStartRange("viscous_flux_3D_staggered") 
-#endif
+        call StartProfRange("viscous_flux_3D_staggered") 
 
         fR = central_fd_order/2
 
@@ -957,9 +937,7 @@ subroutine viscous_flux_3D_staggered(U,V,W,T,VIS,LMD,DIV,RHS)
         enddo
         !$acc end parallel
 
-#ifdef NVTX
-        call nvtxEndRange 
-#endif
+        call EndProfRange 
 
         return
 end subroutine viscous_flux_3D_staggered

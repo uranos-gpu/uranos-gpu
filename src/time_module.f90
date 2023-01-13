@@ -3,7 +3,7 @@ use parameters_module
 use storage_module
 use mpi_module
 use shock_detection_module
-use nvtx
+use profiling_module
 
 implicit none
 private
@@ -22,9 +22,7 @@ subroutine init_runge_kutta
 #ifdef TIME
         call mpi_stime(s_irk_time)
 #endif
-#ifdef NVTX
-        call nvtxStartRange("init_runge_kutta") 
-#endif
+        call StartProfRange("init_runge_kutta") 
 
         !$acc parallel default(present)
         !$acc loop gang, vector collapse(4)
@@ -42,9 +40,7 @@ subroutine init_runge_kutta
         ! init ducros sensor if the scheme is hybrid
         if(hybrid_weno) call compute_hybrid_weno_flag
 
-#ifdef NVTX
-        call nvtxEndRange
-#endif
+        call EndProfRange
 #ifdef TIME
         call mpi_etime(s_irk_time,t_irk_calls,t_irk_time)
 #endif
@@ -69,9 +65,7 @@ subroutine runge_kutta
 #ifdef TIME
         call mpi_stime(s_crk_time)
 #endif
-#ifdef NVTX
-        call nvtxStartRange("runge_kutta")
-#endif
+        call StartProfRange("runge_kutta")
 
         ! Runge - Kutta time
         time = time + Dt * c_rk(ik)
@@ -97,9 +91,7 @@ subroutine runge_kutta
 
         call check_for_NAN_values
 
-#ifdef NVTX
-        call nvtxEndRange
-#endif
+        call EndProfRange
 #ifdef TIME
         call mpi_etime(s_crk_time,t_crk_calls,t_crk_time)
 #endif
@@ -134,9 +126,7 @@ subroutine compute_dt
 #ifdef TIME
         call mpi_stime(s_cfl_time)
 #endif
-#ifdef NVTX
-        call nvtxStartRange("compute_dt") 
-#endif
+        call StartProfRange("compute_dt") 
 
         if(time+dt < tmax) then
 
@@ -213,9 +203,7 @@ subroutine compute_dt
         ! compute GLOBAL time step
         call MPI_allreduce(my_dt, dt, 1, MPI_RP, MPI_MIN, mpi_comm_cart, mpi_err)
 
-#ifdef NVTX
-        call nvtxEndRange
-#endif
+        call EndProfRange
 #ifdef TIME
         call mpi_etime(s_cfl_time,t_cfl_calls,t_cfl_time)
 #endif
@@ -338,9 +326,7 @@ subroutine last_iteration(sTime,istop)
         character(dl)            :: wrkdir
         real(rp)                 :: ActualTime, MachinTmax
 
-#ifdef NVTX
-        call nvtxStartRange("last_iteration") 
-#endif
+        call StartProfRange("last_iteration") 
 
         call getcwd(wrkdir)
         
@@ -381,9 +367,7 @@ subroutine last_iteration(sTime,istop)
 
         endselect
 
-#ifdef NVTX
-        call nvtxEndRange
-#endif
+        call EndProfRange
 
         return
 end subroutine last_iteration

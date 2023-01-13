@@ -114,7 +114,7 @@ ifeq ($(comp),pgi)
 		TIME   = -DTIME
 		OPENMP =
 	else ifeq ($(mode),gpu)
-		OPT    = -O3 -cudalib=curand -g -acc -ta=tesla#,lineinfo
+		OPT    = -O3 -g -acc -ta=tesla:deepcopy -cudalib=curand#,lineinfo
 		DEBUG  = 
 		TIME   =
 		OPENMP =
@@ -125,13 +125,13 @@ ifeq ($(comp),pgi)
 		OPENMP =
 	else ifeq ($(mode),debug_gpu_marconi100)
 		FC     = mpipgifort
-		OPT    = -O3 -acc -ta=tesla -cudalib=curand
+		OPT    = -O3 -acc -ta=tesla:deepcopy
 		DEBUG  = -Minfo=accel -g
-		TIME   = -DNVTX -lnvToolsExt -Mcuda=cuda11.0
+		TIME   = -DNVTX -cudalib=curand,nvtx3
 		OPENMP =
 	else ifeq ($(mode),marconi100)
 		FC     = mpipgifort
-		OPT    = -O3 -cudalib=curand
+		OPT    = -O3 -acc -ta=tesla:deepcopy -cudalib=curand
 		DEBUG  = 
 		TIME   = 
 		OPENMP =
@@ -322,9 +322,9 @@ $(OBJDIR)storage_module.o			: $(SRCDIR)storage_module.f90 $(addprefix $(OBJDIR),
 $(OBJDIR)time_module.o				: $(SRCDIR)time_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o shock_detection_module.o)
 $(OBJDIR)ic_module.o				: $(SRCDIR)ic_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o fluid_functions_module.o math_tools_module.o random_module.o file_module.o df_module.o)
 $(OBJDIR)init_bc_module.o		 	: $(SRCDIR)init_bc_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o ic_module.o bc_module.o rhs_module.o)
-$(OBJDIR)bc_module.o			 	: $(SRCDIR)bc_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o fluid_functions_module.o inflow_module.o real_to_integer_module.o mpi_comm_module.o)
-$(OBJDIR)rhs_module.o			 	: $(SRCDIR)rhs_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o advection_module.o viscous_module.o integration_module.o sgs_module.o)
-$(OBJDIR)advection_module.o			: $(SRCDIR)advection_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o eigen_matrix_module.o flux_module.o inflow_module.o nvtx.o)
+$(OBJDIR)bc_module.o			 	: $(SRCDIR)bc_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o fluid_functions_module.o inflow_module.o real_to_integer_module.o mpi_comm_module.o profiling_module.o)
+$(OBJDIR)rhs_module.o			 	: $(SRCDIR)rhs_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o advection_module.o viscous_module.o integration_module.o sgs_module.o profiling_module.o)
+$(OBJDIR)advection_module.o			: $(SRCDIR)advection_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o eigen_matrix_module.o flux_module.o inflow_module.o profiling_module.o)
 $(OBJDIR)eigen_matrix_module.o			: $(SRCDIR)eigen_matrix_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o)
 $(OBJDIR)shock_detection_module.o		: $(SRCDIR)shock_detection_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o fluid_functions_module.o mpi_comm_module.o)
 $(OBJDIR)viscous_module.o			: $(SRCDIR)viscous_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o nvtx.o)
