@@ -1,6 +1,5 @@
 module profiling_module
 use nvtx
-use parameters_module, only: profiler
 implicit none
 
 
@@ -11,23 +10,15 @@ subroutine StartProfRange(char)
         implicit none
         character(*), intent(in) :: char
 
-        select case(profiler)
-        case('NVTX')
-          #ifdef NVTX
-          call nvtxStartRange('char')
-          #endif
+        #ifdef NVTX
+        call nvtxStartRange(char)
+        #endif
 
-        case('rocTX')
+        #ifdef rocTX
 
-          ! ...
+        ! ...
 
-        case default
-
-          print*, 'Profiler type ', trim(profiler), ' is not implemented'
-          stop
-
-        endselect
-
+        #endif
 
         return
 end subroutine StartProfRange
@@ -36,17 +27,16 @@ end subroutine StartProfRange
 subroutine EndProfRange
         implicit none
 
-        select case(profiler)
-        case('NVTX')
-          #ifdef NVTX
-          call nvtxEndRange
-          #endif
+        #ifdef NVTX
+        call nvtxEndRange
+        #endif
 
-        case('rocTX')
+        #ifdef rocTX
 
-          ! ...
+        ! ...
 
-        endselect
+        #endif
+
 
         return
 end subroutine EndProfRange
