@@ -16,7 +16,7 @@ subroutine StartProfRange(char)
 
         #ifdef rocTX
 
-        ! ...
+        ! ... insert here rocTX calls
 
         #endif
 
@@ -33,7 +33,7 @@ subroutine EndProfRange
 
         #ifdef rocTX
 
-        ! ...
+        ! ... insert here rocTX calls
 
         #endif
 
