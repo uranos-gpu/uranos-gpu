@@ -99,16 +99,18 @@ subroutine init_mpi
         mpi_flag = .true.
 
 #ifdef _OPENACC
+
         call MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, &
-             0, MPI_INFO_NULL, local_comm,mpi_err)
-        call MPI_Comm_rank(MPI_COMM_WORLD, local_rank, mpi_err)
+             0, MPI_INFO_NULL, local_comm,mpi_err)
+        call MPI_Comm_rank(local_comm, local_rank, mpi_err)
 
-        call acc_init(acc_device_nvidia)
-        num_dev = acc_get_num_devices(acc_device_nvidia)
-        dev_id = mod(local_rank,num_dev)
-        call acc_set_device_num(dev_id,acc_device_nvidia)
+        call acc_init(acc_device_nvidia)
+        num_dev = acc_get_num_devices(acc_device_nvidia)
+        dev_id = mod(local_rank,num_dev)
+        call acc_set_device_num(dev_id,acc_device_nvidia)
 
-        print*, 'Rank ', local_rank, 'is associated to GPU', dev_id
+        print*, 'Rank ', local_rank, 'is associated to GPU', dev_id
+
 #endif
 
         call check_mpi('init_mpi',mpi_err)
