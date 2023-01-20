@@ -39,7 +39,6 @@ module parameters_module
         ! mpi_opt_level = 3 > isend/irecv + derived data types
         integer :: mpi_opt_level = 3
         logical :: cuda_aware = .false.
-        character :: profiler = 'NVTX'
 
         ! input per costruire la griglia di calcolo
         integer, dimension(3) :: cart_dims
