@@ -313,7 +313,7 @@ clean:
 $(OBJDIR)parameters_module.o			: $(SRCDIR)parameters_module.f90
 $(OBJDIR)allocate_module.o			: $(SRCDIR)allocate_module.f90 $(addprefix $(OBJDIR), parameters_module.o)
 $(OBJDIR)mpi_comm_module.o			: $(SRCDIR)mpi_comm_module.f90 $(addprefix $(OBJDIR), parameters_module.o mpi_module.o)
-$(OBJDIR)mpi_module.o				: $(SRCDIR)mpi_module.f90 $(addprefix $(OBJDIR), parameters_module.o performance_module.o file_module.o)
+$(OBJDIR)mpi_module.o				: $(SRCDIR)mpi_module.f90 $(addprefix $(OBJDIR), parameters_module.o performance_module.o file_module.o allocate_module.o)
 $(OBJDIR)input_module.o				: $(SRCDIR)input_module.f90 $(addprefix $(OBJDIR), parameters_module.o mpi_module.o real_to_integer_module.o)
 $(OBJDIR)mesh_module.o				: $(SRCDIR)mesh_module.f90 $(addprefix $(OBJDIR), parameters_module.o mpi_module.o math_tools_module.o input_module.o matrix_inversion_module.o)
 $(OBJDIR)output_module.o			: $(SRCDIR)output_module.f90 $(addprefix $(OBJDIR), parameters_module.o mpi_module.o storage_module.o norm_module.o statistics_module.o fluid_functions_module.o file_module.o integration_module.o wmles_module.o fluid_functions_module.o onlineStats.o output_tch.o)
@@ -326,7 +326,7 @@ $(OBJDIR)bc_module.o			 	: $(SRCDIR)bc_module.f90 $(addprefix $(OBJDIR), paramet
 $(OBJDIR)rhs_module.o			 	: $(SRCDIR)rhs_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o advection_module.o viscous_module.o integration_module.o sgs_module.o profiling_module.o)
 $(OBJDIR)advection_module.o			: $(SRCDIR)advection_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o eigen_matrix_module.o flux_module.o inflow_module.o profiling_module.o)
 $(OBJDIR)eigen_matrix_module.o			: $(SRCDIR)eigen_matrix_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o)
-$(OBJDIR)shock_detection_module.o		: $(SRCDIR)shock_detection_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o fluid_functions_module.o mpi_comm_module.o)
+$(OBJDIR)shock_detection_module.o		: $(SRCDIR)shock_detection_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o fluid_functions_module.o mpi_comm_module.o profiling_module.o)
 $(OBJDIR)viscous_module.o			: $(SRCDIR)viscous_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o nvtx.o)
 $(OBJDIR)flux_module.o				: $(SRCDIR)flux_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o)
 $(OBJDIR)inflow_module.o			: $(SRCDIR)inflow_module.f90 $(addprefix $(OBJDIR), storage_module.o fluid_functions_module.o math_tools_module.o df_module.o)

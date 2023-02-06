@@ -10,15 +10,15 @@ subroutine StartProfRange(char)
         implicit none
         character(*), intent(in) :: char
 
-        #ifdef NVTX
+#ifdef NVTX
         call nvtxStartRange(char)
-        #endif
+#endif
 
-        #ifdef rocTX
+#ifdef rocTX
 
         ! ... insert here rocTX calls
 
-        #endif
+#endif
 
         return
 end subroutine StartProfRange
@@ -27,15 +27,15 @@ end subroutine StartProfRange
 subroutine EndProfRange
         implicit none
 
-        #ifdef NVTX
+#ifdef NVTX
         call nvtxEndRange
-        #endif
+#endif
 
-        #ifdef rocTX
+#ifdef rocTX
 
         ! ... insert here rocTX calls
 
-        #endif
+#endif
 
 
         return
