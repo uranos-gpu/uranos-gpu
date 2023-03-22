@@ -1,4 +1,5 @@
-[![ALT](images/logo4_2.png "paper")][about.gitlab.com]
+
+[![Semantic description of image](images/logo4_2.png "Hello World")*My caption*][about.gitlab.com]
 
 # Reference
 
