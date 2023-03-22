@@ -1,4 +1,4 @@
-![Semantic description of image](/source/images/log4_2.png)
+![ALT](source/images/log4_2.png)
 
 # Reference
 
