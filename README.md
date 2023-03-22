@@ -1,6 +1,20 @@
 # References
 
-De Vanna, F., Avanzi, F., Cogo, M., Sandrin, S., Bettencourt, M., Picano, F., Benini, E. (2022) URANOS: a GPU accelerated Navier-Stokes solver for compressible wall-bounded flows, under review Computer Physics Communications.
+De Vanna, F., Avanzi, F., Cogo, M., Sandrin, S., Bettencourt, M., Picano, F., & Benini, E. (2023). URANOS: A GPU accelerated Navier-Stokes solver for compressible wall-bounded flows. Computer Physics Communications, 108717, doi: https://doi.org/10.1016/j.cpc.2023.108717
+
+# Scientific papers obtained with URANOS
+
+- Francesco De Vanna, Francesco Picano, Ernesto Benini, A sharp-interface immersed boundary method for moving objects in compressible viscous flows, Computers & Fluids, 2020, https://doi.org/10.1016/j.compfluid.2019.104415
+
+- Francesco De Vanna, Alberto Benato, Francesco Picano, Ernesto Benini, High order conservative formulation of viscous terms for variable viscosity flows, Acta Mechanica, 2021, https://doi.org/10.1007/s00707-021-02937-2
+
+- Francesco De Vanna, Michele Cogo, Matteo Bernardini, Francesco Picano, Ernesto Benini, Unified wall-resolved and wall-modelled method for large-eddy simulations of com- pressible wall-bounded flows, Physical Review Fluids, 2021, https://doi.org/10.1103/PhysRevFluids.6.034614
+
+- Francesco De Vanna, Francesco Picano, Ernesto Benini, Mark Kenneth Quinn, Large- Eddy-Simulations of the unsteady behaviour of a hypersonic intake at Mach 5, AIAA Journal, 2021, https://doi.org/10.2514/1.J060160
+
+- Francesco De Vanna, Matteo Bernardini, Francesco Picano, Ernesto Benini, Wall-modeled LES of shock-wave/boundary layer interaction, International Journal of Heat and Fluid Flow, 2022, https://doi.org/10.1016/j.ijheatfluidflow.2022.109071
+
+- Francesco De Vanna, Giacomo Baldan, Francesco Picano, and Ernesto Benini, Effect of convective schemes in wall-resolved and wall-modeled LES of compressible wall turbulence, Computer & Fluids, 2022, https://doi.org/10.1016/j.compfluid.2022.105710
 
 
 
