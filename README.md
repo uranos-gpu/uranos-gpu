@@ -1,4 +1,4 @@
-![ALT](images/logo4_2.png)
+[![ALT](images/logo4_2.png)][about.gitlab.com]
 
 # Reference
 
