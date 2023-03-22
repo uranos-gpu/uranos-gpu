@@ -1,4 +1,6 @@
-# References
+# Reference
+
+Please, while using URANOS for you computations cite the following paper:
 
 De Vanna, F., Avanzi, F., Cogo, M., Sandrin, S., Bettencourt, M., Picano, F., & Benini, E. (2023). URANOS: A GPU accelerated Navier-Stokes solver for compressible wall-bounded flows. Computer Physics Communications, 108717, doi: https://doi.org/10.1016/j.cpc.2023.108717
 
