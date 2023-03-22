@@ -1,4 +1,4 @@
-![ALT](./source/images/log4_2.png)
+![ALT](source/images/logo4_2.png)
 
 # Reference
 
