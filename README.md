@@ -1,3 +1,5 @@
+![Semantic description of image](/source/images/log4_2.png)
+
 # Reference
 
 Please, while using URANOS for you computations cite the following paper:
