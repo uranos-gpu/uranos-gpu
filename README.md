@@ -1,4 +1,5 @@
-![Semantic description of image](images/logo4_2.png)
+#![Semantic description of image](images/logo4_2.png)
+![](images/logo4_2.svg){width=100%}
 
 # Reference
 
