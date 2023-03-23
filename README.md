@@ -1,4 +1,4 @@
-![Semantic description of image](images/logo4.svg)
+![Semantic description of image](images/logo4_2.png)
 
 # Reference
 
