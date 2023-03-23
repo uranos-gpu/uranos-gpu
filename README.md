@@ -1,4 +1,4 @@
-![](images/logo4.svg){width=100%}
+![](images/logo5.svg){width=100%}
 
 # Reference
 
