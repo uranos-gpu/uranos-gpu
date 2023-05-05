@@ -49,7 +49,7 @@ make -j comp=gnu mode=debug
 compiles the code with the gnu compiler using the debugging flags.
 
 ```
-make -j comp=pgi mode=gnu
+make -j comp=pgi mode=gpu
 ```
 
 !CAUTION! Each cluster requires specific module to be loaded before the compiling process. 
