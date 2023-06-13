@@ -2231,8 +2231,12 @@ subroutine init_TBLNoise(status)
 
         ! x correlation via Castro equation
         dx      = gbl_min_step(1)
-        exppar1 = -0.5_rp*pi*dx/DF%xlen
-        exppar2 = -pi*dx/DF%xlen
+        exppar1(1) = -0.5_rp*pi*dx/DF_xlen1
+        exppar1(2) = -0.5_rp*pi*dx/DF_xlen2
+        exppar1(3) = -0.5_rp*pi*dx/DF_xlen3
+        exppar2(1) = -pi*dx/DF_xlen1
+        exppar2(2) = -pi*dx/DF_xlen2
+        exppar2(3) = -pi*dx/DF_xlen3
         par1    = exp(exppar1)
         par2    = sqrt(1.0_rp-exp(exppar2))
 
