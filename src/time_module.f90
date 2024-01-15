@@ -19,14 +19,12 @@ subroutine init_runge_kutta
 ! ------------------------------------------------------------------
         implicit none
         integer :: i, j, k, l
-#ifdef TIME
-        call mpi_stime(s_irk_time)
-#endif
+
         call StartProfRange("init_runge_kutta") 
 
         !$acc parallel default(present)
         !$acc loop gang, vector collapse(4)
-        do          l = 1,eqs
+        do          l = 1,5
            do       k = lbz,ubz
               do    j = lby,uby
                  do i = lbx,ubx
@@ -41,10 +39,7 @@ subroutine init_runge_kutta
         if(hybrid_weno) call compute_hybrid_weno_flag
 
         call EndProfRange
-#ifdef TIME
-        call mpi_etime(s_irk_time,t_irk_calls,t_irk_time)
-#endif
-        
+
 return
 end subroutine init_runge_kutta
 
@@ -60,11 +55,8 @@ subroutine runge_kutta
 ! ----------------------------------------------------------------------------------------
         implicit none
         real(rp) :: aik, bik
-        integer  :: i,j,k,n,l
+        integer  :: i,j,k,l
 
-#ifdef TIME
-        call mpi_stime(s_crk_time)
-#endif
         call StartProfRange("runge_kutta")
 
         ! Runge - Kutta time
@@ -74,10 +66,9 @@ subroutine runge_kutta
         aik = a_rk(ik)
         bik = b_rk(ik)
 
-        ! Runge - Kutta scheme
         !$acc parallel default(present)
         !$acc loop gang, vector collapse(4)
-        do          l = 1,eqs
+        do          l = 1,5
            do       k = sz,ez
               do    j = sy,ey
                  do i = sx,ex
@@ -92,9 +83,6 @@ subroutine runge_kutta
         call check_for_NAN_values
 
         call EndProfRange
-#ifdef TIME
-        call mpi_etime(s_crk_time,t_crk_calls,t_crk_time)
-#endif
         
 return
 end subroutine runge_kutta
@@ -123,9 +111,6 @@ subroutine compute_dt
         real(rp) :: ru, rv, rw, ir, T_, c_
         integer  :: i,j,k
 
-#ifdef TIME
-        call mpi_stime(s_cfl_time)
-#endif
         call StartProfRange("compute_dt") 
 
         if(time+dt < tmax) then
@@ -204,9 +189,6 @@ subroutine compute_dt
         call MPI_allreduce(my_dt, dt, 1, MPI_RP, MPI_MIN, mpi_comm_cart, mpi_err)
 
         call EndProfRange
-#ifdef TIME
-        call mpi_etime(s_cfl_time,t_cfl_calls,t_cfl_time)
-#endif
 
         return
 end subroutine compute_dt
@@ -319,10 +301,13 @@ subroutine last_iteration(sTime,istop)
         real(rp), intent(in)  :: sTime
         integer , intent(out) :: iStop
         
-        character(dl), parameter :: marconi100 = '/m100/home/userexternal/fdevanna/uranos_mpi'
+        character(dl), parameter :: marconi100u01 = '/m100/home/userexternal/fdevanna/uranos_mpi'
+        character(dl), parameter :: marconi100u02 = '/m100_scratch/userexternal/gbaldan0/uranos_mpi'
         character(dl), parameter :: sapienza   = '/scratch/mbernard/uranos_mpi'
         character(dl), parameter :: irene      = '/ccc/scratch/cont005/ra0111/devannaf/uranos_mpi'
         character(dl), parameter :: galileo100 = '/g100_work/IscrC_iWLES/uranosToGPU/fdevanna/uranos_mpi'
+        character(dl), parameter :: leonardou01= '/leonardo_scratch/large/userexternal/fdevanna/uranos_mpi'
+        character(dl), parameter :: leonardou02= '/path/to/user/folder'
         character(dl)            :: wrkdir
         real(rp)                 :: ActualTime, MachinTmax
 
@@ -332,7 +317,8 @@ subroutine last_iteration(sTime,istop)
         
         selectcase(trim(wrkdir))
 
-          case(trim(marconi100), trim(irene))
+          case(trim(marconi100u01), trim(marconi100u02), trim(irene), &
+               trim(leonardou01), trim(leonardou02))
 
             ActualTime = MPI_WTIME()
             MachinTmax = 23.00_rp*3600.0_rp

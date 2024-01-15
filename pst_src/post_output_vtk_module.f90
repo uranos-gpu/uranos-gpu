@@ -136,7 +136,6 @@ subroutine print_field_vtk(lo,up,vtkFile)
         implicit none
         integer, dimension(3), intent(in) :: lo, up
         type(FileType)       , intent(in) :: vtkFile
-        integer             :: n
 
 
         if(density)             call scalarVTK(vtkFile, lo,up,'Density'    , phi,1)
@@ -165,7 +164,7 @@ subroutine print_field_vtk(lo,up,vtkFile)
         if(vorticity)           call scalarVTK(vtkFile, lo,up,'Vorticity_z'        , vor_z)
         if(vorticity_magnitude) call scalarVTK(vtkFile, lo,up,'Vorticity_magnitude', abs_vor)
 
-        if(hybrid_weno)         call scalarVTK(vtkFile, lo,up,'Hybrid_weno_flag', weno%flag)
+        if(hybrid_weno)         call scalarVTK(vtkFile, lo,up,'Hybrid_weno_flag', weno_flag)
 
         if(qcriterion)          call scalarVTK(vtkFile, lo,up,'Q_Criterion', q_criterion)
 
@@ -218,9 +217,6 @@ subroutine print_field_vtk(lo,up,vtkFile)
 
         return
 end subroutine print_field_vtk
-
-
-
 
 
 

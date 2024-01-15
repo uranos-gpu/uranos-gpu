@@ -2,37 +2,49 @@ module df_module
 use parameters_module, only: rp
 use mpi_module, only: sy,ey,sz,ez
 use random_module
+use profiling_module
 #ifdef _OPENACC
+#ifdef NVIDIA
 use curand
+use curand_device
 use openacc_curand
+#endif
+#ifdef AMD
+use iso_c_binding
+use hipfort_rocrand
+#endif
 #endif
 
 implicit none
 
-type dfData
-  integer                :: N      = 60 !30                !< filter width
-  real(rp), dimension(3) :: dimMin = (/0.05_rp, 0.05_rp, 0.05_rp/)  !< filter min Length
-  real(rp), dimension(3) :: dimMax = (/0.25_rp, 0.20_rp, 0.25_rp/)  !< filter max Length
-        
-  real(rp), dimension(:,:)  , allocatable :: ylen
-  real(rp), dimension(:,:)  , allocatable :: zlen
-  real(rp), dimension(:,:,:), allocatable :: By
-  real(rp), dimension(:,:,:), allocatable :: Bz
+integer, parameter    , public :: DF_N      = 60 !30                !< filter width
+real(rp), dimension(3), public :: DF_dimMin = (/0.05_rp, 0.05_rp, 0.05_rp/)  !< filter min Length
+real(rp), dimension(3), public :: DF_dimMax = (/0.25_rp, 0.20_rp, 0.25_rp/)  !< filter max Length
 
-  real(rp), dimension(:,:,:)  , allocatable :: RnD2D
-  real(rp), dimension(:,:,:,:), allocatable :: RnD3D
-  real(rp), dimension(:,:,:)  , allocatable :: LundMatrix
-  real(rp), dimension(:,:,:)  , allocatable :: fy
-endtype DfData
+real(rp), dimension(:,:)  , allocatable, public :: DF_ylen
+real(rp), dimension(:,:)  , allocatable, public :: DF_zlen
+real(rp), dimension(:,:,:), allocatable, public :: DF_By
+real(rp), dimension(:,:,:), allocatable, public :: DF_Bz
+
+real(rp), dimension(:,:,:)  , allocatable, public :: DF_RnD2D
+real(rp), dimension(:,:,:,:), allocatable, public :: DF_RnD3D
+real(rp), dimension(:,:,:)  , allocatable, public :: DF_LundMatrix
+real(rp), dimension(:,:,:)  , allocatable, public :: DF_fy
 
 real(rp) :: DF_xlen1 = 0.50_rp
 real(rp) :: DF_xlen2 = 0.15_rp
 real(rp) :: DF_xlen3 = 0.15_rp
-  
-type(DfData), public :: DF
+
+#ifdef AMD
+real(c_double), dimension(:), allocatable, public :: rnd2Dnum
+type(c_ptr)                              , public :: rnd2Dnumptr
+integer(c_size_t)                        , public :: rnd2Dnumsize
+integer       , dimension(3)             , public :: rnd2Dnumshape
+#endif
+
 contains
 
-subroutine DFInputData_TBL(ReTau,Mach,Prandtl,y_gbl,ny,DF)
+subroutine DFInputData_TBL(ReTau,Mach,Prandtl,y_gbl,ny)
         
         use parameters_module     , only: data_dir, Trat
         use mpi_module            , only: rank
@@ -47,8 +59,7 @@ subroutine DFInputData_TBL(ReTau,Mach,Prandtl,y_gbl,ny,DF)
         real(rp), dimension(:), allocatable, intent(in)    :: y_gbl
         real(rp)                           , intent(in)    :: Mach, Prandtl, ReTau
         integer                            , intent(in)    :: ny
-        type(DfData)                       , intent(inout) :: DF
-        
+
         ! local declarations
         character(50), dimension(:)    , allocatable :: dtFile
         real(rp)     , dimension(:)    , allocatable :: DtReth
@@ -208,10 +219,10 @@ subroutine DFInputData_TBL(ReTau,Mach,Prandtl,y_gbl,ny,DF)
         !
         ! === filling the lund Matrix inside every proc
         !
-        allocate(DF%LundMatrix(3,3,0:ny),stat=err)
+        allocate(DF_LundMatrix(3,3,0:ny),stat=err)
         if(err .ne. 0) stop ' Allocation error of Lunds Matrix'
 
-        DF%LundMatrix = 0.0_rp
+        DF_LundMatrix = 0.0_rp
         do j = 0,ny
         
           if(ReyStress(1,1,j) < 1.0E-08_rp) then
@@ -232,12 +243,12 @@ subroutine DFInputData_TBL(ReTau,Mach,Prandtl,y_gbl,ny,DF)
 
           endif
         
-          DF%LundMatrix(:,:,j) = a(:,:)
+          DF_LundMatrix(:,:,j) = a(:,:)
 
         enddo
 
-        allocate(DF%fy(3, sy-DF%N:ey+DF%N, sz-DF%N:ez+DF%N), stat = err)
-        if(err .ne. 0) stop ' Allocation error of DF%fy'
+        allocate(DF_fy(3, sy-DF_N:ey+DF_N, sz-DF_N:ez+DF_N), stat = err)
+        if(err .ne. 0) stop ' Allocation error of DF_fy'
 
 #ifdef DEBUG
         ! write input Reynolds stresses
@@ -255,12 +266,12 @@ subroutine DFInputData_TBL(ReTau,Mach,Prandtl,y_gbl,ny,DF)
         LundFile%dir  = trim(data_dir)//'/DF_INPUTS'
         call OpenNewFile(lundFile,0)
         do j = 0,ny
-           write(lundFile%unit,'(7e18.6)') y_gbl(j), DF%LundMatrix(1,1,j), &
-                                        DF%LundMatrix(2,2,j), &
-                                        DF%LundMatrix(3,3,j), &
-                                        DF%LundMatrix(2,1,j), &
-                                        DF%LundMatrix(3,1,j), &
-                                        DF%LundMatrix(3,2,j)
+           write(lundFile%unit,'(7e18.6)') y_gbl(j), DF_LundMatrix(1,1,j), &
+                                        DF_LundMatrix(2,2,j), &
+                                        DF_LundMatrix(3,3,j), &
+                                        DF_LundMatrix(2,1,j), &
+                                        DF_LundMatrix(3,1,j), &
+                                        DF_LundMatrix(3,2,j)
         enddo
         call CloseFile(LundFile)
 #endif
@@ -271,28 +282,30 @@ subroutine DFInputData_TBL(ReTau,Mach,Prandtl,y_gbl,ny,DF)
 end subroutine DFInputData_TBL
 
 
-subroutine DFInputData_HTURB(y_gbl,ny,DF)
+subroutine DFInputData_HTURB(y_gbl,ny)
 
 #ifdef DEBUG
         use parameters_module, only: data_dir
         use mpi_module       , only: rank
         use FileModule
 #endif
+        use parameters_module, only: u_inf, turbulent_intensity
 
         implicit none
         real(rp), dimension(:), allocatable, intent(in)    :: y_gbl
         integer                            , intent(in)    :: ny
-        type(DfData)                       , intent(inout) :: DF
 
         ! local declarations
         real(rp), dimension(:,:,:), allocatable :: ReyStress
         real(rp), dimension(3,3)                :: a
 
-        real(rp), parameter :: trb_int = 1.0E-4_rp
-        integer             :: j, err = 0
+        real(rp) :: trb_int
+        integer  :: j, err = 0
 #ifdef DEBUG
         type(FileType) :: DF_inputs, LundFile
 #endif
+
+        trb_int = turbulent_intensity * u_inf**2
 
         !
         ! ==== compute Reynolds stresses
@@ -311,10 +324,10 @@ subroutine DFInputData_HTURB(y_gbl,ny,DF)
         !
         ! ==== filling lund matrix
         !
-        allocate(DF%LundMatrix(3,3,0:ny), stat = err)
+        allocate(DF_LundMatrix(3,3,0:ny), stat = err)
         if(err .ne. 0) stop ' Allocation error in DFInputData_HTURB'
 
-        DF%LundMatrix = 0.0_rp
+        DF_LundMatrix = 0.0_rp
         do j = 0,ny
                 
            a(1,1) = sqrt(ReyStress(1,1,j))
@@ -329,7 +342,7 @@ subroutine DFInputData_HTURB(y_gbl,ny,DF)
            a(3,2) = (ReyStress(3,2,j) - a(2,1)*a(3,1))/a(2,2)
            a(3,3) = sqrt(ReyStress(3,3,j) - a(3,1)**2 - a(3,2)**2)
 
-           DF%LundMAtrix(:,:,j) = a(:,:)
+           DF_LundMAtrix(:,:,j) = a(:,:)
 
         enddo
 
@@ -349,40 +362,41 @@ subroutine DFInputData_HTURB(y_gbl,ny,DF)
         LundFile%dir  = trim(data_dir)//'/DF_INPUTS'
         call OpenNewFile(lundFile,0)
         do j = 0,ny
-           write(lundFile%unit,'(7e18.6)') y_gbl(j), DF%LundMatrix(1,1,j), &
-                                        DF%LundMatrix(2,2,j), &
-                                        DF%LundMatrix(3,3,j), &
-                                        DF%LundMatrix(2,1,j), &
-                                        DF%LundMatrix(3,1,j), &
-                                        DF%LundMatrix(3,2,j)
+           write(lundFile%unit,'(7e18.6)') y_gbl(j), DF_LundMatrix(1,1,j), &
+                                        DF_LundMatrix(2,2,j), &
+                                        DF_LundMatrix(3,3,j), &
+                                        DF_LundMatrix(2,1,j), &
+                                        DF_LundMatrix(3,1,j), &
+                                        DF_LundMatrix(3,2,j)
         enddo
         call CloseFile(LundFile)
 #endif
         
         deallocate(ReyStress)
 
+        allocate(DF_fy(3, sy-DF_N:ey+DF_N, sz-DF_N:ez+DF_N), stat = err)
+        if(err .ne. 0) stop ' Allocation error of DF_fy'
+
         return
 end subroutine DFInputData_HTURB
 
 
-subroutine DFRandomField2D(ny,nz,DF)
+subroutine DFRandomField2D(ny,nz)
 
         use random_module
+#ifdef AMD
+        use iso_c_binding
+#endif
 
         implicit none
-        type(DfData), intent(inout) :: DF
         integer     , intent(in)    :: ny,nz
         
         ! local 
         real(rp)  :: mean_x, mean_y, mean_z
         real(rp)  :: rmsq_x, rmsq_y, rmsq_z
         real(rp)  :: rms_x, rms_y, rms_z
-        integer   :: m,j,k, l, DF_N
+        integer   :: m,i,j,k,l
         real(rp)  :: irNz
-
-     !   integer :: err = 0, sz
-     !   integer, dimension(3) :: dim_
-     !   real(rp) :: mean, sdev
 
         real(rp), parameter :: s  = 0.449871_rp
         real(rp), parameter :: t  = -0.386595_rp
@@ -393,34 +407,45 @@ subroutine DFRandomField2D(ny,nz,DF)
         real(rp), parameter :: r2 = 0.27846_rp
         real(rp)            :: u, v, x, y, q
 
-        DF_N = DF%N
+#ifndef AMD
+        real(rp), parameter       :: mean = 0.0_rp, sdev = 1.0_rp
+#else
+        real(c_double), parameter :: mean = 0.0, sdev = 1.0
+#endif
+        integer, dimension(3) :: dim_
+        integer(8)            :: err, sz
+
+        call StartProfRange('DFRandomField2D')
 
 #ifdef _OPENACC
+#ifdef NVIDIA
+        dim_ = shape(DF_Rnd2D)
+        sz = dim_(1)*dim_(2)*dim_(3)
 
-        !$acc parallel num_gangs(1) vector_length(1) &
-        !$acc default(present)
-        !$acc loop collapse(3) 
-        do       k = 1,nz
-           do    j = 1-DF_N,ny+DF_N
-              do m = 1,3
-                      
-                 DF%Rnd2D(m,j,k) = curand_normal(cudaState)
+        !$acc host_data use_device(DF_Rnd2D)
+        err = curandGenerateNormalDouble(generator, DF_Rnd2D, sz, mean, sdev)
+        if (err.ne.0) print*,"Error in curandGenerateNormalDouble: ", err
+        !$acc end host_data
+#endif
+#ifdef AMD
+        !$acc host_data use_device(rnd2Dnum, rnd2Dnumptr)
+        rnd2Dnumptr = c_loc(rnd2Dnum(1))
+        
+        err = rocrand_generate_normal_double(generator, rnd2Dnumptr, rnd2Dnumsize, mean, sdev)
+        if (err.ne.0) print*,"Error in rocrand_generate_normal_double: ", err
+        !$acc end host_data
 
-              enddo
-           enddo
+        !$acc parallel default(present)
+        !$acc loop gang, vector collapse(3)
+        do k=1,rnd2Dnumshape(3)
+          do j=1,rnd2Dnumshape(2)
+            do i=1,rnd2Dnumshape(1)
+               DF_Rnd2D(i,j-DF_N,k-DF_N) = rnd2Dnum(i+(j-1)*rnd2Dnumshape(1)+(k-1)*rnd2Dnumshape(1)*rnd2Dnumshape(2))
+            enddo
+          enddo
         enddo
         !$acc end parallel
-
-     !   dim_ = shape(DF%Rnd2D)
-     !   sz = dim_(1)*dim_(2)*dim_(3)
-     !   mean = 0.0_rp
-     !   sdev = 1.0_rp
-     !   
-     !   !$acc host_data use_device(DF%Rnd2D)
-     !   err =curandGenerateNormalDouble(generator, DF%Rnd2D, sz, mean,sdev)
-     !   !$acc end host_data
-
-        
+#endif
 #else
 
         ! === compute random field
@@ -446,7 +471,7 @@ subroutine DFRandomField2D(ny,nz,DF)
                    if (v**2 < -4.0_rp*LOG(u)*u**2) exit
                  enddo
 
-                 DF%Rnd2D(m,j,k) = v/u
+                 DF_Rnd2D(m,j,k) = v/u
 
               enddo
            enddo
@@ -471,13 +496,13 @@ subroutine DFRandomField2D(ny,nz,DF)
 
            !$acc loop seq
            do k = 1,nz
-              mean_x = mean_x + DF%Rnd2D(1,j,k)
-              mean_y = mean_y + DF%Rnd2D(2,j,k)
-              mean_z = mean_z + DF%Rnd2D(3,j,k)
+              mean_x = mean_x + DF_Rnd2D(1,j,k)
+              mean_y = mean_y + DF_Rnd2D(2,j,k)
+              mean_z = mean_z + DF_Rnd2D(3,j,k)
               !
-              rmsq_x = rmsq_x + DF%Rnd2D(1,j,k)**2
-              rmsq_y = rmsq_y + DF%Rnd2D(2,j,k)**2
-              rmsq_z = rmsq_z + DF%Rnd2D(3,j,k)**2
+              rmsq_x = rmsq_x + DF_Rnd2D(1,j,k)**2
+              rmsq_y = rmsq_y + DF_Rnd2D(2,j,k)**2
+              rmsq_z = rmsq_z + DF_Rnd2D(3,j,k)**2
            enddo
            mean_x = mean_x*irNz
            mean_y = mean_y*irNz
@@ -493,9 +518,9 @@ subroutine DFRandomField2D(ny,nz,DF)
         
            !$acc loop seq
            do k = 1,nz
-              DF%Rnd2D(1,j,k) = (DF%Rnd2D(1,j,k) - mean_x)/rms_x
-              DF%Rnd2D(2,j,k) = (DF%Rnd2D(2,j,k) - mean_y)/rms_y
-              DF%Rnd2D(3,j,k) = (DF%Rnd2D(3,j,k) - mean_z)/rms_z
+              DF_Rnd2D(1,j,k) = (DF_Rnd2D(1,j,k) - mean_x)/rms_x
+              DF_Rnd2D(2,j,k) = (DF_Rnd2D(2,j,k) - mean_y)/rms_y
+              DF_Rnd2D(3,j,k) = (DF_Rnd2D(3,j,k) - mean_z)/rms_z
            enddo
         enddo
         !$acc end parallel
@@ -507,12 +532,14 @@ subroutine DFRandomField2D(ny,nz,DF)
         do       k = 1,DF_N
            do    j = 1-DF_N,ny+DF_N
               do l = 1,3
-                 DF%Rnd2D(l,j,nz+k) = DF%Rnd2D(l,j,k)
-                 DF%Rnd2D(l,j,1 -k) = DF%Rnd2D(l,j,nz+1-k)
+                 DF_Rnd2D(l,j,nz+k) = DF_Rnd2D(l,j,k)
+                 DF_Rnd2D(l,j,1 -k) = DF_Rnd2D(l,j,nz+1-k)
               enddo
            enddo
         enddo
         !$acc end parallel
+
+        call EndProfRange
 
         return
 end subroutine DFRandomField2D
@@ -524,7 +551,7 @@ end subroutine DFRandomField2D
 
 
 
-subroutine DFRandomField3D(nx,ny,nz,gn,DF)
+subroutine DFRandomField3D(nx,ny,nz,gn)
 
         use random_module, only: random_normal
 #ifdef DEBUG
@@ -534,7 +561,6 @@ subroutine DFRandomField3D(nx,ny,nz,gn,DF)
 #endif
 
         implicit none
-        type(DfData), intent(inout) :: DF
         integer     , intent(in)    :: nx, ny, nz,gn
         
         ! local 
@@ -548,12 +574,12 @@ subroutine DFRandomField3D(nx,ny,nz,gn,DF)
         ! === compute random field
         !
         do k = 1,nz
-           do j = 1-DF%N,ny+DF%N
+           do j = 1-DF_N,ny+DF_N
               do i = 1-gn,nx+gn+1
                  do m = 1,3
 
                     call random_normal(r)
-                    DF%Rnd3D(m,i,j,k) = r
+                    DF_Rnd3D(m,i,j,k) = r
 
                  enddo
               enddo
@@ -563,14 +589,14 @@ subroutine DFRandomField3D(nx,ny,nz,gn,DF)
         ! === remove the mean computed spanwise
         !
         do i = 1-gn,nx+gn+1
-           do j = 1-DF%N,ny+DF%N
+           do j = 1-DF_N,ny+DF_N
 
               mean = 0.0_rp
               rmsq = 0.0_rp
               do k = 1,nz
                  do m = 1,3
-                    mean(m) = mean(m) + DF%Rnd3D(m,i,j,k)
-                    rmsq(m) = rmsq(m) + DF%Rnd3D(m,i,j,k)**2
+                    mean(m) = mean(m) + DF_Rnd3D(m,i,j,k)
+                    rmsq(m) = rmsq(m) + DF_Rnd3D(m,i,j,k)**2
                  enddo
               enddo
               mean = mean/real(nz,rp)
@@ -579,7 +605,7 @@ subroutine DFRandomField3D(nx,ny,nz,gn,DF)
 
               do k = 1,nz
                  do m = 1,3
-                    DF%Rnd3D(m,i,j,k) = (DF%Rnd3D(m,i,j,k) - mean(m))/rms(m)
+                    DF_Rnd3D(m,i,j,k) = (DF_Rnd3D(m,i,j,k) - mean(m))/rms(m)
                  enddo
               enddo
            enddo
@@ -587,12 +613,12 @@ subroutine DFRandomField3D(nx,ny,nz,gn,DF)
         !
         ! === apply periodicity spanwise
         !
-        do k = 1,DF%N
-           do j = 1-DF%N,ny+DF%N
+        do k = 1,DF_N
+           do j = 1-DF_N,ny+DF_N
               do i = 1-GN,nx+gn+1
                  do m = 1,3
-                    DF%Rnd3D(m,i,j,nz+k) = DF%Rnd3D(m,i,j,k)
-                    DF%Rnd3D(m,i,j,1 -k) = DF%Rnd3D(m,i,j,nz+1-k)
+                    DF_Rnd3D(m,i,j,nz+k) = DF_Rnd3D(m,i,j,k)
+                    DF_Rnd3D(m,i,j,1 -k) = DF_Rnd3D(m,i,j,nz+1-k)
                  enddo
               enddo
            enddo
@@ -602,8 +628,8 @@ subroutine DFRandomField3D(nx,ny,nz,gn,DF)
         randomField3D%name = 'randomField_'//trim(str(rank))
         randomField3D%dir  = trim(data_dir)//'/INIT_RANDOM_FIELD'
         call OpenNewFile(randomField3D,0)
-        do k =1-DF%N,nz+DF%N
-           write(randomField3D%unit,*) k, DF%Rnd3D(1,1,1,k)
+        do k =1-DF_N,nz+DF_N
+           write(randomField3D%unit,*) k, DF_Rnd3D(1,1,1,k)
         enddo
         call CloseFile(randomField3D)
 #endif
@@ -621,7 +647,7 @@ end subroutine DFRandomField3D
 
 
 
-subroutine DFIntegralLenght_TBL(y_gbl,ny,DF)
+subroutine DFIntegralLenght_TBL(y_gbl,ny)
 ! ------------------------------------------------------------------------------------------
 !       This subroutine compute the integral lenght scales for the digital filtering process
 !
@@ -637,7 +663,6 @@ subroutine DFIntegralLenght_TBL(y_gbl,ny,DF)
 #endif
 
         implicit none
-        type(dfData)                       , intent(inout) :: DF
         real(rp), dimension(:), allocatable, intent(in)    :: y_gbl
         integer                            , intent(in)    :: ny
 
@@ -662,15 +687,15 @@ subroutine DFIntegralLenght_TBL(y_gbl,ny,DF)
 
         do j=0,ny
            ftany = 0.5_rp*(1.0_rp+tanh((y_gbl(j)-0.2_rp)/0.03_rp)) ! blending function
-           DF%zlen(1,j)  = zlenin_u+ftany*(zlenou_u-zlenin_u)
-           DF%zlen(2,j)  = zlenin_v+ftany*(zlenou_v-zlenin_v)
-           DF%zlen(3,j)  = zlenin_w+ftany*(zlenou_w-zlenin_w)
+           DF_zlen(1,j)  = zlenin_u+ftany*(zlenou_u-zlenin_u)
+           DF_zlen(2,j)  = zlenin_v+ftany*(zlenou_v-zlenin_v)
+           DF_zlen(3,j)  = zlenin_w+ftany*(zlenou_w-zlenin_w)
 
-           !DF%zlen(1,j) = min(DF%dimMin(1) + (y_gbl(j)/0.3_rp)*0.20_rp,DF%dimMax(1))
-           !DF%zlen(2,j) = min(DF%dimMin(2) + (y_gbl(j)/0.3_rp)*0.15_rp,DF%dimMax(2))
-           !DF%zlen(3,j) = min(DF%dimMin(3) + (y_gbl(j)/0.3_rp)*0.20_rp,DF%dimMax(3))
+           !DF_zlen(1,j) = min(DF_dimMin(1) + (y_gbl(j)/0.3_rp)*0.20_rp,DF_dimMax(1))
+           !DF_zlen(2,j) = min(DF_dimMin(2) + (y_gbl(j)/0.3_rp)*0.15_rp,DF_dimMax(2))
+           !DF_zlen(3,j) = min(DF_dimMin(3) + (y_gbl(j)/0.3_rp)*0.20_rp,DF_dimMax(3))
         enddo
-        DF%ylen = 0.7_rp*DF%zlen
+        DF_ylen = 0.7_rp*DF_zlen
 
         DF_xlen1 = 0.80_rp
         DF_xlen2 = 0.30_rp
@@ -681,7 +706,7 @@ subroutine DFIntegralLenght_TBL(y_gbl,ny,DF)
         intLenFile%dir  = trim(data_dir)//'/DF_INTEGRAL_LENGTH'
         call OpenNewFile(intLenFile,0)
         do j = 0,ny
-           write(intLenFile%unit,*) y_gbl(j), Df%ylen(:,j), Df%zlen(:,j)
+           write(intLenFile%unit,*) y_gbl(j), DF_ylen(:,j), DF_zlen(:,j)
         enddo
         call CloseFile(intLenFile)
 #endif
@@ -691,20 +716,19 @@ end subroutine DFIntegralLenght_TBL
 
 
 
-subroutine DFIntegralLenght_HTURB(Lz,DF)
+subroutine DFIntegralLenght_HTURB(Lz)
         implicit none
-        type(dfData), intent(inout) :: DF
         real(rp)    , intent(in)    :: Lz
 
-        DF%ylen = 0.25_rp*Lz
-        DF%zlen = 0.25_rp*Lz
+        DF_ylen = 0.25_rp*Lz
+        DF_zlen = 0.25_rp*Lz
         
         return
 end subroutine DFIntegralLenght_HTURB
 
 
 
-subroutine DFCoefficients(y_gbl,ny,gbl_min_step,DF)
+subroutine DFCoefficients(y_gbl,ny,gbl_min_step)
 ! -----------------------------------------------------------------------
 !
 !       Computation of the Digital filters exponetial coefficients
@@ -721,7 +745,6 @@ subroutine DFCoefficients(y_gbl,ny,gbl_min_step,DF)
         real(rp)    , dimension(:), allocatable, intent(in)    :: y_gbl
         real(rp)    , dimension(:)             , intent(in)    :: gbl_min_step
         integer                                , intent(in)    :: ny
-        type(dfData)                           , intent(inout) :: DF
 
         ! local declarations
         real(rp), dimension(3) :: sumby, sumbz
@@ -739,24 +762,24 @@ subroutine DFCoefficients(y_gbl,ny,gbl_min_step,DF)
 
            ! === y filter coefficients
            sumby = 0.0_rp
-           do jj = -DF%N,DF%N
-              DF%By(:,jj,j) = exp(-pi*abs(jj)/(DF%yLen(:,j)/dy))
+           do jj = -DF_N,DF_N
+              DF_By(:,jj,j) = exp(-pi*abs(jj)/(DF_yLen(:,j)/dy))
 
-              sumby(:) = sumby(:) + DF%By(:,jj,j)**2
+              sumby(:) = sumby(:) + DF_By(:,jj,j)**2
            enddo
            do m = 1,3
-              DF%By(m,:,j) = DF%By(m,:,j)/sqrt(sumby(m))
+              DF_By(m,:,j) = DF_By(m,:,j)/sqrt(sumby(m))
            enddo
 
            ! === z filter coefficients
            sumbz = 0.0_rp
-           do jj = -DF%N,DF%N
-              DF%Bz(:,jj,j) = exp(-pi*abs(jj)/(DF%zLen(:,j)/dz))
+           do jj = -DF_N,DF_N
+              DF_Bz(:,jj,j) = exp(-pi*abs(jj)/(DF_zLen(:,j)/dz))
 
-              sumbz(:) = sumbz(:) + DF%Bz(:,jj,j)**2
+              sumbz(:) = sumbz(:) + DF_Bz(:,jj,j)**2
            enddo
            do m = 1,3
-              DF%Bz(m,:,j) = DF%Bz(m,:,j)/sqrt(sumbz(m))
+              DF_Bz(m,:,j) = DF_Bz(m,:,j)/sqrt(sumbz(m))
            enddo
 
         enddo
@@ -766,8 +789,8 @@ subroutine DFCoefficients(y_gbl,ny,gbl_min_step,DF)
         DFCoeffFIle%dir  = trim(data_dir)//'/DF_COEFFICIENT'
         call OpenNewFile(DFCoeffFile,0)
         do j = 0, ny
-           do jj = -DF%N,DF%N
-              write(DFCoeffFile%unit,*) y_gbl(j), jj, DF%By(:,jj,j), DF%Bz(:,jj,j)
+           do jj = -DF_N,DF_N
+              write(DFCoeffFile%unit,*) y_gbl(j), jj, DF_By(:,jj,j), DF_Bz(:,jj,j)
            enddo
         enddo
         call CloseFile(DFCoeffFile)
@@ -777,16 +800,15 @@ subroutine DFCoefficients(y_gbl,ny,gbl_min_step,DF)
 end subroutine DFcoefficients
 
 
-subroutine DFConvolution2D(sy,ey,sz,ez,DF,vf)
+subroutine DFConvolution2D(sy,ey,sz,ez,vf)
         implicit none
         
         integer                                , intent(in)    :: sy, ey, sz, ez
-        type(DfData)                           , intent(inout) :: DF
         real(rp), allocatable, dimension(:,:,:), intent(inout) :: vf
 
-        integer :: l, j,k,jj,kk, DF_N
+        integer :: l, j,k,jj,kk
 
-        DF_N = DF%N
+        call StartProfRange('DFConvolution2D')
 
         ! y convolution
         !$acc parallel default(present)
@@ -794,7 +816,7 @@ subroutine DFConvolution2D(sy,ey,sz,ez,DF,vf)
         do       k = sz-DF_N,ez+DF_N
            do    j = sy-DF_N,ey+DF_N
               do l = 1,3
-                 DF%fy(l,j,k) = 0.0_rp
+                 DF_fy(l,j,k) = 0.0_rp
               enddo
            enddo
         enddo
@@ -806,7 +828,7 @@ subroutine DFConvolution2D(sy,ey,sz,ez,DF,vf)
            do       j = sy,ey
               do    l = 1,3
                  do jj = -DF_N,DF_N
-                    DF%fy(l,j,k) = DF%fy(l,j,k) + DF%By(l,jj,j)*DF%RnD2D(l,j+jj,k)
+                    DF_fy(l,j,k) = DF_fy(l,j,k) + DF_By(l,jj,j)*DF_RnD2D(l,j+jj,k)
                  enddo
               enddo
            enddo
@@ -832,18 +854,20 @@ subroutine DFConvolution2D(sy,ey,sz,ez,DF,vf)
            do       j = sy,ey
               do    l = 1,3
                  do kk = -DF_N,DF_N
-                    vf(l,j,k) = vf(l,j,k) + DF%Bz(l,kk,j)*DF%fy(l,j,k+kk)
+                    vf(l,j,k) = vf(l,j,k) + DF_Bz(l,kk,j)*DF_fy(l,j,k+kk)
                  enddo
               enddo
            enddo
         enddo
         !$acc end parallel
 
+        call EndProfRange
+
         return
 end subroutine DFConvolution2D
         
 
-subroutine DFConvolution3D(sx,ex,sy,ey,sz,ez,DF,vf)
+subroutine DFConvolution3D(sx,ex,sy,ey,sz,ez,vf)
 
 #ifdef DEBUG
         use FileModule 
@@ -852,7 +876,6 @@ subroutine DFConvolution3D(sx,ex,sy,ey,sz,ez,DF,vf)
 #endif
         implicit none
         integer                                  , intent(in)    :: sx, ex, sy, ey, sz, ez
-        type(DfData)                             , intent(inout) :: DF
         real(rp), allocatable, dimension(:,:,:,:), intent(inout) :: vf
 
         ! local declarations
@@ -862,16 +885,16 @@ subroutine DFConvolution3D(sx,ex,sy,ey,sz,ez,DF,vf)
         type(FileType) :: velFluc
 #endif
 
-        allocate(fy(3, sx:ex, sy-DF%N:ey+DF%N, sz-DF%N:ez+DF%N), stat = err)
+        allocate(fy(3, sx:ex, sy-DF_N:ey+DF_N, sz-DF_N:ez+DF_N), stat = err)
         if(err .ne. 0) stop ' Allocation error in DFConvolution2D'
 
         ! y convolution
         fy = 0.0_rp
-        do k = sz-DF%N,ez+DF%N
+        do k = sz-DF_N,ez+DF_N
            do j = sy,ey
-              do jj = -DF%N,DF%N
+              do jj = -DF_N,DF_N
                  do m = 1,3
-                    fy(m,sx:ex,j,k) = fy(m,sx:ex,j,k) + DF%By(m,jj,j)*DF%RnD3D(m,sx:ex,j+jj,k)
+                    fy(m,sx:ex,j,k) = fy(m,sx:ex,j,k) + DF_By(m,jj,j)*DF_RnD3D(m,sx:ex,j+jj,k)
                  enddo
               enddo
            enddo
@@ -881,9 +904,9 @@ subroutine DFConvolution3D(sx,ex,sy,ey,sz,ez,DF,vf)
         vf = 0.0_rp
         do k = sz,ez
            do j = sy,ey
-              do kk = -DF%N,DF%N
+              do kk = -DF_N,DF_N
                  do m = 1,3
-                    vf(m,sx:ex,j,k) = vf(m,sx:ex,j,k) + DF%Bz(m,kk,j)*fy(m,sx:ex,j,k+kk)
+                    vf(m,sx:ex,j,k) = vf(m,sx:ex,j,k) + DF_Bz(m,kk,j)*fy(m,sx:ex,j,k+kk)
                  enddo
               enddo
            enddo
@@ -924,6 +947,8 @@ subroutine DFCastroTimeCorrelation(ik,c_rk,u_inf,dt,sy,ey,sz,ez,vf_old,vf_new)
         real(rp) :: sqrtexp_x, sqrtexp_y, sqrtexp_z
         real(rp) :: dtOld
         integer  :: j,k,ikk
+
+        call StartProfRange('turbulent_inflow')
 
         ikk = mod(ik,3)-1
         ikk = mod(ikk+3,3)
@@ -967,21 +992,24 @@ subroutine DFCastroTimeCorrelation(ik,c_rk,u_inf,dt,sy,ey,sz,ez,vf_old,vf_new)
         enddo
         !$acc end parallel
 
+        call EndProfRange
+
         return
 end subroutine DFCastroTimeCorrelation
 
         
 
-subroutine DFEnforceReynoldsStresses2D(sy,ey,sz,ez,vf,DF,uf)
+subroutine DFEnforceReynoldsStresses2D(sy,ey,sz,ez,vf,uf)
 
         implicit none
         integer                                , intent(in)    :: sy, ey, sz, ez
         real(rp), dimension(:,:,:), allocatable, intent(in)    :: vf
         real(rp), dimension(:,:,:), allocatable, intent(inout) :: uf
-        type(DfData)                           , intent(inout) :: DF
 
         ! local declarations
         integer :: j, k
+
+        call StartProfRange('DFEnforceReynoldsStresses2D')
 
         ! perform the multiplication with Lund's Matrix
 
@@ -1000,20 +1028,22 @@ subroutine DFEnforceReynoldsStresses2D(sy,ey,sz,ez,vf,DF,uf)
         !$acc loop gang, vector collapse(2)
         do    k = sz,ez
            do j = sy,ey
-              uf(1,j,k) = uf(1,j,k) + DF%LundMatrix(1,1,j)*vf(1,j,k)
-              uf(2,j,k) = uf(2,j,k) + DF%LundMatrix(2,1,j)*vf(1,j,k)
-              uf(3,j,k) = uf(3,j,k) + DF%LundMatrix(3,1,j)*vf(1,j,k)
+              uf(1,j,k) = uf(1,j,k) + DF_LundMatrix(1,1,j)*vf(1,j,k)
+              uf(2,j,k) = uf(2,j,k) + DF_LundMatrix(2,1,j)*vf(1,j,k)
+              uf(3,j,k) = uf(3,j,k) + DF_LundMatrix(3,1,j)*vf(1,j,k)
 
-              uf(1,j,k) = uf(1,j,k) + DF%LundMatrix(1,2,j)*vf(2,j,k)
-              uf(2,j,k) = uf(2,j,k) + DF%LundMatrix(2,2,j)*vf(2,j,k)
-              uf(3,j,k) = uf(3,j,k) + DF%LundMatrix(3,2,j)*vf(2,j,k)
+              uf(1,j,k) = uf(1,j,k) + DF_LundMatrix(1,2,j)*vf(2,j,k)
+              uf(2,j,k) = uf(2,j,k) + DF_LundMatrix(2,2,j)*vf(2,j,k)
+              uf(3,j,k) = uf(3,j,k) + DF_LundMatrix(3,2,j)*vf(2,j,k)
               
-              uf(1,j,k) = uf(1,j,k) + DF%LundMatrix(1,3,j)*vf(3,j,k)
-              uf(2,j,k) = uf(2,j,k) + DF%LundMatrix(2,3,j)*vf(3,j,k)
-              uf(3,j,k) = uf(3,j,k) + DF%LundMatrix(3,3,j)*vf(3,j,k)
+              uf(1,j,k) = uf(1,j,k) + DF_LundMatrix(1,3,j)*vf(3,j,k)
+              uf(2,j,k) = uf(2,j,k) + DF_LundMatrix(2,3,j)*vf(3,j,k)
+              uf(3,j,k) = uf(3,j,k) + DF_LundMatrix(3,3,j)*vf(3,j,k)
            enddo
         enddo
         !$acc end parallel
+
+        call EndProfRange
 
         return
 end subroutine DFEnforceReynoldsStresses2D
@@ -1023,13 +1053,12 @@ end subroutine DFEnforceReynoldsStresses2D
 
 
 
-subroutine DFEnforceReynoldsStresses3D(sx,ex,sy,ey,sz,ez,vf,DF,uf)
+subroutine DFEnforceReynoldsStresses3D(sx,ex,sy,ey,sz,ez,vf,uf)
 
         implicit none
         integer                                  , intent(in)    :: sx, ex, sy, ey, sz, ez
         real(rp), dimension(:,:,:,:), allocatable, intent(in)    :: vf
         real(rp), dimension(:,:,:,:), allocatable, intent(inout) :: uf
-        type(DfData)                             , intent(inout) :: DF
 
         ! local declarations
         integer :: i,j, k, m, l 
@@ -1041,7 +1070,7 @@ subroutine DFEnforceReynoldsStresses3D(sx,ex,sy,ey,sz,ez,vf,DF,uf)
               do i = sx,ex
                  do m = 1,3
                     do l = 1,3
-                       uf(m,i,j,k) = uf(m,i,j,k) + DF%LundMatrix(m,l,j)*vf(l,i,j,k)
+                       uf(m,i,j,k) = uf(m,i,j,k) + DF_LundMatrix(m,l,j)*vf(l,i,j,k)
                     enddo
                  enddo
               enddo

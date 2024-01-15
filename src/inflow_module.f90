@@ -1,20 +1,18 @@
 module inflow_module
 use parameters_module
 use storage_module
+use profiling_module
 
 implicit none
 private
 
-type, public :: ifl
-  real(rp), allocatable, dimension(:,:,:) :: mean               !< mean      inflow field
-  real(rp), allocatable, dimension(:,:,:) :: turb               !< turbulent inflow field
-  real(rp), allocatable, dimension(:,:,:) :: vf_old             !< old velocity fluctuations
-  real(rp), allocatable, dimension(:,:,:) :: vf_new             !< new velocity fluctuations
-  logical                                 :: TurbFlag = .false.
-  logical                                 :: smthFlag = .false.
-end type ifl
+real(rp), allocatable, dimension(:,:,:), public :: iflow_mean               !< mean      inflow field
+real(rp), allocatable, dimension(:,:,:), public :: iflow_turb               !< turbulent inflow field
+real(rp), allocatable, dimension(:,:,:), public :: iflow_vf_old             !< old velocity fluctuations
+real(rp), allocatable, dimension(:,:,:), public :: iflow_vf_new             !< new velocity fluctuations
+logical                                , public :: iflow_TurbFlag = .false.
+logical                                , public :: iflow_smthFlag = .false.
 
-type(ifl), public :: iflow
 public init_inflow_profile, init_turbulent_inflow, turbulent_inflow
 
 
@@ -29,43 +27,44 @@ subroutine init_inflow_profile
         !
         ! === set the Inflow flags
         !
-        if(smooth_inflow) iFlow%SmthFlag = .true.
-        if(turb_inflow  ) iFlow%turbflag = .true.
+        if(smooth_inflow) iflow_SmthFlag = .true.
+        if(turb_inflow  ) iflow_turbflag = .true.
         !
         ! === allocate the mean and turb inflow profiles
         !
-        allocate(iFlow%mean(-GN:0  , lby:uby,1:5), &
-                 iFlow%turb(1:3,sy:ey, sz:ez), stat=err)
+        allocate(iflow_mean(-GN:0  , lby:uby,1:5), &
+                 iflow_turb(1:3,sy:ey, sz:ez), stat=err)
         if(err.ne.0) stop ' Allocation error in init_inflow_profile!' 
 
-        iFlow%mean = 0.0_rp
-        iFlow%turb = 0.0_rp
+        iflow_mean = 0.0_rp
+        iflow_turb = 0.0_rp
 
         selectcase(inflow_profile)
           case('constant')
-          call inflow_constant(iflow)
+          call inflow_constant()
 
           case('parabolic')
-          call inflow_parabolic(iflow)
+          call inflow_parabolic()
 
           case('blasius')
-          call inflow_blasius(iflow)
+          call inflow_blasius()
 
           case('pohlhausen')
-          call inflow_pohlhausen(iflow)
+          call inflow_pohlhausen()
 
           case('TurbulentBoundaryLayerInflow')
-          call inflow_TurbulentBoundaryLayer(iflow)
+          call inflow_TurbulentBoundaryLayer()
 
           case('shock_inflow')
-          call shock_inflow(iflow)
+          call shock_inflow()
 
           case('smooth_body_inflow')
-          stepH = 0.22_rp/0.032_rp
-          call inflow_step(iflow,stepH)
+          stepH = 0.0_rp
+          call inflow_step(stepH)
 
           case('supersonic_ramp')
-          call inflow_step(iflow,0.0_rp)
+          if(     viscous) call inflow_step(0.0_rp)
+          if(.not.viscous) call inflow_constant()
 
           case default
 
@@ -74,7 +73,7 @@ subroutine init_inflow_profile
 
         end select
 
-        if(iflow%turbFlag) call init_turbulent_inflow
+        if(iflow_turbFlag) call init_turbulent_inflow
 
         return
 end subroutine init_inflow_profile
@@ -82,24 +81,26 @@ end subroutine init_inflow_profile
 
 
 
-subroutine inflow_constant(iflow)
-        implicit none
-        type(ifl), intent(inout) :: iFlow
+subroutine inflow_constant()
 
-        !$omp workshare
-        iFlow%mean(:,:,1) = 1.0_rp
-        iFlow%mean(:,:,2) = u_inf
-        iFlow%mean(:,:,3) = 0.0_rp
-        iFlow%mean(:,:,4) = 0.0_rp
-        iFlow%mean(:,:,5) = 1.0_rp
-        !$omp end workshare
+        implicit none
+        real(rp) :: Ttot, Trat, T_
+
+        Ttot = total_temperature_inlet
+        Trat = (1.0_rp + 0.5_rp*(gamma0-1.0_rp)*Mach**2)
+        T_   = Ttot/Trat
+
+        iflow_mean(:,:,1) = 1.0_rp
+        iflow_mean(:,:,2) = u_inf
+        iflow_mean(:,:,3) = 0.0_rp
+        iflow_mean(:,:,4) = 0.0_rp
+        iflow_mean(:,:,5) = T_
 
         return
 end subroutine inflow_constant
 
-subroutine inflow_parabolic(iflow)
+subroutine inflow_parabolic()
         implicit none
-        type(ifl), intent(inout) :: iFlow
 
         ! local declaration
         real(rp) :: u_, T_, a, b, c
@@ -116,11 +117,11 @@ subroutine inflow_parabolic(iflow)
               u_ = a*y(j)**2 + b*y(j) + c
               T_ = 1.0_rp - 0.5_rp* (gamma0-1.0_rp)/gamma0 * Prandtl * u_**2
 
-              iFlow%mean(i,j,1) = 1.0_rp
-              iFlow%mean(i,j,2) = u_ 
-              iFlow%mean(i,j,3) = 0.0_rp
-              iFlow%mean(i,j,4) = 0.0_rp
-              iFlow%mean(i,j,5) = T_
+              iflow_mean(i,j,1) = 1.0_rp
+              iflow_mean(i,j,2) = u_
+              iflow_mean(i,j,3) = 0.0_rp
+              iflow_mean(i,j,4) = 0.0_rp
+              iflow_mean(i,j,5) = T_
 
            enddo
         enddo
@@ -129,12 +130,10 @@ subroutine inflow_parabolic(iflow)
 end subroutine inflow_parabolic
 
 
-subroutine inflow_blasius(iFlow)
+subroutine inflow_blasius()
         
         use fluid_functions_module, only: BlasiusProfile
         implicit none
-        type(ifl), intent(inout) :: iFlow
-
         ! local declaration
         real(rp), dimension(1-GN:ny+GN) :: VelY
         real(rp), dimension(1-GN:ny+GN) :: RhoY
@@ -147,11 +146,11 @@ subroutine inflow_blasius(iFlow)
         do j    = lby,uby
            do i = -GN,0
 
-              iFlow%mean(i,j,1) = RhoY(j)
-              iFlow%mean(i,j,2) = VelY(j)
-              iFlow%mean(i,j,3) = 0.0_rp
-              iFlow%mean(i,j,4) = 0.0_rp
-              iFlow%mean(i,j,5) = TmpY(j)
+              iflow_mean(i,j,1) = RhoY(j)
+              iflow_mean(i,j,2) = VelY(j)
+              iflow_mean(i,j,3) = 0.0_rp
+              iflow_mean(i,j,4) = 0.0_rp
+              iflow_mean(i,j,5) = TmpY(j)
 
            enddo
         enddo
@@ -160,12 +159,11 @@ subroutine inflow_blasius(iFlow)
 end subroutine inflow_blasius
 
 
-subroutine inflow_pohlhausen(iFlow)
+subroutine inflow_pohlhausen()
         
         use fluid_functions_module, only: pohlhausenProfile, CompressibleCorrection
 
         implicit none
-        type(ifl), intent(inout) :: iFlow
 
         ! local declaration
         real(rp), dimension(1-GN:ny+GN) :: u_inc
@@ -222,11 +220,11 @@ subroutine inflow_pohlhausen(iFlow)
         do j    = lby,uby
            do i = -GN,0
 
-              iFlow%mean(i,j,1) = RhoY(j)
-              iFlow%mean(i,j,2) = u_inc(j)
-              iFlow%mean(i,j,3) = 0.0_rp
-              iFlow%mean(i,j,4) = 0.0_rp
-              iFlow%mean(i,j,5) = TmpY(j)
+              iflow_mean(i,j,1) = RhoY(j)
+              iflow_mean(i,j,2) = u_inc(j)
+              iflow_mean(i,j,3) = 0.0_rp
+              iflow_mean(i,j,4) = 0.0_rp
+              iflow_mean(i,j,5) = TmpY(j)
 
            enddo
         enddo
@@ -236,12 +234,11 @@ end subroutine inflow_pohlhausen
 
 
 
-subroutine inflow_step(iflow,stepH)
+subroutine inflow_step(stepH)
 
         use fluid_functions_module, only: CompressibleCorrection
 
         implicit none
-        type(ifl), intent(inout) :: iflow
         real(rp) , intent(in)    :: stepH
 
         real(rp), parameter                 :: pi_wake = 0.434_rp
@@ -336,11 +333,11 @@ subroutine inflow_step(iflow,stepH)
         do j    = lby,uby
            do i = -GN,0
 
-              iFlow%mean(i,j,1) = RhoY(j)
-              iFlow%mean(i,j,2) = VelY_inc(j)
-              iFlow%mean(i,j,3) = 0.0_rp
-              iFlow%mean(i,j,4) = 0.0_rp
-              iFlow%mean(i,j,5) = TmpY(j)
+              iflow_mean(i,j,1) = RhoY(j)
+              iflow_mean(i,j,2) = VelY_inc(j)
+              iflow_mean(i,j,3) = 0.0_rp
+              iflow_mean(i,j,4) = 0.0_rp
+              iflow_mean(i,j,5) = TmpY(j)
 
            enddo
         enddo
@@ -350,7 +347,7 @@ subroutine inflow_step(iflow,stepH)
 end subroutine inflow_step
 
 
-subroutine shock_inflow(iFlow)
+subroutine shock_inflow()
 ! ----------------------------------------------------------------------------------
 !       
 !       This subroutine provides the exact inflow condition of a inflowing shock wave
@@ -362,7 +359,6 @@ subroutine shock_inflow(iFlow)
         use math_tools_module     , only: newton_raphson
 
         implicit none
-        type(ifl), intent(inout) :: iFlow
 
         ! === local declarations
         ! ambient conditions
@@ -385,11 +381,11 @@ subroutine shock_inflow(iFlow)
         w2 = 0.0_rp
 
         ! set variable inflow profile
-        iFlow%mean(:,:,1) = r2
-        iFlow%mean(:,:,2) = u2
-        iFlow%mean(:,:,3) = v2
-        iFlow%mean(:,:,4) = w2
-        iFlow%mean(:,:,5) = p2/r2
+        iflow_mean(:,:,1) = r2
+        iflow_mean(:,:,2) = u2
+        iflow_mean(:,:,3) = v2
+        iflow_mean(:,:,4) = w2
+        iflow_mean(:,:,5) = p2/r2
 
         if(rank == root) then
           write(*,'(A,e18.6)') ' The flow  is inflowing  at Mach: ', Mach
@@ -403,16 +399,15 @@ end subroutine shock_inflow
 
 
 
-subroutine inflow_TurbulentBoundaryLayer(iFlow)
+subroutine inflow_TurbulentBoundaryLayer()
         
-        use fluid_functions_module, only: MuskerProfile, CompressibleCorrection, Sutherland, BoundaryLayerQuantities
+        use fluid_functions_module, only: MuskerProfile, CompressibleCorrection, laminar_viscosity, BoundaryLayerQuantities
         use real_to_integer_module, only: locate
         use interpolation_module  , only: polint
         use parameters_module     , only: ReTau
         use FileModule          
 
         implicit none
-        type(ifl), intent(inout) :: iFlow
 
         ! local declarations
         real(rp), dimension(:,:,:), allocatable :: tempPrim
@@ -604,11 +599,11 @@ subroutine inflow_TurbulentBoundaryLayer(iFlow)
         do j = lby,uby
            do i = 1-GN,0
 
-              iFlow%mean(i,j,1) = tempPrim(i,j,1)
-              iFlow%mean(i,j,2) = u_inf*tempPrim(i,j,2)/tempPrim(i,j,1)
-              iFlow%mean(i,j,3) = u_inf*tempPrim(i,j,3)/tempPrim(i,j,1)
-              iFlow%mean(i,j,4) = 0.0_rp
-              iFlow%mean(i,j,5) = 1.0_rp/tempPrim(i,j,1)
+              iflow_mean(i,j,1) = tempPrim(i,j,1)
+              iflow_mean(i,j,2) = u_inf*tempPrim(i,j,2)/tempPrim(i,j,1)
+              iflow_mean(i,j,3) = u_inf*tempPrim(i,j,3)/tempPrim(i,j,1)
+              iflow_mean(i,j,4) = 0.0_rp
+              iflow_mean(i,j,5) = 1.0_rp/tempPrim(i,j,1)
 
            enddo
         enddo
@@ -618,8 +613,8 @@ subroutine inflow_TurbulentBoundaryLayer(iFlow)
         inflow%dir  = trim(data_dir)//'/INITIAL_CONDITION'
         call OpenNewFile(inflow,it)
         do j = lby,uby
-           write(inflow%unit,*) y(j), iFlow%mean(0,j,1), iFlow%mean(0,j,2)/u_inf, &
-                                      iFlow%mean(0,j,3)/u_inf, iFlow%mean(0,j,5)
+           write(inflow%unit,*) y(j), iflow_mean(0,j,1), iflow_mean(0,j,2)/u_inf, &
+                                      iflow_mean(0,j,3)/u_inf, iflow_mean(0,j,5)
         enddo
         call CloseFile(inflow)
 
@@ -651,19 +646,24 @@ subroutine init_turbulent_inflow
         allocate(y_tmp(0:ny), stat = err)
         if(err .ne. 0) stop ' Allocation error in init_turbulent_inflow'
 
-        allocate(DF%ylen(3,0:ny), DF%zlen(3,0:ny), stat = err)
+        allocate(DF_ylen(3,0:ny), DF_zlen(3,0:ny), stat = err)
         if(err .ne. 0) stop ' Allocation error in init_turbulent_inflow'
 
-        allocate(DF%By(3,-DF%N:DF%N, 0:ny), DF%Bz(3,-DF%N:DF%N, 0:ny), stat = err)
+        allocate(DF_By(3,-DF_N:DF_N, 0:ny), DF_Bz(3,-DF_N:DF_N, 0:ny), stat = err)
         if(err .ne. 0) stop ' Allocation error in init_turbulent_inflow'
 
-        allocate(DF%Rnd2D(3, 1-DF%N:ny+DF%N, 1-DF%N:nz+DF%N), stat = err)
+        allocate(DF_Rnd2D(3, 1-DF_N:ny+DF_N, 1-DF_N:nz+DF_N), stat = err)
+#ifdef AMD
+        rnd2Dnumshape = shape(DF_Rnd2D)
+        rnd2Dnumsize = rnd2Dnumshape(1) * rnd2Dnumshape(2) * rnd2Dnumshape(3)
+        allocate(rnd2Dnum(rnd2Dnumsize), stat = err)
+#endif
         if(err .ne. 0) stop ' Allocation error in init_turbulent_inflow'
 
-        allocate(iflow%vf_old(3, sy:ey, sz:ez), stat = err)
+        allocate(iflow_vf_old(3, sy:ey, sz:ez), stat = err)
         if(err .ne. 0) stop ' Allocation error in init_turbulent_inflow'
 
-        allocate(iflow%vf_new(3, sy:ey, sz:ez), stat = err)
+        allocate(iflow_vf_new(3, sy:ey, sz:ez), stat = err)
         if(err .ne. 0) stop ' Allocation error in init_turbulent_inflow'
 
         ! step 1) create a temporary grid 
@@ -674,17 +674,17 @@ subroutine init_turbulent_inflow
 
           case('TurbulentBoundaryLayerInflow', 'smooth_body_inflow', 'supersonic_ramp')
           ! step 2) Read input data from database
-          call DFInputData_TBL(ReTau,Mach,Prandtl,y_tmp,ny,DF)
+          call DFInputData_TBL(ReTau,Mach,Prandtl,y_tmp,ny)
 
           ! step 3) Get integral lenght scale
-          call DFIntegralLenght_TBL(y_tmp,ny,DF)
+          call DFIntegralLenght_TBL(y_tmp,ny)
         
           case('constant')
           ! step 2) Read input data from database
-          call DFInputData_HTURB(y_tmp,ny,DF)
+          call DFInputData_HTURB(y_tmp,ny)
 
           ! step 3) Get integral lenght scale
-          call DFIntegralLenght_HTURB(Lz,DF)
+          call DFIntegralLenght_HTURB(Lz)
 
         case default
           print*, 'Turbulent inflow is not implemented for inflow "', trim(inflow_profile), '"'
@@ -693,29 +693,35 @@ subroutine init_turbulent_inflow
 
 
         ! step 4) compute DF coefficients
-        call DFCoefficients(y_tmp,ny,gbl_min_step,DF)
+        call DFCoefficients(y_tmp,ny,gbl_min_step)
+#ifdef AMD
+        !$acc data copy(rnd2Dnum, rnd2Dnumshape,rnd2Dnumptr) &
+        !$acc copy(DF_Rnd2D,DF_N,DF_ylen,DF_zlen,DF_By,DF_Bz,DF_Fy,DF_LundMatrix) &
+        !$acc copy(iflow_vf_old, iflow_vf_new, iflow_turb)
+#endif
+#ifdef NVIDIA
+        !$acc data copy(DF_Rnd2D,DF_ylen,DF_zlen,DF_By,DF_Bz,DF_Fy,DF_LundMatrix) &
+        !$acc copy(iflow_vf_old, iflow_vf_new, iflow_turb)
+#endif
 
-        !$acc data copyin(df, iflow) &
-        !$acc copy(DF%Rnd2D,DF%N,DF%ylen,DF%zlen,DF%By,DF%Bz,DF%Fy,DF%LundMatrix) &
-        !$acc copy(iflow%vf_old, iflow%vf_new, iflow%turb)
 
         ! step 5) get a random slice
-        call DFRandomField2D(ny,nz,DF)
+        call DFRandomField2D(ny,nz)
 
         ! step 6) compute velocity flunctuations based on the extracted random slice
-        call DFConvolution2D(sy,ey,sz,ez,DF,iflow%vf_old)
+        call DFConvolution2D(sy,ey,sz,ez,iflow_vf_old)
 
         ! step 7) get a new random slice
-        call DFRandomField2D(ny,nz,DF)
-
+        call DFRandomField2D(ny,nz)
+        
         ! step 8) compute a new velocity fluctuation based on the extracted random slice
-        call DFConvolution2D(sy,ey,sz,ez,DF,iflow%vf_new)
+        call DFConvolution2D(sy,ey,sz,ez,iflow_vf_new)
 
         ! step 9) provide time-correlation via Castro's formula
-        call DFCastroTimeCorrelation(ik,c_rk,u_inf,dt,sy,ey,sz,ez,iflow%vf_old,iflow%turb)
+        call DFCastroTimeCorrelation(ik,c_rk,u_inf,dt,sy,ey,sz,ez,iflow_vf_old,iflow_turb)
 
         ! step 6) Enforce Reynolds stress and obtain turb inflow profile
-        call DFEnforceReynoldsStresses2D(sy,ey,sz,ez,iflow%vf_new,DF,iflow%turb)
+        call DFEnforceReynoldsStresses2D(sy,ey,sz,ez,iflow_vf_new,iflow_turb)
 
         !$acc end data
 
@@ -732,12 +738,12 @@ subroutine init_turbulent_inflow
          rey23   = 0._rp
          do k=1,nz
            do m=1,3
-            rmean(m)   = rmean(m)   + iflow%turb(m,j,k)
-            rmeansq(m) = rmeansq(m) + iflow%turb(m,j,k)**2
+            rmean(m)   = rmean(m)   + iflow_turb(m,j,k)
+            rmeansq(m) = rmeansq(m) + iflow_turb(m,j,k)**2
            enddo
-           rey12 = rey12+iflow%turb(1,j,k)*iflow%turb(2,j,k)
-           rey13 = rey13+iflow%turb(1,j,k)*iflow%turb(3,j,k)
-           rey23 = rey23+iflow%turb(2,j,k)*iflow%turb(3,j,k)
+           rey12 = rey12+iflow_turb(1,j,k)*iflow_turb(2,j,k)
+           rey13 = rey13+iflow_turb(1,j,k)*iflow_turb(3,j,k)
+           rey23 = rey23+iflow_turb(2,j,k)*iflow_turb(3,j,k)
          enddo
          rmean   = rmean/(nz)
          rmeansq = rmeansq/(nz)
@@ -763,13 +769,12 @@ end subroutine init_turbulent_inflow
 
 
 
-subroutine turbulent_inflow(iFlow)
+subroutine turbulent_inflow()
         
         use df_module
         use FileModule
 
         implicit none
-        type(ifl), intent(inout) :: iFlow
         integer :: j,k,l
 
 #ifdef DEBUG
@@ -781,19 +786,21 @@ subroutine turbulent_inflow(iFlow)
         integer                :: err = 0
 #endif
 
-        if(iFlow%TurbFlag) then
+        call StartProfRange('turbulent_inflow')
+
+        if(iflow_TurbFlag) then
 
           ! step 1) extract a new random slice
-          call DFRandomField2D(ny,nz,DF)
+          call DFRandomField2D(ny,nz)
 
           ! step 2) get velocity flunctuations based on the new random slice
-          call DFConvolution2D(sy,ey,sz,ez,DF,iflow%vf_new)
+          call DFConvolution2D(sy,ey,sz,ez,iflow_vf_new)
 
           ! step 3) provide time correlation of the inflow slices
-          call DFCastroTimeCorrelation(ik,c_rk,u_inf,dt,sy,ey,sz,ez,iflow%vf_old,iflow%vf_new)
+          call DFCastroTimeCorrelation(ik,c_rk,u_inf,dt,sy,ey,sz,ez,iflow_vf_old,iflow_vf_new)
 
           ! step 4) enforce Reynolds Stress
-          call DFEnforceReynoldsStresses2D(sy,ey,sz,ez,iflow%vf_new,DF,iflow%turb)
+          call DFEnforceReynoldsStresses2D(sy,ey,sz,ez,iflow_vf_new,iflow_turb)
 
         else
 
@@ -802,7 +809,7 @@ subroutine turbulent_inflow(iFlow)
           do       k = sz,ez
              do    j = sy,ey
                 do l = 1,3
-                   iFlow%turb(l,j,k) = 0.0_rp
+                   iflow_turb(l,j,k) = 0.0_rp
                 enddo
              enddo
           enddo
@@ -820,7 +827,7 @@ subroutine turbulent_inflow(iFlow)
         lcl_ekt_max = 0.0_rp
         do k    = sz,ez
            do j = sy,ey 
-              ek = (u_inf*iflow%turb(1,j,k))**2 + (u_inf*iflow%turb(2,j,k))**2 + (u_inf*iflow%turb(3,j,k))**2
+              ek = (u_inf*iflow_turb(1,j,k))**2 + (u_inf*iflow_turb(2,j,k))**2 + (u_inf*iflow_turb(3,j,k))**2
 
               lcl_ekt     = lcl_ekt + ek
               lcl_ekt_max = max(ek,lcl_ekt_max)
@@ -841,11 +848,13 @@ subroutine turbulent_inflow(iFlow)
         write(turbInflow%unit,*) '# max turbulent energy ', gbl_ekt_max
         do k    = sz,ez
            do j = sy,ey
-              write(turbInflow%unit,*) y(j), z(k), u_inf*iflow%turb(:,j,k)
+              write(turbInflow%unit,*) y(j), z(k), u_inf*iflow_turb(:,j,k)
            enddo
         enddo
         call CloseFile(turbInflow)
 #endif
+
+        call EndProfRange
 
         return
 end subroutine turbulent_inflow

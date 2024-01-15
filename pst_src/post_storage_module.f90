@@ -143,7 +143,7 @@ subroutine init_cons_fields
         lbz = sz - GN ; ubz = ez + GN
 
         ! conservative variables 
-        allocate(phi(lbx:ubx, lby:uby, lbz:ubz,eqs), STAT=err) ; if(err.ne.0) stop 'allocation error' ; phi = 0._rp
+        allocate(phi(lbx:ubx, lby:uby, lbz:ubz,5), STAT=err) ; if(err.ne.0) stop 'allocation error' ; phi = 0._rp
 
         return
 end subroutine init_cons_fields
@@ -193,7 +193,8 @@ subroutine init_inst_fields
 
         if(hybrid_weno) then
           call AllocateReal(SSENSOR,lbx,ubx,lby,uby,lbz,ubz)
-          call AllocateInteger(weno%flag,lbx,ubx,lby,uby,lbz,ubz); weno%flag = weno%smooth
+          call AllocateInteger(weno_flag,lbx,ubx,lby,uby,lbz,ubz); weno_flag = weno_smooth
+          call AllocateInteger(weno_flag_xyz,lbx,ubx,lby,uby,lbz,ubz);
         endif
 
         if(sdensity)   call AllocateReal(s_density,lbx,ubx,lby,uby,lbz,ubz)
@@ -360,8 +361,7 @@ subroutine destroy_variables
 
         call DeallocateReal(SSENSOR)
 
-        if(allocated(weno%flag)) deallocate(weno%flag)
-        if(allocated(weno%temp)) deallocate(weno%temp)
+        if(allocated(weno_flag)) deallocate(weno_flag)
 
         if(allocated(s_density)) deallocate(s_density)
         if(allocated(q_criterion)) deallocate(q_criterion)

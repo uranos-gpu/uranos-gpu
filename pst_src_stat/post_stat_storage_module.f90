@@ -15,7 +15,6 @@ character(dl) :: ifile
 character(dl) :: ifile_wmles
 character(3)  :: pcharAll
 
-
 real(rp), allocatable, dimension(:,:) :: FavreVelU2D
 real(rp), allocatable, dimension(:,:) :: FavreVelV2D
 real(rp), allocatable, dimension(:,:) :: FavreVelW2D
@@ -70,6 +69,9 @@ subroutine GetPeriodicDirs
           case('TFT')
           write(*,'(A)') ' The problem is xz-periodic'
 
+          case('FTT')
+          write(*,'(A)') ' The problem is yz-periodic'
+
         endselect
 
         return
@@ -91,7 +93,7 @@ subroutine InitStatsFields
         
         ! init statistical field
         selectcase(pcharAll)
-          case('FFT') 
+          case('FFT','FTT') 
           call AllocateReal(vmean2D,lbx,ubx,lby,uby,1,nvAve2D)
 
           call AllocateReal(FavreVelU2D,lbx,ubx,lby,uby)
@@ -143,7 +145,6 @@ subroutine InitStatsFields
 
         return
 end subroutine InitStatsFields
-
 
 
 subroutine DestroyStatsFields

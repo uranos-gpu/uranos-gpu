@@ -145,7 +145,7 @@ subroutine ReadBinaryStatFile(filename)
 
         selectcase(pcharAll)
 
-          case('FFT')
+          case('FFT','FTT')
 
           read(funit) itStat
           do l = 1,nvAve2D
@@ -192,7 +192,6 @@ subroutine ReadBinaryWmlesStatFile(filename)
 
         return
 end subroutine ReadBinaryWmlesStatFile
-
 
 
 

@@ -6,7 +6,9 @@ use norm_module
 implicit none
 
 private
-public write_all, write_statistics, screen_elapse_time, mpi_plot, screen_output, write_probes
+public write_restart, write_restart_stat, write_statistics, &
+       screen_elapse_time, mpi_plot, screen_output, &
+       compute_average_iteration_time
 
 interface mpi_plot
   module procedure mpi_plot_scl, mpi_plot_vec 
@@ -14,61 +16,63 @@ end interface
 
 
 contains 
-subroutine write_all
+subroutine write_restart
+
+        implicit none
+
+        !$acc update host(phi,U,V,W,P,T,LMD,VIS)
+
+        call screen_output
+        call mpi_write
+
+        return
+end subroutine write_restart
+
+subroutine write_restart_stat
+
         use onlineStats
 
         implicit none
         character(1), dimension(3) :: pchar
         character(3)               :: pcharAll
 
-
-#ifdef TIME
-        call mpi_stime(s_out_time)
-#endif
-       
         !$acc update host(phi,U,V,W,P,T,LMD,VIS)
 
-        call screen_output
-        call mpi_write
+        itStat = itStat + 1
 
-        if(StFlg) then
+        pchar = 'F'
+        if(periods(1)) pchar(1) = 'T'
+        if(periods(2)) pchar(2) = 'T'
+        if(periods(3)) pchar(3) = 'T'
+        pcharAll = pchar(1)//pchar(2)//pchar(3)
+        
+        ! write binary statistics
+        selectcase(pcharAll)
 
-          ! updata statistical iterations
-          itStat = itStat + 1
+        case('TFT') ! xz are periodic
+          call compute_1DStats(phi,VIS,nx,nz,nVAve1D,itStat, &
+                            sx,ex,sy,ey,sz,ez,comm2Dxz,vmean1D,mpi_flag)
 
-          pchar = 'F'
-          if(periods(1)) pchar(1) = 'T'
-          if(periods(2)) pchar(2) = 'T'
-          if(periods(3)) pchar(3) = 'T'
-          pcharAll = pchar(1)//pchar(2)//pchar(3)
-          
-          ! write binary statistics
-          selectcase(pcharAll)
+          call mpi_write_stat1D(sy,ey,ny,nvAve1D,'BINARY_STAT',vmean1D)
 
-          case('TFT') ! xz are periodic
-            call compute_1DStats(phi,VIS,nx,nz,nVAve1D,itStat, &
-                              sx,ex,sy,ey,sz,ez,comm2Dxz,vmean1D,mpi_flag)
+        case('FFT') ! z  is periodid
+          call compute_2DStats(phi,VIS,nz,nVAve2D,itStat, &
+                            sx,ex,sy,ey,sz,ez,comm1Dz,vmean2D,mpi_flag)
 
-            call mpi_write_stat1D(sy,ey,ny,nvAve1D,'BINARY_STAT',vmean1D)
+          call mpi_write_stat2D(sx,ex,sy,ey,nx,ny,vmean2D)
+          if(wmles) then
+            call mpi_write_stat1D(sx,ex,nx,nVWMLESData,&
+                    'BINARY_WMLES_STAT',vmean1D_wmles)
+          endif
+        case('FTT') ! yz are periodic
+          call compute_2DStats(phi,VIS,nz,nVAve2D,itStat, &
+                            sx,ex,sy,ey,sz,ez,comm1Dz,vmean2D,mpi_flag)
+          call mpi_write_stat2D(sx,ex,sy,ey,nx,ny,vmean2D)
 
-          case('FFT') ! z  is periodid
-            call compute_2DStats(phi,VIS,nz,nVAve2D,itStat, &
-                              sx,ex,sy,ey,sz,ez,comm1Dz,vmean2D,mpi_flag)
+        endselect
 
-            call mpi_write_stat2D(sx,ex,sy,ey,nx,ny,vmean2D)
-            if(wmles) then
-              call mpi_write_stat1D(sx,ex,nx,nVWMLESData,&
-                      'BINARY_WMLES_STAT',vmean1D_wmles)
-            endif
-
-          endselect
-        endif
-
-#ifdef TIME
-        call mpi_etime(s_out_time,t_out_calls,t_out_time)
-#endif
         return
-end subroutine write_all
+end subroutine write_restart_stat
 
 
 
@@ -147,6 +151,23 @@ subroutine mpi_write
 end subroutine mpi_write
 
 
+
+
+subroutine compute_average_iteration_time
+        implicit none
+
+        end_it_time = MPI_WTIME()
+        end_it_time = (end_it_time - str_it_time)/real(itOut,rp)
+        str_it_time = MPI_WTIME()
+
+        return
+end subroutine compute_average_iteration_time
+
+
+
+
+
+
 subroutine screen_output
 ! -------------------------------------------------------------
 !
@@ -157,21 +178,21 @@ subroutine screen_output
         real(rp), parameter :: DivCheckToll = 1.0E-14_rp
         real(rp)            :: gbl_r_max, gbl_T_max, gbl_p_max, gbl_M_max
         real(rp)            :: lcl_r_max, lcl_T_max, lcl_p_max, lcl_M_max
-        real(rp)            :: gbl_r_min, gbl_T_min, gbl_p_min, gbl_D_max, gbl_D_min
-        real(rp)            :: lcl_r_min, lcl_T_min, lcl_p_min, lcl_D_max, lcl_D_min
+        real(rp)            :: gbl_r_min, gbl_T_min, gbl_p_min
+        real(rp)            :: lcl_r_min, lcl_T_min, lcl_p_min
         real(rp)            :: r_, ir, u_, v_, w_, p_, T_
-        integer             :: i,j,k, err = 0
+        integer             :: i,j,k, err
+
+        err = 0
 
         lcl_M_max = 0.0_rp
         lcl_r_max = 0.0_rp
         lcl_T_max = 0.0_rp
         lcl_p_max = 0.0_rp
-        lcl_D_max = 0.0_rp
 
         lcl_r_min = huge(0.0_rp)
         lcl_T_min = huge(0.0_rp)
         lcl_p_min = huge(0.0_rp)
-        lcl_D_min = huge(0.0_rp)
 
         selectcase(dims)
           !
@@ -195,13 +216,11 @@ subroutine screen_output
                 lcl_p_max = max(p_,lcl_p_max)
                 lcl_T_max = max(T_,lcl_T_max) 
                 lcl_M_max = max(((u_*u_ + v_*v_)/(gamma0*T_)), lcl_M_max)
-                lcl_D_max = max(DIV(i,j,k),lcl_D_max)
 
                 ! min quantities
                 lcl_r_min = min(r_,lcl_r_min)
                 lcl_p_min = min(p_,lcl_p_min)
                 lcl_T_min = min(T_,lcl_T_min) 
-                lcl_D_min = min(DIV(i,j,k),lcl_D_min)
 
              enddo
           enddo
@@ -209,6 +228,10 @@ subroutine screen_output
           !  === 3D CASE
           !
           case(3)
+!          !$acc parallel default(present)
+!          !$acc loop gang, vector collapse(3) &
+!          !$acc reduction(max:lcl_r_max,lcl_p_max,lcl_T_max,lcl_M_max) &
+!          !$acc reduction(min:lcl_r_min,lcl_p_min,lcl_T_min)
           do k       = sz,ez
              do j    = sy,ey
                 do i = sx,ex
@@ -227,17 +250,16 @@ subroutine screen_output
                    lcl_p_max = max(p_,lcl_p_max)
                    lcl_T_max = max(T_,lcl_T_max) 
                    lcl_M_max = max(((u_*u_ + v_*v_ + w_*w_)/(gamma0*T_)), lcl_M_max)
-                   lcl_D_max = max(DIV(i,j,k),lcl_D_max)
 
                    ! min quantities
                    lcl_r_min = min(r_,lcl_r_min)
                    lcl_p_min = min(p_,lcl_p_min)
                    lcl_T_min = min(T_,lcl_T_min) 
-                   lcl_D_min = min(DIV(i,j,k),lcl_D_min)
 
                 enddo
              enddo
           enddo
+!          !$acc end parallel
 
         endselect
 
@@ -247,21 +269,19 @@ subroutine screen_output
         call MPI_allreduce(lcl_r_max, gbl_r_max, 1, MPI_RP, MPI_MAX, mpi_comm_cart, err)
         call MPI_allreduce(lcl_M_max, gbl_M_max, 1, MPI_RP, MPI_MAX, mpi_comm_cart, err)
         call MPI_allreduce(lcl_p_max, gbl_p_max, 1, MPI_RP, MPI_MAX, mpi_comm_cart, err)
-        call MPI_allreduce(lcl_D_max, gbl_D_max, 1, MPI_RP, MPI_MAX, mpi_comm_cart, err)
 
         call MPI_allreduce(lcl_T_min, gbl_T_min, 1, MPI_RP, MPI_MIN, mpi_comm_cart, err)
         call MPI_allreduce(lcl_r_min, gbl_r_min, 1, MPI_RP, MPI_MIN, mpi_comm_cart, err)
         call MPI_allreduce(lcl_p_min, gbl_p_min, 1, MPI_RP, MPI_MIN, mpi_comm_cart, err)
-        call MPI_allreduce(lcl_D_min, gbl_D_min, 1, MPI_RP, MPI_MIN, mpi_comm_cart, err)
 
         ! ---- write screen output ---- !
         if(rank == root) then
           if(mod(it,10*itout)==0) then
-            write(*,'(4x,12(A,5x))') ' it', 'time %', ' dt ', '       M max',              &
+            write(*,'(4x,11(A,5x))') ' it', 'time %', ' dt ', '       M max',              &
                                                               '     r max'  ,'     r min', &
                                                               '     T max'  ,'     T min', &
                                                               '     p max'  ,'     p min', &
-                                                              '     Div max','   Div min'
+                                                              '     titer'
             write(*,*) ' -----------------------------------------------------------------------------------', &
                        '---------------------------------------------------------------------------'
           endif
@@ -270,7 +290,7 @@ subroutine screen_output
                                                gbl_r_max, gbl_r_min, &
                                                gbl_T_max, gbl_T_min, &
                                                gbl_p_max, gbl_p_min, &
-                                               gbl_D_max, gbl_D_min
+                                               end_it_time
         endif
 
         if(gbl_r_min < DivCheckToll .or. &
@@ -307,13 +327,11 @@ subroutine write_statistics
 
         implicit none
 
-#ifdef TIME
-        call mpi_stime(s_sts_time)
-#endif
-
         !$acc update host(phi,U,V,W,P,T,LMD,VIS)
         !$acc update host(WMLES_DATA)
 
+        ! updata statistical iterations
+        !itStat = itStat + 1
 
         selectcase(ic)
 
@@ -325,33 +343,8 @@ subroutine write_statistics
 
         endselect
 
-#ifdef TIME
-        call mpi_etime(s_sts_time,t_sts_calls,t_sts_time)
-#endif
-
-
         return
 end subroutine write_statistics
-
-
-
-subroutine write_probes
-        implicit none
-
-        !$acc update host(phi,P)
-        
-        if(bc(4) == 'oblique_shock') then
-          call WriteWallPressure
-          call writeProbes
-        endif
-
-        if(ic == 'supersonic_intake') then
-          call writeProbes
-          call WriteMassFlowSupersonicIntake
-        endif
-
-        return
-end subroutine write_probes
 
 
 subroutine mpi_write_stat1D(sid,eid,n,nstats,dirname,vmean)
@@ -383,7 +376,7 @@ subroutine mpi_write_stat1D(sid,eid,n,nstats,dirname,vmean)
         !
         ! === open the file
         !
-        write(iteration, '(i7.7)') it
+        write(iteration, '(i7.7)') itStat
         saving_dir = "DATA/"//trim(data_dir)//"/"//trim(dirname)
         filename = trim(saving_dir)//"/stats"//trim(iteration)//'.bin'
 
@@ -469,7 +462,7 @@ subroutine mpi_write_stat2D(sx,ex,sy,ey,nx,ny,vmean)
         !
         ! === open the file
         !
-        write(iteration, '(i7.7)') it
+        write(iteration, '(i7.7)') itStat
         filename = "DATA/"//trim(data_dir)//"/BINARY_STAT/stats"&
                 //trim(iteration)//'.bin'
 
@@ -539,7 +532,7 @@ subroutine stat_turbulent_boundary_layer
         use FileModule
         use real_to_integer_module
         use interpolation_module
-        use fluid_functions_module, only: sutherland, KarmanSchoenherr, ReThetaIncSpalding
+        use fluid_functions_module, only: laminar_viscosity, KarmanSchoenherr, ReThetaIncSpalding
         use onlineStats
         use wmles_module!, only: compute_tau_wall_wmles2D, compute_tau_wall_wmles2D_static
 
@@ -609,19 +602,19 @@ subroutine stat_turbulent_boundary_layer
            tmpAD = 1.0_rp + r*0.5_rp*(gamma0-1.0_rp)*Mach**2
            tmpWl = Trat*tmpAD
            rWall = vmean2D(i,sy,11)/tmpWl
-           mWall = Sutherland(tmpWl)
+           mWall = laminar_viscosity(tmpWl,Tref,vis_flag)
 
            uWall = vmean2D(i,sy,2)/vmean2D(i,sy,1)
            u_yWl = (uWall)/y(sy)
            tauWl = mu_inf*mWall*u_yWl
            if    (bc(3) == 'dws_adiabatic') then
-             call compute_tau_wall_wmles2D(i,vmean2D,tmpWl,yc,u_wm,T_wm,tauWl)
+             call compute_tau_wall_wmles2D(i,vmean2D,tmpWl,u_wm,T_wm,tauWl)
            elseif(bc(3) == 'static_dws_adiabatic') then
              tauWl = vmean1D_wmles(i,3)
            elseif(bc(3) == 'istatic_dws_adiabatic') then
              tauWl = vmean1D_wmles(i,3)
            elseif(bc(3) == 'vorticity_dws_adiabatic') then
-             call compute_tau_wall_wmles2D_vorticity(i,vmean2D,vmean2D_aux,tmpWl,yc,u_wm,T_wm,tauWl)
+             call compute_tau_wall_wmles2D_vorticity(i,vmean2D,vmean2D_aux,tmpWl,u_wm,T_wm,tauWl)
            elseif(bc(3) == 'idws_adiabatic') then
              tauWl = vmean1D_wmles(i,3)
            elseif(bc(3) == 'idws_isothermal') then
@@ -818,7 +811,7 @@ subroutine stat_turbulent_boundary_layer
            r     = Prandtl**(1.0_rp/3.0_rp)
            tmpWl = Trat*(1.0_rp + r*0.5_rp*(gamma0-1.0_rp)*Mach**2)
            rWall = vmean2D(s,sy,11)/tmpWl
-           mWall = Sutherland(tmpWl)
+           mWall = laminar_viscosity(tmpWl,Tref,vis_flag)
 
            uWall = vmean2D(s,sy,2)/vmean2D(s,sy,1)
            u_yWl = (uWall)/y(sy)
@@ -826,7 +819,7 @@ subroutine stat_turbulent_boundary_layer
 
            wmles_stat=.false.
            if(bc(3) == 'dws_adiabatic') then
-             call compute_tau_wall_wmles2D(s,vmean2D,tmpWl,yc,u_wm,T_wm,tauWl)
+             call compute_tau_wall_wmles2D(s,vmean2D,tmpWl,u_wm,T_wm,tauWl)
              wmles_stat=.true.
            elseif(bc(3) == 'static_dws_adiabatic') then
              tauWl = vmean1D_wmles(i,3)
@@ -835,7 +828,7 @@ subroutine stat_turbulent_boundary_layer
              tauWl = vmean1D_wmles(i,3)
              wmles_stat=.true.
            elseif(bc(3) == 'vorticity_dws_adiabatic') then
-             call compute_tau_wall_wmles2D_vorticity(s,vmean2D,vmean2D_aux,tmpWl,yc,u_wm,T_wm,tauWl)
+             call compute_tau_wall_wmles2D_vorticity(s,vmean2D,vmean2D_aux,tmpWl,u_wm,T_wm,tauWl)
              wmles_stat=.true.
            elseif(bc(3) == 'idws_adiabatic') then
              tauWl = vmean1D_wmles(i,3)
@@ -851,18 +844,16 @@ subroutine stat_turbulent_boundary_layer
              call OpenNewFile(wmFile,it)
              u_Tau = sqrt(tauWl/rWall)
         
-             do j = 1,nw
-                if(j == 1) then
-                du = u_wm(j)
-                r_ = vmean2D(s,wmles_strI,11)/T_wm(j)
-                uc = sqrt(r_/rWall)
-                u_wmVD(j) = uc*du
-                else
+             j = 1
+             du = u_wm(j)
+             r_ = vmean2D(s,wmles_strI,11)/T_wm(j)
+             uc = sqrt(r_/rWall)
+             u_wmVD(j) = uc*du
+             do j = 2,nw
                 du = u_wm(j) - u_wm(j-1)
                 r_ = vmean2D(s,wmles_strI,11)/T_wm(j)
                 uc = sqrt(r_/rWall)
                 u_wmVD(j) = u_wmVD(j-1) + uc*du
-                endif
              enddo
         
              do j = 1,nw
@@ -1006,163 +997,6 @@ subroutine stat_turbulent_boundary_layer
         
         return
 end subroutine stat_turbulent_boundary_layer
-
-
-
-subroutine writeProbes
-
-        use FileModule
-
-        implicit none
-        type(FileType)         :: ProbeFile
-        real(rp), dimension(3) :: PidStr, PidEnd
-        real(rp)               :: irmean_gbl
-        real(rp)               :: irNz
-        real(rp)               :: r_mean_lcl, rumean_lcl, rvmean_lcl, rwmean_lcl, remean_lcl
-        real(rp)               :: r_mean_gbl, rumean_gbl, rvmean_gbl, rwmean_gbl, remean_gbl
-        real(rp)               :: u_mean_gbl, v_mean_gbl, w_mean_gbl, ekmean_gbl, p_mean_gbl, T_mean_gbl
-        integer                :: n, err = 0, i,j,k
-
-        ! find probes location within the procs
-        PidStr = (/x(sx)  , y(sy)  , z(sz)  /)
-        PidEnd = (/x(ex+1), y(ey+1), z(ez+1)/)
-        do n = 1,Probe%n
-
-           if(Probe%x(1,n) >= PidStr(1) .and. Probe%x(1,n) <= PidEnd(1) .and. &
-              Probe%x(2,n) >= PidStr(2) .and. Probe%x(2,n) <= PidEnd(2)) then
-
-                
-              i = Probe%i(1,n)
-              j = Probe%i(2,n)
-             
-              ! summing up along z-direction
-              r_mean_lcl = 0.0_rp
-              rumean_lcl = 0.0_rp
-              rvmean_lcl = 0.0_rp
-              rwmean_lcl = 0.0_rp
-              remean_lcl = 0.0_rp
-              do k = sz,ez
-
-                 r_mean_lcl = r_mean_lcl + phi(i,j,k,1)
-                 rumean_lcl = rumean_lcl + phi(i,j,k,2)
-                 rvmean_lcl = rvmean_lcl + phi(i,j,k,3)
-                 rwmean_lcl = rwmean_lcl + phi(i,j,k,4)
-                 remean_lcl = remean_lcl + phi(i,j,k,5)
-
-              enddo
-        
-              !reducing
-              call MPI_allreduce(r_mean_lcl,r_mean_gbl,1,MPI_RP,MPI_SUM,comm1Dz,err)
-              call MPI_allreduce(rumean_lcl,rumean_gbl,1,MPI_RP,MPI_SUM,comm1Dz,err)
-              call MPI_allreduce(rvmean_lcl,rvmean_gbl,1,MPI_RP,MPI_SUM,comm1Dz,err)
-              call MPI_allreduce(rwmean_lcl,rwmean_gbl,1,MPI_RP,MPI_SUM,comm1Dz,err)
-              call MPI_allreduce(remean_lcl,remean_gbl,1,MPI_RP,MPI_SUM,comm1Dz,err)
-
-              irNz = 1.0_rp/real(Nz,rp)          
-              r_mean_gbl = r_mean_gbl*irNz
-              rumean_gbl = rumean_gbl*irNz
-              rvmean_gbl = rvmean_gbl*irNz
-              rwmean_gbl = rwmean_gbl*irNz
-              remean_gbl = remean_gbl*irNz
-       
-              ! printing on file
-              irmean_gbl = 1.0_rp/r_mean_gbl
-              u_mean_gbl = rumean_gbl*irmean_gbl
-              v_mean_gbl = rvmean_gbl*irmean_gbl
-              w_mean_gbl = rwmean_gbl*irmean_gbl
-              ekmean_gbl = 0.5_rp*(u_mean_gbl**2 + v_mean_gbl**2 + w_mean_gbl**2)
-              p_mean_gbl = (gamma0-1.0_rp)*(remean_gbl - r_mean_gbl*ekmean_gbl)
-              T_mean_gbl = p_mean_gbl*irmean_gbl
-
-              if(Probe%x(3,n) >= PidStr(3) .and. Probe%x(3,n) <= PidEnd(3)) then
-                ProbeFile%name = 'Probe_'//trim(str(n))
-                ProbeFile%dir  = trim(data_dir)//'/PROBES'
-                call AppendToFile(ProbeFile,it)
-
-                write(ProbeFile%unit,10) it, time, p_mean_gbl, T_mean_gbl, &
-                                       r_mean_gbl, u_mean_gbl, v_mean_gbl, w_mean_gbl
-                10 format(1i10,7e18.9)
-        
-                call CloseFile(ProbeFile)
-              endif
-       
-           endif
-        enddo
-
-        return
-end subroutine writeProbes
-
-
-
-
-
-
-subroutine WriteMassFlowSupersonicIntake
-
-        use FileModule
-        use math_tools_module     , only: DegtoRad
-        use real_to_integer_module, only: nearest_integer_opt
-
-        implicit none
-        type(FileType)         :: massFile
-        real(rp), dimension(3) :: PidStr, PidEnd
-        real(rp), parameter    :: L0 = 150.0_rp   , hc = 0.24_rp
-        real(rp), parameter    :: t1 = 10.00_rp   , t2 = 22.00_rp
-        real(rp), parameter    :: r1 = 52.80_rp/L0, r2 = 32.36_rp/L0
-        real(rp)               :: b1, b2, xst, yst, dA
-        real(rp)               :: lcl_mFlow, gbl_mFlow, m0, massFlow
-        integer                :: i0, js, je, err = 0
-
-        PidStr = (/x(sx)  , y(sy)  , z(sz)  /)
-        PidEnd = (/x(ex+1), y(ey+1), z(ez+1)/)
-
-        b1 = r1*sin(degtorad(t1))
-        b2 = r2*sin(degtorad(t2))
-
-        xst = (L0 -  53.00_rp)/L0
-        yst = b1 + b2
-        
-        ! reference mass flow
-        m0  = u_inf*Ly*Lz
-
-        gbl_mFlow = -huge(1.0_rp)
-        if(xst > PidStr(1) .and. xst < PidEnd(1)) then
-          
-          i0 = nearest_integer_opt(x,sx,ex,xst)
-          js = nearest_integer_opt(y,sy,ey,yst)
-          je = nearest_integer_opt(y,sy,ey,hc)
-
-          lcl_mFlow = 0.0_rp
-          do k    = sz,ez
-             do j = js,je
-
-                dA = ystep(j)*zstep(k)
-                lcl_mFlow = lcl_mFlow + phi(i0,j,k,2)*dA
-
-             enddo
-          enddo
-          call MPI_allreduce(lcl_mFlow,gbl_mFlow,1,MPI_RP,mpi_sum,comm2Dyz,err)
-
-        endif
-
-        call MPI_allreduce(gbl_mFlow,massFlow,1,MPI_RP,mpi_max,mpi_comm_world,err)
-
-        if(rank == root) then
-
-          massFile%name = 'mass_flow'
-          massFile%dir  = trim(data_dir)//'/MASS_FLOW'
-          call AppendToFile(massFile,it)
-          
-          write(massFile%unit,10) it, time, massFlow/m0
-          10 format(1i10,2e18.9)
-          call CloseFile(massFile)
-
-        endif
-
-
-        return
-end subroutine WriteMassFlowSupersonicIntake
-
 
 
 

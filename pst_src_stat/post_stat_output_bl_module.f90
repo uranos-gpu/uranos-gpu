@@ -14,7 +14,7 @@ public write_bl_streamwise_stats, write_bl_wall_normal_stats, &
 contains
 subroutine write_bl_streamwise_stats
 
-        use Fluid_functions_module, only: Sutherland
+        use Fluid_functions_module, only: laminar_viscosity
         use FileModule
 
         implicit none
@@ -36,7 +36,7 @@ subroutine write_bl_streamwise_stats
            rcF = Prandtl**(1.0_rp/3.0_rp)
            T_w = Trat*(1.0_rp + rcF*0.5_rp*(gamma0-1.0_rp)*Mach**2)
            r_w = vmean2D(i,sy,11)/T_w
-           m_w = Sutherland(T_w)
+           m_w = laminar_viscosity(T_w,Tref,vis_flag)
 
            dudyw = (-22._rp*FavreVelU2D(i,1)+36._rp*FavreVelU2D(i,2)-18._rp*FavreVelU2D(i,3)+ 4._rp*FavreVelU2D(i,4))/12._rp
            dy    = (-22._rp*            y(1)+36._rp*            y(2)-18._rp*            y(3)+ 4._rp*            y(4))/12._rp

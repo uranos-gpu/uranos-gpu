@@ -1,5 +1,5 @@
 module output_tch
-use parameters_module, only: rp
+use parameters_module, only: rp, Tref, vis_flag
 
 implicit none
 private
@@ -86,14 +86,12 @@ end subroutine stat_turbulent_channel
 
 
 
-
-
-
 subroutine GetMeanWallQuantities(jW,vmean1D,wl)
         
-        use parameters_module     , only: gamma0, mu_inf, bc, wmles
-        use fluid_functions_module, only: Sutherland
+        use parameters_module     , only: gamma0, mu_inf, bc, wmles, Tref
+        use fluid_functions_module, only: laminar_viscosity
         use storage_module        , only: vmean0D_wmles
+        use wmles_module          , only: compute_tau_wall_wmles1D
 
         implicit none
         
@@ -104,7 +102,7 @@ subroutine GetMeanWallQuantities(jW,vmean1D,wl)
         ! get wall quantities
         wl%tmp = 1.0_rp
         wl%rho = vmean1D(jW,11)/wl%tmp
-        wl%vis = Sutherland(wl%tmp)
+        wl%vis = laminar_viscosity(wl%tmp,Tref,vis_flag)
         wl%u_y = (vmean1D(jW,18)*vmean1D(jW,1) - vmean1D(jW,2)*vmean1D(jW,17))/(vmean1D(jW,1)**2)
 
         ! compute tau wall
@@ -159,7 +157,7 @@ subroutine TransformVanDriest(sy,ey,vmean1D,wl,plus)
         integer  :: j
 
         plus%uVD = 0.0_rp
-        do j = sy,ey
+        do j = sy+1,ey
            du = plus%u(j) - plus%u(j-1)
            uc = sqrt(vmean1D(j,1)/wl%rho)
            plus%uVD(j) = plus%uVD(j-1) + uc*du

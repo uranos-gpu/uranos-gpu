@@ -2,6 +2,7 @@ module init_bc_module
 use parameters_module
 use storage_module
 use ic_module
+use random_module
 implicit none
 
 public init_boundary_conditions
@@ -14,6 +15,8 @@ subroutine init_boundary_conditions
 
         implicit none
         integer :: err = 0
+        integer :: i,j,k
+        real(rp) :: r_, u_, v_, w_, p_
 
         if(len_trim(restart_file).eq.0) then
                 
@@ -21,6 +24,7 @@ subroutine init_boundary_conditions
                 if    (ic == 'ambient'        .or. &
                        ic == 'hTurb'          .or. &
                        ic == 'KolmogorovFlow' .or. &
+                       ic == 'blades'         .or. &
                        ic == 'smooth_body')  then
                         call ambient(err)
 
@@ -175,24 +179,39 @@ subroutine init_boundary_conditions
                 endif
                 
                 ! initialize conservative variable
-                !$omp workshare
-                phi(:,:,:,2) = phi(:,:,:,1) * U
-                phi(:,:,:,3) = phi(:,:,:,1) * V
-                phi(:,:,:,4) = phi(:,:,:,1) * W
-                phi(:,:,:,5) = (P)/(gamma0-1._rp)+0.5_rp*phi(:,:,:,1)*(U**2+V**2+W**2)
+                do       k = lbz,ubz
+                   do    j = lby,uby
+                      do i = lbx,ubx
+                           
+                           r_ = phi(i,j,k,1)
+                           u_ = U(i,j,k)
+                           v_ = V(i,j,k)
+                           w_ = W(i,j,k)
+                           p_ = P(i,j,k)
 
-                T = P/phi(:,:,:,1)
-                !$omp end workshare
+                           phi(i,j,k,2) = r_ * u_
+                           phi(i,j,k,3) = r_ * v_
+                           phi(i,j,k,4) = r_ * w_
+                           phi(i,j,k,5) = p_/(gamma0-1._rp)+0.5_rp*r_*(u_*u_+v_*v_+w_*w_)
 
-                if(viscous) then
-                  !$omp workshare
-                  VIS = T*sqrt(T) * (1.0_rp+suthc)/(T+suthc)
-                  !$omp end workshare
+                           T(i,j,k) = p_/r_
 
-                  !$omp workshare
-                  LMD = k_inf * VIS
-                  !$omp end workshare
-                endif
+                      enddo
+                   enddo
+               enddo
+
+               if(viscous) then
+                 do       k = lbz,ubz
+                    do    j = lby,uby
+                       do i = lbx,ubx
+
+                          VIS(i,j,k) = laminar_viscosity(T(i,j,k),tref,vis_flag)
+                          LMD(i,j,k) = k_inf * VIS(i,j,k)
+
+                       enddo
+                    enddo
+                 enddo
+               endif
 
         ! ============= init from file ============== !
         else 
@@ -395,6 +414,7 @@ subroutine init_previous_stats(restart_file)
         
         itStat = itStat - 1 
 
+
         return
 end subroutine init_previous_stats
 
@@ -571,35 +591,6 @@ end subroutine mpi_read_stat2D
 
 
 
-
-!subroutine restart_turbulent_channel(force_turbulent_channel)
-!
-!        implicit none
-!        real(rp), intent(inout) :: force_turbulent_channel
-!
-!        character(dl) :: tchFile
-!        real(rp)      :: dummy
-!        integer       :: funit = 10, err = 0
-!        logical       :: FileExist
-!
-!        tchFile = 'DATA/'//trim(data_dir)//'/TCH_MONITOR.txt'
-!
-!        inquire(file = tchFile,exist = FileExist)
-!        if(FileExist) then
-!        
-!          open(unit = funit, file = tchFile, access = 'sequential', iostat=err)
-!          if(err .ne. 0) stop 'TCH_MONITOR.txt not been found'
-!        
-!          do 
-!            read(funit,*,iostat=err) dummy,dummy, dummy, dummy, &
-!                    force_turbulent_channel,dummy,dummy, dummy, dummy
-!            if(err .ne. 0) exit
-!          enddo
-!          close(funit)
-!
-!        endif
-!
-!end subroutine restart_turbulent_channel
 
 
 end module init_bc_module

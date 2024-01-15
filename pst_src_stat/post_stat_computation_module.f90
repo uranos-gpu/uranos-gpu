@@ -13,7 +13,7 @@ subroutine ComputeAdditionalStats
         implicit none
 
         selectcase(pcharAll)
-        case('FFT')
+        case('FFT','FTT')
           call ComputeAdditionalStats2D(vmean2D)
 
         case('TFT')

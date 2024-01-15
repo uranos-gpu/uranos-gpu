@@ -6,6 +6,49 @@ use performance_module
 implicit none
 contains
 
+
+integer function RealToInt(x,lbx,ubx,xi) result(minIndex)
+        !$acc routine seq
+        use parameters_module, only: rp
+
+        implicit none
+        real(rp), allocatable, dimension(:), intent(in) :: x
+        real(rp)                           , intent(in) :: xi
+        integer                            , intent(in) :: lbx,ubx
+
+        real(rp) :: minDistance, distance
+        integer  :: left, right, mid
+
+        left        = lbx
+        right       = ubx
+        minIndex    = left
+        minDistance = abs(xi - x(left))
+
+        do while (left <= right)
+
+           mid = (left + right)/2
+
+           distance = abs(xi - x(mid))
+
+           if(distance < minDistance) then
+             minDistance = distance
+             minIndex = mid
+           endif
+
+           if(xi < x(mid)) then
+             right = mid - 1
+           else
+             left  = mid + 1
+           endif
+
+        enddo
+
+
+        return
+end function RealToInt
+
+
+
 function optFloor(x,lb,ub,xl) result(il)
 
         use parameters_module, only: rp
@@ -17,41 +60,28 @@ function optFloor(x,lb,ub,xl) result(il)
         integer                                         :: il
 
         ! local declarations
-        integer, parameter :: not_found = -100
         integer            :: lo, hi, mid
-
-#ifdef TIME
-        call mpi_stime(s_flr_time)
-#endif
-
-        il = not_found
-        if(xl < x(lb)) then
-          il = lb
-          return
-        endif
-        if(xl > x(ub)) then
-          il = ub-1
-          return
-        endif
 
         lo = lb
         hi = ub
-        do while((lo <= hi) .and. il == not_found)
+        il = lo
 
-           mid = (lo+hi)/2
-           if(xl >= x(mid) .and. xl <= x(mid+1)) then
-             il = mid ! found it
-           elseif(x(mid+1) > xl) then
-             hi = mid-1
-           elseif(x(mid)   < xl) then
-             lo = mid+1
-           endif
+        ! Binary search
+        do while (hi - lo > 1)
+            mid = (lo + hi) / 2
+            if (x(mid) <= xl) then
+                lo = mid
+            else
+                hi = mid
+            end if
+        end do
 
-        enddo
-
-#ifdef TIME
-        call mpi_etime(s_flr_time,t_flr_calls,t_flr_time)
-#endif
+        ! Determine the floor index
+        if (x(il) <= xl) then
+            il = lo
+        else
+            il = lo - 1
+        end if
 
         return
 end function optFloor
@@ -60,11 +90,10 @@ end function optFloor
 
 
 function locFloor(x,lb,ub,xl) result(il)
-
         use parameters_module, only: rp
 
         implicit none
-        real(rp), dimension(:), allocatable, intent(in) :: x
+        real(rp), allocatable, dimension(:), intent(in) :: x
         integer                            , intent(in) :: lb, ub
         real(rp)                           , intent(in) :: xl
         integer                                         :: il

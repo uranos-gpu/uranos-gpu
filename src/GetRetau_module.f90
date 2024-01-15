@@ -130,7 +130,7 @@ subroutine GetReynolds_TBL
         
         use mesh_module           , only: compute_grid_point
         use fluid_functions_module, only: MuskerProfile, CompressibleCorrection, &
-                                          Sutherland
+                                          laminar_viscosity
 
         implicit none
 
@@ -157,7 +157,7 @@ subroutine GetReynolds_TBL
         
         ! obtain reference Reynolds number
         ue       = maxval(UPlusCmp)
-        mWall    = Sutherland(tWall)
+        mWall    = laminar_viscosity(tWall,Tref,vis_flag)
 
         ReOut    = ReTau*ue/rWall*mWall
         Reynolds = ReOut
@@ -174,7 +174,7 @@ subroutine GetReynolds_SmoothBody
 
         use mesh_module, only: compute_grid_point
         use fluid_functions_module, only: MuskerProfile, CompressibleCorrection, &
-                                          sutherland
+                                          laminar_viscosity
 
         implicit none
         integer, parameter :: n = 10000
@@ -202,7 +202,7 @@ subroutine GetReynolds_SmoothBody
                                      UPlusInc,UPlusCmp,RhoY,TmpY)
 
         ue = maxval(UPlusCmp)
-        mWall    = Sutherland(tWall)
+        mWall    = laminar_viscosity(tWall,Tref,vis_flag)
 
         ReOut    = ReTau*ue/rWall*mWall!*(1.0_rp/0.032_rp)
         Reynolds = ReOut

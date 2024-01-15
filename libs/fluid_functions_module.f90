@@ -4,24 +4,39 @@ use storage_module
 implicit none
 contains
 
-elemental function Sutherland(t) result(mu_t)
-! -------------------------------------------------------------
-!       Sutherland's Law valid till T/T_ref = 3.5_rp
-! -------------------------------------------------------------
+elemental function laminar_viscosity(t,tref,vis_flag) result(mu_t)
         !$acc routine seq
         use parameters_module, only: rp
 
+        ! Tref 1 62.9_rp
+        ! Tref 2 107.1_rp
+
         implicit none
-
-        real(rp), parameter :: suthc = 110.4_rp/273.15_rp
-
         real(rp), intent(in) :: T
-        real(rp)             :: mu_t
+        real(rp), intent(in) :: Tref
+        integer , intent(in) :: vis_flag
 
-        mu_t = T*sqrt(T) * (1.0_rp+suthc)/(T+suthc)
+        real(rp), parameter  :: suthc = 110.4_rp
+        real(rp)             :: a,b,mu_t
+
+        mu_t = 0.0_rp
+        if    (vis_flag == 0) then      
+
+          a     = sqrt(T)
+          mu_t  = a*sqrt(a)
+
+        elseif(vis_flag == 1) then
+
+          a = suthc/Tref
+          b = 1.0_rp + a
+
+          mu_t = T*sqrt(T) * b/(T+a)
+
+        endif
+
 
         return
-end function Sutherland
+end function laminar_viscosity
 
 
 
@@ -32,8 +47,8 @@ elemental function getmuT(rho,tauw,yj,mul) result(mut)
         real(rp), intent(in) :: rho,tauw,yj,mul
         real(rp)             :: mut
 
-        real(rp), parameter :: vkc = 0.41_rp !0.384_rp
-        real(rp), parameter :: A_p = 17.0_rp !15.5_rp
+        real(rp), parameter :: vkc = 0.41_rp
+        real(rp), parameter :: iAp = 1.0_rp/17.0_rp
         real(rp)            :: y_s
         real(rp)            :: DvD
         real(rp)            :: abstauw
@@ -41,7 +56,7 @@ elemental function getmuT(rho,tauw,yj,mul) result(mut)
         abstauw = abs(tauW)
 
         y_s = yj*sqrt(rho*abstauw)/mul
-        DvD = (1.0_rp-exp(-y_s/A_p))**2
+        DvD = (1.0_rp-exp(-y_s*iAp))**2
         mut = vkc*rho*sqrt(abstauw/rho)*yj*DvD
 
         return

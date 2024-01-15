@@ -11,8 +11,8 @@ contains
 subroutine compute_1DStats(phi,VIS,nx,nz,nVar,itStat,&
                           sx,ex,sy,ey,sz,ez,comm,vmean,mpi_flag)
 
-        use parameters_module     , only: rp, gamma0
-        use fluid_functions_module, only: Sutherland
+        use parameters_module     , only: rp, gamma0, Tref, vis_flag
+        use fluid_functions_module, only: laminar_viscosity
         use storage_module        , only: central_1, central_fd_order
         use mesh_module           , only: ystep_i
         use mpi_module            , only: lby,uby
@@ -54,7 +54,7 @@ subroutine compute_1DStats(phi,VIS,nx,nz,nVar,itStat,&
                  p_ = (gamma0-1.0_rp)*(re - r_*ek)
                  T_ = p_*ir
 
-                 mL = Sutherland(T_)
+                 mL = laminar_viscosity(T_,Tref,vis_flag)
                  mT = VIS(i,j,k) - mL
 
                  ! conservative variables
@@ -144,10 +144,10 @@ end subroutine compute_1DStats
 subroutine compute_2DStats(phi,VIS,nz,nVar,itStat, &
                            sx,ex,sy,ey,sz,ez,comm,vmean,mpi_flag)
         
-        use parameters_module     , only: rp, gamma0, central_fd_order, hybrid_weno
-        use fluid_functions_module, only: Sutherland
+        use parameters_module     , only: rp, gamma0, central_fd_order, hybrid_weno, Tref, vis_flag
+        use fluid_functions_module, only: laminar_viscosity
         use mpi_module            , only: lbx,ubx, lby,uby
-        use storage_module        , only: central_1, vmean2D_aux, SSENSOR, weno
+        use storage_module        , only: central_1, vmean2D_aux, SSENSOR, weno_flag
         use mesh_module           , only: xstep_i, ystep_i, zstep_i
 
         implicit none
@@ -175,7 +175,7 @@ subroutine compute_2DStats(phi,VIS,nz,nVar,itStat, &
         real(rp) :: rvx, rvy, rvz
         real(rp) :: rwx, rwy, rwz
         real(rp) :: omx, omy, omz
-        real(rp) :: sensor, weno_flag
+        real(rp) :: sensor, weno_flag_
 
         tmp_lcl = 0.0_rp
         tmp_gbl = 0.0_rp
@@ -196,7 +196,7 @@ subroutine compute_2DStats(phi,VIS,nz,nVar,itStat, &
                  c_ = sqrt(gamma0*T_)
                  ve = sqrt(u_*u_ + v_*v_ + w_*w_)
 
-                 mL = Sutherland(T_)
+                 mL = laminar_viscosity(T_,Tref,vis_flag)
                  mT = VIS(i,j,k) - mL
 
                  ! conservative variables
@@ -310,9 +310,9 @@ subroutine compute_2DStats(phi,VIS,nz,nVar,itStat, &
                    tmp_lcl(i,j,32) = tmp_lcl(i,j,32) + sensor
                    tmp_lcl(i,j,33) = tmp_lcl(i,j,33) + sensor*sensor
 
-                   weno_flag = real(weno%flag(i,j,k),rp)
-                   tmp_lcl(i,j,34) = tmp_lcl(i,j,34) + weno_flag
-                   tmp_lcl(i,j,35) = tmp_lcl(i,j,35) + weno_flag*weno_flag
+                   weno_flag_ = real(weno_flag(i,j,k),rp)
+                   tmp_lcl(i,j,34) = tmp_lcl(i,j,34) + weno_flag_
+                   tmp_lcl(i,j,35) = tmp_lcl(i,j,35) + weno_flag_*weno_flag_
                  endif
 
               enddo

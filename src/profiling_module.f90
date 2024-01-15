@@ -1,5 +1,6 @@
 module profiling_module
 use nvtx
+use roctx
 implicit none
 
 
@@ -7,6 +8,7 @@ contains
 
 subroutine StartProfRange(char)
         use nvtx
+        use roctx
         implicit none
         character(*), intent(in) :: char
 
@@ -14,10 +16,8 @@ subroutine StartProfRange(char)
         call nvtxStartRange(char)
 #endif
 
-#ifdef rocTX
-
-        ! ... insert here rocTX calls
-
+#ifdef ROCTX
+        call roctxStartRange(char)
 #endif
 
         return
@@ -31,10 +31,8 @@ subroutine EndProfRange
         call nvtxEndRange
 #endif
 
-#ifdef rocTX
-
-        ! ... insert here rocTX calls
-
+#ifdef ROCTX
+        call roctxEndRange
 #endif
 
 

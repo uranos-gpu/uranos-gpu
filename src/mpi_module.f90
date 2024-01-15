@@ -5,9 +5,6 @@ use mpi
 use openacc
 #endif
 use allocate_module
-#ifdef TIME
-use performance_module
-#endif
 implicit none
 
 ! cpu variables
@@ -85,7 +82,9 @@ subroutine init_mpi
 !       MPI initialization
 ! ------------------------------------------------------
         implicit none
+#ifdef _OPENACC
         integer :: local_comm, local_rank
+#endif
 
 #ifdef OPENMP
         required = MPI_THREAD_FUNNELED
@@ -99,21 +98,24 @@ subroutine init_mpi
         mpi_flag = .true.
 
 #ifdef _OPENACC
-
         call MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, &
-             0, MPI_INFO_NULL, local_comm,mpi_err)
-        call MPI_Comm_rank(local_comm, local_rank, mpi_err)
-
-        call acc_init(acc_device_nvidia)
-        num_dev = acc_get_num_devices(acc_device_nvidia)
-        dev_id = mod(local_rank,num_dev)
-        call acc_set_device_num(dev_id,acc_device_nvidia)
-
-        print*, 'Rank ', local_rank, 'is associated to GPU', dev_id
-
+                                 0, MPI_INFO_NULL, local_comm,mpi_err)
+        call MPI_Comm_rank(local_comm, local_rank, mpi_err)
+#ifdef NVIDIA
+        call acc_init(acc_device_nvidia)
+        num_dev = acc_get_num_devices(acc_device_nvidia)
+        dev_id = mod(local_rank,num_dev)
+        call acc_set_device_num(dev_id,acc_device_nvidia)
+#endif
+#ifdef AMD
+        call acc_init(acc_device_host)
+        dev_id = local_rank
+        call acc_set_device_num(dev_id,acc_device_host)
+#endif
+        print*, 'Rank ', local_rank, 'is associated to GPU', dev_id
 #endif
 
-        call check_mpi('init_mpi',mpi_err)
+        call MPI_BARRIER(MPI_COMM_WORLD,mpi_err)
         
         return
 end subroutine init_mpi
@@ -324,6 +326,7 @@ subroutine init_subdomain_boundaries
                 if(cuda_aware)         write(*,*) ' CUDA-AWARE MPI enabled'
                 write(*,*)
                 write(*,'(1x,A,A)')    ' Advection scheme    : ', trim(scheme)
+                write(*,'(1x,A,A)')    ' Diffusion scheme    : ', trim(diffusion_scheme)
                 write(*,'(1x,A,i4)')   ' FD accurary order   : ', fd_order
                 write(*,'(1x,A,i4)')   ' WENO accurary order : ', weno_order
                 if(viscous) then
@@ -400,7 +403,7 @@ subroutine init_mpi_exchange_data
         ! ==== init mpi derived data data for conservative variables
         call init_mpi_buffers
 
-        call init_mpi_type_field(ndims_cons,eqs  ,MPI_RP, type_send_cons, type_recv_cons)
+        call init_mpi_type_field(ndims_cons,5,MPI_RP, type_send_cons, type_recv_cons)
         
         if    (dims == 2) then
           allocate(req_array_xx(4), req_array_yz(4))
@@ -730,7 +733,6 @@ subroutine mpi_communicate4D_int1(tp_send,tp_recv,var)
 
         return
 end subroutine mpi_communicate4D_int1
-
 
 
 

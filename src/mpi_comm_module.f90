@@ -51,14 +51,14 @@ subroutine mpi_share4D(mpi_comm_cart,type_send_cons,type_recv_cons,my_neighbour,
         
           if(cuda_aware) then
           call mpi_communicate4D_real8_sendrecv_cuda_aware(mpi_comm_cart,&
-                my_neighbour,dims,&
+                my_neighbour,&
                 phi_bfr_send_E, phi_bfr_send_W, phi_bfr_recv_E, phi_bfr_recv_W, &
                 phi_bfr_send_N, phi_bfr_send_S, phi_bfr_recv_N, phi_bfr_recv_S, &
                 phi_bfr_send_B, phi_bfr_send_F, phi_bfr_recv_B, phi_bfr_recv_F, &
                 phi)
 
           else
-          call mpi_communicate4D_real8_sendrecv(mpi_comm_cart,my_neighbour,dims,&
+          call mpi_communicate4D_real8_sendrecv(mpi_comm_cart,my_neighbour,&
                 phi_bfr_send_E, phi_bfr_send_W, phi_bfr_recv_E, phi_bfr_recv_W, &
                 phi_bfr_send_N, phi_bfr_send_S, phi_bfr_recv_N, phi_bfr_recv_S, &
                 phi_bfr_send_B, phi_bfr_send_F, phi_bfr_recv_B, phi_bfr_recv_F, &
@@ -69,13 +69,13 @@ subroutine mpi_share4D(mpi_comm_cart,type_send_cons,type_recv_cons,my_neighbour,
         
           if(cuda_aware) then
           call mpi_communicate4D_real8_bfr_cuda_aware(mpi_comm_cart,&
-                my_neighbour,dims    , &
+                my_neighbour, &
                 phi_bfr_send_E, phi_bfr_send_W, phi_bfr_recv_E, phi_bfr_recv_W, &
                 phi_bfr_send_N, phi_bfr_send_S, phi_bfr_recv_N, phi_bfr_recv_S, &
                 phi_bfr_send_B, phi_bfr_send_F, phi_bfr_recv_B, phi_bfr_recv_F, &
                 phi)
           else
-          call mpi_communicate4D_real8_bfr(mpi_comm_cart,my_neighbour,dims    , &
+          call mpi_communicate4D_real8_bfr(mpi_comm_cart,my_neighbour, &
                 phi_bfr_send_E, phi_bfr_send_W, phi_bfr_recv_E, phi_bfr_recv_W, &
                 phi_bfr_send_N, phi_bfr_send_S, phi_bfr_recv_N, phi_bfr_recv_S, &
                 phi_bfr_send_B, phi_bfr_send_F, phi_bfr_recv_B, phi_bfr_recv_F, &
@@ -135,14 +135,14 @@ subroutine mpi_share3D(mpi_comm_cart,type_send_prim,type_recv_prim,my_neighbour,
 
           if(cuda_aware) then
           call mpi_communicate3D_real8_sendrecv_cuda_aware(mpi_comm_cart,&
-                my_neighbour,dims,&
+                my_neighbour,&
                 bfr_send_E, bfr_send_W, bfr_recv_E, bfr_recv_W, &
                 bfr_send_N, bfr_send_S, bfr_recv_N, bfr_recv_S, &
                 bfr_send_B, bfr_send_F, bfr_recv_B, bfr_recv_F, &
                 var)
 
           else
-          call mpi_communicate3D_real8_sendrecv(mpi_comm_cart,my_neighbour,dims,&
+          call mpi_communicate3D_real8_sendrecv(mpi_comm_cart,my_neighbour,&
                 bfr_send_E, bfr_send_W, bfr_recv_E, bfr_recv_W, &
                 bfr_send_N, bfr_send_S, bfr_recv_N, bfr_recv_S, &
                 bfr_send_B, bfr_send_F, bfr_recv_B, bfr_recv_F, &
@@ -153,13 +153,13 @@ subroutine mpi_share3D(mpi_comm_cart,type_send_prim,type_recv_prim,my_neighbour,
         
           if(cuda_aware) then
           call mpi_communicate3D_real8_bfr_cuda_aware(mpi_comm_cart, &
-                my_neighbour,dims, &
+                my_neighbour, &
                 bfr_send_E, bfr_send_W, bfr_recv_E, bfr_recv_W, &
                 bfr_send_N, bfr_send_S, bfr_recv_N, bfr_recv_S, &
                 bfr_send_B, bfr_send_F, bfr_recv_B, bfr_recv_F, &
                 var)
           else
-          call mpi_communicate3D_real8_bfr(mpi_comm_cart,my_neighbour,dims, &
+          call mpi_communicate3D_real8_bfr(mpi_comm_cart,my_neighbour, &
                 bfr_send_E, bfr_send_W, bfr_recv_E, bfr_recv_W, &
                 bfr_send_N, bfr_send_S, bfr_recv_N, bfr_recv_S, &
                 bfr_send_B, bfr_send_F, bfr_recv_B, bfr_recv_F, &
@@ -188,7 +188,7 @@ end subroutine mpi_share3D
 
 
 
-subroutine mpi_shareInt3D(mpi_comm_cart,type_send_prim,type_recv_prim,my_neighbour,dims, &
+subroutine mpi_shareInt3D(mpi_comm_cart,type_send_prim,type_recv_prim,my_neighbour, &
                 bfr_send_E, bfr_send_W, bfr_recv_E, bfr_recv_W, &
                 bfr_send_N, bfr_send_S, bfr_recv_N, bfr_recv_S, &
                 bfr_send_B, bfr_send_F, bfr_recv_B, bfr_recv_F, &
@@ -211,20 +211,19 @@ subroutine mpi_shareInt3D(mpi_comm_cart,type_send_prim,type_recv_prim,my_neighbo
         integer                , dimension(6)    , intent(in)    :: type_send_prim
         integer                , dimension(6)    , intent(in)    :: type_recv_prim
         integer                , dimension(6)    , intent(in)    :: my_neighbour
-        integer                                  , intent(in)    :: dims
         integer                                  , intent(in)    :: mpi_comm_cart
         
         selectcase(mpi_opt_level)
         case(1) !SENDRECV
         if(cuda_aware) then
         call mpi_communicateInt3D_sendrecv_cuda_aware(mpi_comm_cart,&
-                        my_neighbour,dims,&
+                        my_neighbour,&
                         bfr_send_E, bfr_send_W, bfr_recv_E, bfr_recv_W, &
                         bfr_send_N, bfr_send_S, bfr_recv_N, bfr_recv_S, &
                         bfr_send_B, bfr_send_F, bfr_recv_B, bfr_recv_F, &
                         var)
         else
-        call mpi_communicateInt3D_sendrecv(mpi_comm_cart,my_neighbour,dims,&
+        call mpi_communicateInt3D_sendrecv(mpi_comm_cart,my_neighbour,&
                         bfr_send_E, bfr_send_W, bfr_recv_E, bfr_recv_W, &
                         bfr_send_N, bfr_send_S, bfr_recv_N, bfr_recv_S, &
                         bfr_send_B, bfr_send_F, bfr_recv_B, bfr_recv_F, &
@@ -234,13 +233,13 @@ subroutine mpi_shareInt3D(mpi_comm_cart,type_send_prim,type_recv_prim,my_neighbo
         case(2) !ISEND/IRECV + BUFFERS
         if(cuda_aware) then
         call mpi_communicateInt3D_isend_irecv_bfr_cuda_aware(mpi_comm_cart,&
-                        my_neighbour,dims,&
+                        my_neighbour ,&
                         bfr_send_E, bfr_send_W, bfr_recv_E, bfr_recv_W, &
                         bfr_send_N, bfr_send_S, bfr_recv_N, bfr_recv_S, &
                         bfr_send_B, bfr_send_F, bfr_recv_B, bfr_recv_F, &
                         var)
         else
-        call mpi_communicateInt3D_isend_irecv_bfr(mpi_comm_cart,my_neighbour,dims,&
+        call mpi_communicateInt3D_isend_irecv_bfr(mpi_comm_cart,my_neighbour,&
                         bfr_send_E, bfr_send_W, bfr_recv_E, bfr_recv_W, &
                         bfr_send_N, bfr_send_S, bfr_recv_N, bfr_recv_S, &
                         bfr_send_B, bfr_send_F, bfr_recv_B, bfr_recv_F, &
@@ -250,10 +249,10 @@ subroutine mpi_shareInt3D(mpi_comm_cart,type_send_prim,type_recv_prim,my_neighbo
         case(3) ! ISEND/IRECV + DERIVED DATA TYPES
          if(cuda_aware) then
          call mpi_communicateInt3D_isend_irecv_ddt_cuda_aware(mpi_comm_cart,&
-                    type_send_prim,type_recv_prim,my_neighbour,dims,var)
+                    type_send_prim,type_recv_prim,my_neighbour,var)
          else
          call mpi_communicateInt3D_isend_irecv_ddt(mpi_comm_cart,&
-                    type_send_prim,type_recv_prim,my_neighbour,dims,var)
+                    type_send_prim,type_recv_prim,my_neighbour,var)
          endif
         case default
 
@@ -336,7 +335,7 @@ subroutine mpi_communicate3D_real8(comm,tp_send,tp_recv,neigh,dims,var)
         integer                                , intent(in)    :: comm
 
         ! local declarations
-        integer, dimension(4)       :: req_xx
+        integer, dimension(4)       :: req_x
         integer, dimension(2**dims) :: req_yz
 
         integer, parameter :: tag = 0
@@ -347,14 +346,14 @@ subroutine mpi_communicate3D_real8(comm,tp_send,tp_recv,neigh,dims,var)
         !
         ! === E/W communications
         !
-        call MPI_IRECV(var,1,tp_recv(W),neigh(W),tag+1,comm,req_xx(1),err)
-        call MPI_IRECV(var,1,tp_recv(E),neigh(E),tag+2,comm,req_xx(2),err)
+        call MPI_IRECV(var,1,tp_recv(W),neigh(W),tag+1,comm,req_x(1),err)
+        call MPI_IRECV(var,1,tp_recv(E),neigh(E),tag+2,comm,req_x(2),err)
 
-        call MPI_ISEND(var,1,tp_send(E),neigh(E),tag+1,comm,req_xx(3),err)
-        call MPI_ISEND(var,1,tp_send(W),neigh(W),tag+2,comm,req_xx(4),err)
+        call MPI_ISEND(var,1,tp_send(E),neigh(E),tag+1,comm,req_x(3),err)
+        call MPI_ISEND(var,1,tp_send(W),neigh(W),tag+2,comm,req_x(4),err)
 
         ! wait till communications end (corner needed)
-        call MPI_waitall(size(req_xx), req_xx, MPI_STATUSES_IGNORE, err)
+        call MPI_waitall(size(req_x), req_x, MPI_STATUSES_IGNORE, err)
 
         !
         ! === N/S communications
@@ -399,7 +398,7 @@ subroutine mpi_communicate3D_real8_cuda_aware(comm,tp_send,tp_recv,neigh,dims,va
         integer                                , intent(in)    :: comm
 
         ! local declarations
-        integer, dimension(4)       :: req_xx
+        integer, dimension(4)       :: req_x
         integer, dimension(2**dims) :: req_yz
 
         integer, parameter :: tag = 0
@@ -410,14 +409,14 @@ subroutine mpi_communicate3D_real8_cuda_aware(comm,tp_send,tp_recv,neigh,dims,va
         !
         ! === E/W communications
         !
-        call MPI_IRECV(var,1,tp_recv(W),neigh(W),tag+1,comm,req_xx(1),err)
-        call MPI_IRECV(var,1,tp_recv(E),neigh(E),tag+2,comm,req_xx(2),err)
+        call MPI_IRECV(var,1,tp_recv(W),neigh(W),tag+1,comm,req_x(1),err)
+        call MPI_IRECV(var,1,tp_recv(E),neigh(E),tag+2,comm,req_x(2),err)
 
-        call MPI_ISEND(var,1,tp_send(E),neigh(E),tag+1,comm,req_xx(3),err)
-        call MPI_ISEND(var,1,tp_send(W),neigh(W),tag+2,comm,req_xx(4),err)
+        call MPI_ISEND(var,1,tp_send(E),neigh(E),tag+1,comm,req_x(3),err)
+        call MPI_ISEND(var,1,tp_send(W),neigh(W),tag+2,comm,req_x(4),err)
 
         ! wait till communications end (corner needed)
-        call MPI_waitall(size(req_xx), req_xx, MPI_STATUSES_IGNORE, err)
+        call MPI_waitall(size(req_x), req_x, MPI_STATUSES_IGNORE, err)
 
         !
         ! === N/S communications
@@ -492,7 +491,7 @@ subroutine mpi_communicate4D_real8(comm,tp_send,tp_recv,neigh,dims,var)
         integer                                   , intent(in)    :: comm
 
         ! local 
-        integer, dimension(4)       :: req_xx
+        integer, dimension(4)       :: req_x
         integer, dimension(2**dims) :: req_yz
 
         integer, parameter :: tag = 0
@@ -503,14 +502,14 @@ subroutine mpi_communicate4D_real8(comm,tp_send,tp_recv,neigh,dims,var)
         !
         ! === E/W communications
         !
-        call MPI_IRECV(var,1,tp_recv(W),neigh(W),tag+1,comm,req_xx(1),err)
-        call MPI_IRECV(var,1,tp_recv(E),neigh(E),tag+2,comm,req_xx(2),err)
+        call MPI_IRECV(var,1,tp_recv(W),neigh(W),tag+1,comm,req_x(1),err)
+        call MPI_IRECV(var,1,tp_recv(E),neigh(E),tag+2,comm,req_x(2),err)
 
-        call MPI_ISEND(var,1,tp_send(E),neigh(E),tag+1,comm,req_xx(3),err)
-        call MPI_ISEND(var,1,tp_send(W),neigh(W),tag+2,comm,req_xx(4),err)
+        call MPI_ISEND(var,1,tp_send(E),neigh(E),tag+1,comm,req_x(3),err)
+        call MPI_ISEND(var,1,tp_send(W),neigh(W),tag+2,comm,req_x(4),err)
 
         ! wait till communications end (corner needed)
-        call MPI_waitall(size(req_xx), req_xx, MPI_STATUSES_IGNORE, err)
+        call MPI_waitall(size(req_x), req_x, MPI_STATUSES_IGNORE, err)
 
         !
         ! === N/S communications
@@ -552,7 +551,7 @@ subroutine mpi_communicate4D_real8_cuda_aware(comm,tp_send,tp_recv,neigh,dims,va
         integer                                   , intent(in)    :: comm
 
         ! local 
-        integer, dimension(4)       :: req_xx
+        integer, dimension(4)       :: req_x
         integer, dimension(2**dims) :: req_yz
 
         integer, parameter :: tag = 0
@@ -563,14 +562,14 @@ subroutine mpi_communicate4D_real8_cuda_aware(comm,tp_send,tp_recv,neigh,dims,va
         !
         ! === E/W communications
         !
-        call MPI_IRECV(var,1,tp_recv(W),neigh(W),tag+1,comm,req_xx(1),err)
-        call MPI_IRECV(var,1,tp_recv(E),neigh(E),tag+2,comm,req_xx(2),err)
+        call MPI_IRECV(var,1,tp_recv(W),neigh(W),tag+1,comm,req_x(1),err)
+        call MPI_IRECV(var,1,tp_recv(E),neigh(E),tag+2,comm,req_x(2),err)
 
-        call MPI_ISEND(var,1,tp_send(E),neigh(E),tag+1,comm,req_xx(3),err)
-        call MPI_ISEND(var,1,tp_send(W),neigh(W),tag+2,comm,req_xx(4),err)
+        call MPI_ISEND(var,1,tp_send(E),neigh(E),tag+1,comm,req_x(3),err)
+        call MPI_ISEND(var,1,tp_send(W),neigh(W),tag+2,comm,req_x(4),err)
 
         ! wait till communications end (corner needed)
-        call MPI_waitall(size(req_xx), req_xx, MPI_STATUSES_IGNORE, err)
+        call MPI_waitall(size(req_x), req_x, MPI_STATUSES_IGNORE, err)
 
         !
         ! === N/S communications
@@ -618,7 +617,7 @@ end subroutine mpi_communicate4D_real8_cuda_aware
 
 
 
-subroutine mpi_communicate4D_real8_bfr(comm,neigh,dims,&
+subroutine mpi_communicate4D_real8_bfr(comm,neigh,&
                                        bfr_s_E, bfr_s_W, bfr_r_E, bfr_r_W, &
                                        bfr_s_N, bfr_s_S, bfr_r_N, bfr_r_S, &
                                        bfr_s_B, bfr_s_F, bfr_r_B, bfr_r_F, &
@@ -639,20 +638,19 @@ subroutine mpi_communicate4D_real8_bfr(comm,neigh,dims,&
         real(rp), allocatable, dimension(:,:,:,:) , intent(inout) :: bfr_r_B
         real(rp), allocatable, dimension(:,:,:,:) , intent(inout) :: bfr_r_F
         integer              , dimension(6)       , intent(in)    :: neigh
-        integer                                   , intent(in)    :: dims
         integer                                   , intent(in)    :: comm
 
         ! local declaration
         integer, parameter    :: dtype = MPI_RP
         integer, dimension(4) :: bfr_dims_x, bfr_dims_y, bfr_dims_z
-        integer, dimension(4) :: req_xx
-        integer, dimension(4) :: req_yy
-        integer, dimension(4) :: req_zz
+        integer, dimension(4) :: req_x
+        integer, dimension(4) :: req_y
+        integer, dimension(4) :: req_z
         integer               :: bfr_size_x, bfr_size_y, bfr_size_z
 
         integer, parameter :: tag = 0
         integer, parameter :: W = 1, E = 2, S = 3, N = 4, B = 5, F = 6
-        integer            :: i,j,k,l,err = 0, ii, jj, kk
+        integer            :: i,j,k,l,err = 0, ii, jj, kk, q
 
         !
         ! === buffer dimensions
@@ -665,111 +663,173 @@ subroutine mpi_communicate4D_real8_bfr(comm,neigh,dims,&
         bfr_size_y = bfr_dims_y(1)*bfr_dims_y(2)*bfr_dims_y(3)*bfr_dims_y(4)
         bfr_size_z = bfr_dims_z(1)*bfr_dims_z(2)*bfr_dims_z(3)*bfr_dims_z(4)
 
+        
+        if(neigh(E) >= 0) then
+          !$acc parallel default(present)
+          !$acc loop gang, vector collapse(4)
+          do          l = 1,5
+             do       k = lbz,ubz
+                do    j = lby,uby
+                   do i = 1,GN    
+                      ii = ex-GN+i  !ex+1-GN,ex
+                      bfr_s_E(ii,j,k,l) = var(ii,j,k,l)
+                   enddo
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+          !$acc update host(bfr_s_E) 
+        endif
+        
+        if(neigh(W) >= 0) then
+          !$acc parallel default(present)
+          !$acc loop gang, vector collapse(4)
+          do          l = 1,5
+             do       k = lbz,ubz
+                do    j = lby,uby
+                   do i = 1,GN    
+                      ii = sx-1+i   !sx,sx+GN-1
+                      bfr_s_W(ii,j,k,l) = var(ii,j,k,l)
+                   enddo
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+          !$acc update host(bfr_s_W) 
+        endif
 
-        !$acc parallel default(present) async(1)
-        !$acc loop gang, vector collapse(4)
-        do          l = 1,5
-           do       k = lbz,ubz
-              do    j = lby,uby
-                 do i = 1,GN    
-                    ii = ex-GN+i  !ex+1-GN,ex
-                    bfr_s_E(ii,j,k,l) = var(ii,j,k,l)
-                    ii = sx-1+i   !sx,sx+GN-1
-                    bfr_s_W(ii,j,k,l) = var(ii,j,k,l)
-                 enddo
-              enddo
-           enddo
-        enddo
-        !$acc end parallel
+        if(neigh(N) >= 0) then
+          !$acc parallel default(present)
+          !$acc loop gang, vector collapse(4)
+          do          l = 1,5
+             do       k = lbz,ubz
+                do    j = 1,GN    
+                   do i = lbx,ubx
+                      jj = ey-GN+j !ey+1-GN,ey
+                      bfr_s_N(i,jj,k,l) = var(i,jj,k,l)
+                   enddo
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+          !$acc update host(bfr_s_N) 
+        endif
 
-        !$acc parallel default(present) async(2)
-        !$acc loop gang, vector collapse(4)
-        do          l = 1,5
-           do       k = lbz,ubz
-              do    j = 1,GN    
-                 do i = lbx,ubx
-                    jj = ey-GN+j !ey+1-GN,ey
-                    bfr_s_N(i,jj,k,l) = var(i,jj,k,l)
-                    jj = sy-1+j  !sy,sy+GN-1
-                    bfr_s_S(i,jj,k,l) = var(i,jj,k,l)
-                 enddo
-              enddo
-           enddo
-        enddo
-        !$acc end parallel
+        if(neigh(S) >= 0) then
+          !$acc parallel default(present)
+          !$acc loop gang, vector collapse(4)
+          do          l = 1,5
+             do       k = lbz,ubz
+                do    j = 1,GN    
+                   do i = lbx,ubx
+                      jj = sy-1+j  !sy,sy+GN-1
+                      bfr_s_S(i,jj,k,l) = var(i,jj,k,l)
+                   enddo
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+          !$acc update host(bfr_s_S) 
+        endif
 
-        !$acc parallel default(present) async(3)
-        !$acc loop gang, vector collapse(4)
-        do          l = 1,5
-           do       k = 1,GN 
-              do    j = lby,uby
-                 do i = lbx,ubx
-                    kk = ez-GN+k  !ez+1-GN,ez
-                    bfr_s_F(i,j,kk,l) = var(i,j,kk,l)
-                    kk = sz-1+k   !sz,sz+GN-1
-                    bfr_s_B(i,j,kk,l) = var(i,j,kk,l)
-                 enddo
-              enddo
-           enddo
-        enddo
-        !$acc end parallel
+        if(neigh(F) >= 0) then
+          !$acc parallel default(present)
+          !$acc loop gang, vector collapse(4)
+          do          l = 1,5
+             do       k = 1,GN 
+                do    j = lby,uby
+                   do i = lbx,ubx
+                      kk = ez-GN+k  !ez+1-GN,ez
+                      bfr_s_F(i,j,kk,l) = var(i,j,kk,l)
+                   enddo
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+          !$acc update host(bfr_s_F) 
+        endif
 
-        !$acc wait(1)
-        !$acc update host(bfr_s_E) async(4)
-        !$acc update host(bfr_s_W) async(5)
-
-        !$acc wait(2)
-        !$acc update host(bfr_s_N) async(6)
-        !$acc update host(bfr_s_S) async(7)
-
-        !$acc wait(3)
-        !$acc update host(bfr_s_F) async(8)
-        !$acc update host(bfr_s_B) async(9)
+        if(neigh(B) >= 0) then
+          !$acc parallel default(present)
+          !$acc loop gang, vector collapse(4)
+          do          l = 1,5
+             do       k = 1,GN 
+                do    j = lby,uby
+                   do i = lbx,ubx
+                      kk = sz-1+k   !sz,sz+GN-1
+                      bfr_s_B(i,j,kk,l) = var(i,j,kk,l)
+                   enddo
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+          !$acc update host(bfr_s_B) 
+        endif
 
         !
         ! === east - west communications
         !
-        call MPI_IRECV(bfr_r_W,bfr_size_x,dtype,neigh(W),tag+1,comm,req_xx(2),err)
-        call MPI_IRECV(bfr_r_E,bfr_size_x,dtype,neigh(E),tag+2,comm,req_xx(4),err)
+        q = 0
+        if(neigh(E) >= 0) then
+        call MPI_IRECV(bfr_r_E,bfr_size_x,dtype,neigh(E),tag+1,comm,req_x(q+1),err)
+        call MPI_ISEND(bfr_s_E,bfr_size_x,dtype,neigh(E),tag+2,comm,req_x(q+2),err)
+        q = q+2
+        endif
 
-        !$acc wait(4)
-        call MPI_ISEND(bfr_s_E,bfr_size_x,dtype,neigh(E),tag+1,comm,req_xx(1),err)
-        !$acc wait(5)
-        call MPI_ISEND(bfr_s_W,bfr_size_x,dtype,neigh(W),tag+2,comm,req_xx(3),err)
+        if(neigh(W) >= 0) then
+        call MPI_IRECV(bfr_r_W,bfr_size_x,dtype,neigh(W),tag+2,comm,req_x(q+1),err)
+        call MPI_ISEND(bfr_s_W,bfr_size_x,dtype,neigh(W),tag+1,comm,req_x(q+2),err)
+        q = q+2
+        endif
 
         ! wait till communications end (corner needed)
-        call MPI_waitall(size(req_xx), req_xx, MPI_STATUSES_IGNORE, err)
-        !$acc update device(bfr_r_W,bfr_r_E) async(10)
+        if(q > 0) then 
+           call MPI_waitall(q, req_x, MPI_STATUSES_IGNORE, err)
+           !$acc update device(bfr_r_W,bfr_r_E) 
+        endif
 
         !
         ! ==== nord-south communications
         !
-        call MPI_IRECV(bfr_r_S,bfr_size_y,dtype,neigh(S),tag+3,comm,req_yy(2),err)
-        call MPI_IRECV(bfr_r_N,bfr_size_y,dtype,neigh(N),tag+4,comm,req_yy(4),err)
+        q = 0
+        if(neigh(N) >= 0) then
+        call MPI_IRECV(bfr_r_N,bfr_size_y,dtype,neigh(N),tag+1,comm,req_y(q+1),err)
+        call MPI_ISEND(bfr_s_N,bfr_size_y,dtype,neigh(N),tag+2,comm,req_y(q+2),err)
+        q = q+2
+        endif
 
-        !$acc wait(6)
-        call MPI_ISEND(bfr_s_N,bfr_size_y,dtype,neigh(N),tag+3,comm,req_yy(1),err)
-        !$acc wait(7)
-        call MPI_ISEND(bfr_s_S,bfr_size_y,dtype,neigh(S),tag+4,comm,req_yy(3),err)
+        if(neigh(S) >= 0) then
+        call MPI_IRECV(bfr_r_S,bfr_size_y,dtype,neigh(S),tag+2,comm,req_y(q+1),err)
+        call MPI_ISEND(bfr_s_S,bfr_size_y,dtype,neigh(S),tag+1,comm,req_y(q+2),err)
+        q = q+2
+        endif
 
-        call MPI_waitall(size(req_yy), req_yy, MPI_STATUSES_IGNORE, err)
-        !$acc update device(bfr_r_N,bfr_r_S) async(11)
+        if(q > 0) then 
+          call MPI_waitall(q, req_y, MPI_STATUSES_IGNORE, err)
+          !$acc update device(bfr_r_N,bfr_r_S)
+        endif
 
         !
         ! ==== backward-forwvar communications
         !
-        call MPI_IRECV(bfr_r_B,bfr_size_z,dtype,neigh(B),tag+5,comm,req_zz(2),err)
-        call MPI_IRECV(bfr_r_F,bfr_size_z,dtype,neigh(F),tag+6,comm,req_zz(4),err)
+        q = 0
+        if(neigh(F) >= 0) then
+        call MPI_IRECV(bfr_r_F,bfr_size_z,dtype,neigh(F),tag+1,comm,req_z(q+1),err)
+        call MPI_ISEND(bfr_s_F,bfr_size_z,dtype,neigh(F),tag+2,comm,req_z(q+2),err)
+        q = q+2
+        endif
+        
+        if(neigh(B) >= 0) then
+        call MPI_IRECV(bfr_r_B,bfr_size_z,dtype,neigh(B),tag+2,comm,req_z(q+1),err)
+        call MPI_ISEND(bfr_s_B,bfr_size_z,dtype,neigh(B),tag+1,comm,req_z(q+2),err)
+        q = q+2
+        endif
 
-        !$acc wait(8)
-        call MPI_ISEND(bfr_s_F,bfr_size_z,dtype,neigh(F),tag+5,comm,req_zz(1),err)
-        !$acc wait(9)
-        call MPI_ISEND(bfr_s_B,bfr_size_z,dtype,neigh(B),tag+6,comm,req_zz(3),err)
+        if(q > 0) then
+          call MPI_waitall(q, req_z, MPI_STATUSES_IGNORE, err)
+          !$acc update device(bfr_r_F,bfr_r_B)
+        endif
 
-        call MPI_waitall(size(req_zz), req_zz, MPI_STATUSES_IGNORE, err)
-        !$acc update device(bfr_r_F,bfr_r_B) async(12)
-
-        !$acc wait(10)
         if(neigh(W)>=0) then
         !$acc parallel default(present) async(1)
         !$acc loop gang, vector collapse(4)
@@ -802,7 +862,6 @@ subroutine mpi_communicate4D_real8_bfr(comm,neigh,dims,&
         !$acc end parallel
         endif
 
-        !$acc wait(11)
         if(neigh(S)>=0) then
         !$acc parallel default(present) async(3)
         !$acc loop gang, vector collapse(4)
@@ -835,7 +894,6 @@ subroutine mpi_communicate4D_real8_bfr(comm,neigh,dims,&
         !$acc end parallel
         endif
 
-        !$acc wait(12)
         if(neigh(B)>=0) then
         !$acc parallel default(present) async(5)
         !$acc loop gang, vector collapse(4)
@@ -868,25 +926,7 @@ subroutine mpi_communicate4D_real8_bfr(comm,neigh,dims,&
         !$acc end parallel 
         endif
 
-        if(neigh(W)>=0) then
-          !$acc wait(1)
-        endif
-        if(neigh(E)>=0) then
-          !$acc wait(2)
-        endif
-        if(neigh(S)>=0) then
-          !$acc wait(3)
-        endif
-        if(neigh(N)>=0) then
-          !$acc wait(4)
-        endif
-        if(neigh(B)>=0) then
-          !$acc wait(5)
-        endif
-        if(neigh(F)>=0) then
-          !$acc wait(6)
-        endif
-
+        !$acc wait
 
         return
 end subroutine mpi_communicate4D_real8_bfr
@@ -894,7 +934,7 @@ end subroutine mpi_communicate4D_real8_bfr
 
 
 
-subroutine mpi_communicate4D_real8_bfr_cuda_aware(comm,neigh,dims,&
+subroutine mpi_communicate4D_real8_bfr_cuda_aware(comm,neigh,&
                                        bfr_s_E, bfr_s_W, bfr_r_E, bfr_r_W, &
                                        bfr_s_N, bfr_s_S, bfr_r_N, bfr_r_S, &
                                        bfr_s_B, bfr_s_F, bfr_r_B, bfr_r_F, &
@@ -915,20 +955,19 @@ subroutine mpi_communicate4D_real8_bfr_cuda_aware(comm,neigh,dims,&
         real(rp), allocatable, dimension(:,:,:,:) , intent(inout) :: bfr_r_B
         real(rp), allocatable, dimension(:,:,:,:) , intent(inout) :: bfr_r_F
         integer              , dimension(6)       , intent(in)    :: neigh
-        integer                                   , intent(in)    :: dims
         integer                                   , intent(in)    :: comm
 
         ! local declaration
         integer, parameter    :: dtype = MPI_RP
         integer, dimension(4) :: bfr_dims_x, bfr_dims_y, bfr_dims_z
-        integer, dimension(4) :: req_xx
-        integer, dimension(4) :: req_yy
-        integer, dimension(4) :: req_zz
+        integer, dimension(4) :: req_x
+        integer, dimension(4) :: req_y
+        integer, dimension(4) :: req_z
         integer               :: bfr_size_x, bfr_size_y, bfr_size_z
 
         integer, parameter :: tag = 0
         integer, parameter :: W = 1, E = 2, S = 3, N = 4, B = 5, F = 6
-        integer            :: i,j,k,l,err = 0, ii, jj, kk
+        integer            :: i,j,k,l,err = 0, ii, jj, kk, q
 
         !
         ! === buffer dimensions
@@ -941,55 +980,103 @@ subroutine mpi_communicate4D_real8_bfr_cuda_aware(comm,neigh,dims,&
         bfr_size_y = bfr_dims_y(1)*bfr_dims_y(2)*bfr_dims_y(3)*bfr_dims_y(4)
         bfr_size_z = bfr_dims_z(1)*bfr_dims_z(2)*bfr_dims_z(3)*bfr_dims_z(4)
 
+        if(neigh(E) >= 0) then 
+          !$acc parallel default(present) async(1)
+          !$acc loop gang, vector collapse(4)
+          do          l = 1,5
+             do       k = lbz,ubz
+                do    j = lby,uby
+                   do i = 1,GN    
+                      ii = ex-GN+i  !ex+1-GN,ex
+                      bfr_s_E(ii,j,k,l) = var(ii,j,k,l)
+                   enddo
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+        endif
 
-        !$acc parallel default(present) async(1)
-        !$acc loop gang, vector collapse(4)
-        do          l = 1,5
-           do       k = lbz,ubz
-              do    j = lby,uby
-                 do i = 1,GN    
-                    ii = ex-GN+i  !ex+1-GN,ex
-                    bfr_s_E(ii,j,k,l) = var(ii,j,k,l)
-                    ii = sx-1+i   !sx,sx+GN-1
-                    bfr_s_W(ii,j,k,l) = var(ii,j,k,l)
-                 enddo
-              enddo
-           enddo
-        enddo
-        !$acc end parallel
+        if(neigh(W) >= 0) then
+          !$acc parallel default(present) async(2)
+          !$acc loop gang, vector collapse(4)
+          do          l = 1,5
+             do       k = lbz,ubz
+                do    j = lby,uby
+                   do i = 1,GN    
+                      ii = sx-1+i   !sx,sx+GN-1
+                      bfr_s_W(ii,j,k,l) = var(ii,j,k,l)
+                   enddo
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+        endif
 
-        !$acc parallel default(present) async(2)
-        !$acc loop gang, vector collapse(4)
-        do          l = 1,5
-           do       k = lbz,ubz
-              do    j = 1,GN    
-                 do i = lbx,ubx
-                    jj = ey-GN+j !ey+1-GN,ey
-                    bfr_s_N(i,jj,k,l) = var(i,jj,k,l)
-                    jj = sy-1+j  !sy,sy+GN-1
-                    bfr_s_S(i,jj,k,l) = var(i,jj,k,l)
-                 enddo
-              enddo
-           enddo
-        enddo
-        !$acc end parallel
+        if(neigh(N) >= 0) then
+          !$acc parallel default(present) async(3)
+          !$acc loop gang, vector collapse(4)
+          do          l = 1,5
+             do       k = lbz,ubz
+                do    j = 1,GN    
+                   do i = lbx,ubx
+                      jj = ey-GN+j !ey+1-GN,ey
+                      bfr_s_N(i,jj,k,l) = var(i,jj,k,l)
+                   enddo
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+        endif
 
-        !$acc parallel default(present) async(3)
-        !$acc loop gang, vector collapse(4)
-        do          l = 1,5
-           do       k = 1,GN 
-              do    j = lby,uby
-                 do i = lbx,ubx
-                    kk = ez-GN+k  !ez+1-GN,ez
-                    bfr_s_F(i,j,kk,l) = var(i,j,kk,l)
-                    kk = sz-1+k   !sz,sz+GN-1
-                    bfr_s_B(i,j,kk,l) = var(i,j,kk,l)
-                 enddo
-              enddo
-           enddo
-        enddo
-        !$acc end parallel
+        if(neigh(S) >= 0) then
+          !$acc parallel default(present) async(4)
+          !$acc loop gang, vector collapse(4)
+          do          l = 1,5
+             do       k = lbz,ubz
+                do    j = 1,GN    
+                   do i = lbx,ubx
+                      jj = sy-1+j  !sy,sy+GN-1
+                      bfr_s_S(i,jj,k,l) = var(i,jj,k,l)
+                   enddo
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+        endif
 
+        if(neigh(F) >= 0) then
+          !$acc parallel default(present) async(5)
+          !$acc loop gang, vector collapse(4)
+          do          l = 1,5
+             do       k = 1,GN 
+                do    j = lby,uby
+                   do i = lbx,ubx
+                      kk = ez-GN+k  !ez+1-GN,ez
+                      bfr_s_F(i,j,kk,l) = var(i,j,kk,l)
+                   enddo
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+        endif
+
+        if(neigh(B) >= 0) then
+          !$acc parallel default(present) async(6)
+          !$acc loop gang, vector collapse(4)
+          do          l = 1,5
+             do       k = 1,GN 
+                do    j = lby,uby
+                   do i = lbx,ubx
+                      kk = sz-1+k   !sz,sz+GN-1
+                      bfr_s_B(i,j,kk,l) = var(i,j,kk,l)
+                   enddo
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+        endif
+
+        !$acc wait
 
         !$acc host_data use_device(bfr_s_E,bfr_r_W) &
         !$acc           use_device(bfr_s_W,bfr_r_E) &
@@ -1001,39 +1088,57 @@ subroutine mpi_communicate4D_real8_bfr_cuda_aware(comm,neigh,dims,&
         !
         ! === east - west communications
         !
-        call MPI_IRECV(bfr_r_W,bfr_size_x,dtype,neigh(W),tag+1,comm,req_xx(2),err)
-        call MPI_IRECV(bfr_r_E,bfr_size_x,dtype,neigh(E),tag+2,comm,req_xx(4),err)
+        q = 0
+        if(neigh(E) >= 0) then
+        call MPI_IRECV(bfr_r_E,bfr_size_x,dtype,neigh(E),tag+1,comm,req_x(q+1),err)
+        call MPI_ISEND(bfr_s_E,bfr_size_x,dtype,neigh(E),tag+2,comm,req_x(q+2),err)
+        q = q+2
+        endif
         
-        !$acc wait(1)
-        call MPI_ISEND(bfr_s_E,bfr_size_x,dtype,neigh(E),tag+1,comm,req_xx(1),err)
-        call MPI_ISEND(bfr_s_W,bfr_size_x,dtype,neigh(W),tag+2,comm,req_xx(3),err)
+        if(neigh(W) >= 0) then
+        call MPI_IRECV(bfr_r_W,bfr_size_x,dtype,neigh(W),tag+2,comm,req_x(q+1),err)
+        call MPI_ISEND(bfr_s_W,bfr_size_x,dtype,neigh(W),tag+1,comm,req_x(q+2),err)
+        q = q+2
+        endif
 
         ! wait till communications end (corner needed)
-        call MPI_waitall(size(req_xx), req_xx, MPI_STATUSES_IGNORE, err)
+        if(q > 0) call MPI_waitall(q, req_x, MPI_STATUSES_IGNORE, err)
 
         !
         ! ==== nord-south communications
         !
-        call MPI_IRECV(bfr_r_S,bfr_size_y,dtype,neigh(S),tag+3,comm,req_yy(2),err)
-        call MPI_IRECV(bfr_r_N,bfr_size_y,dtype,neigh(N),tag+4,comm,req_yy(4),err)
+        q = 0
+        if(neigh(S) >= 0) then
+        call MPI_IRECV(bfr_r_S,bfr_size_y,dtype,neigh(S),tag+1,comm,req_y(q+1),err)
+        call MPI_ISEND(bfr_s_S,bfr_size_y,dtype,neigh(S),tag+2,comm,req_y(q+2),err)
+        q = q+2
+        endif
 
-        !$acc wait(2)
-        call MPI_ISEND(bfr_s_N,bfr_size_y,dtype,neigh(N),tag+3,comm,req_yy(1),err)
-        call MPI_ISEND(bfr_s_S,bfr_size_y,dtype,neigh(S),tag+4,comm,req_yy(3),err)
+        if(neigh(N) >= 0) then
+        call MPI_IRECV(bfr_r_N,bfr_size_y,dtype,neigh(N),tag+2,comm,req_y(q+1),err)
+        call MPI_ISEND(bfr_s_N,bfr_size_y,dtype,neigh(N),tag+1,comm,req_y(q+2),err)
+        q = q+2
+        endif
 
-        call MPI_waitall(size(req_yy), req_yy, MPI_STATUSES_IGNORE, err)
+        if(q > 0) call MPI_waitall(q, req_y, MPI_STATUSES_IGNORE, err)
 
         !
         ! ==== backward-forwvar communications
         !
-        call MPI_IRECV(bfr_r_B,bfr_size_z,dtype,neigh(B),tag+5,comm,req_zz(2),err)
-        call MPI_IRECV(bfr_r_F,bfr_size_z,dtype,neigh(F),tag+6,comm,req_zz(4),err)
+        q = 0
+        if(neigh(B) >= 0) then
+        call MPI_IRECV(bfr_r_B,bfr_size_z,dtype,neigh(B),tag+1,comm,req_z(q+1),err)
+        call MPI_ISEND(bfr_s_B,bfr_size_z,dtype,neigh(B),tag+2,comm,req_z(q+2),err)
+        q = q+2
+        endif
+        
+        if(neigh(F) >= 0) then
+        call MPI_IRECV(bfr_r_F,bfr_size_z,dtype,neigh(F),tag+2,comm,req_z(q+1),err)
+        call MPI_ISEND(bfr_s_F,bfr_size_z,dtype,neigh(F),tag+1,comm,req_z(q+2),err)
+        q = q+2
+        endif
 
-        !$acc wait(3)
-        call MPI_ISEND(bfr_s_F,bfr_size_z,dtype,neigh(F),tag+5,comm,req_zz(1),err)
-        call MPI_ISEND(bfr_s_B,bfr_size_z,dtype,neigh(B),tag+6,comm,req_zz(3),err)
-
-        call MPI_waitall(size(req_zz), req_zz, MPI_STATUSES_IGNORE, err)
+        if(q > 0) call MPI_waitall(q, req_z, MPI_STATUSES_IGNORE, err)
 
         !$acc end host_data
 
@@ -1133,25 +1238,7 @@ subroutine mpi_communicate4D_real8_bfr_cuda_aware(comm,neigh,dims,&
         !$acc end parallel 
         endif
 
-        if(neigh(W)>=0) then
-          !$acc wait(1)
-        endif
-        if(neigh(E)>=0) then
-          !$acc wait(2)
-        endif
-        if(neigh(S)>=0) then
-          !$acc wait(3)
-        endif
-        if(neigh(N)>=0) then
-          !$acc wait(4)
-        endif
-        if(neigh(B)>=0) then
-          !$acc wait(5)
-        endif
-        if(neigh(F)>=0) then
-          !$acc wait(6)
-        endif
-
+        !$acc wait
 
         return
 end subroutine mpi_communicate4D_real8_bfr_cuda_aware
@@ -1189,7 +1276,7 @@ end subroutine mpi_communicate4D_real8_bfr_cuda_aware
 
 
 
-subroutine mpi_communicate3D_real8_bfr(comm,neigh,dims,&
+subroutine mpi_communicate3D_real8_bfr(comm,neigh,&
                                        bfr_s_E, bfr_s_W, bfr_r_E, bfr_r_W, &
                                        bfr_s_N, bfr_s_S, bfr_r_N, bfr_r_S, &
                                        bfr_s_B, bfr_s_F, bfr_r_B, bfr_r_F, &
@@ -1210,20 +1297,19 @@ subroutine mpi_communicate3D_real8_bfr(comm,neigh,dims,&
         real(rp), allocatable, dimension(:,:,:) , intent(inout) :: bfr_r_B
         real(rp), allocatable, dimension(:,:,:) , intent(inout) :: bfr_r_F
         integer              , dimension(6)     , intent(in)    :: neigh
-        integer                                 , intent(in)    :: dims
         integer                                 , intent(in)    :: comm
 
         ! local declaration
         integer, parameter    :: dtype = MPI_RP
         integer, dimension(3) :: bfr_dims_x, bfr_dims_y, bfr_dims_z
-        integer, dimension(4) :: req_xx
-        integer, dimension(4) :: req_yy
-        integer, dimension(4) :: req_zz
+        integer, dimension(4) :: req_x
+        integer, dimension(4) :: req_y
+        integer, dimension(4) :: req_z
         integer               :: bfr_size_x, bfr_size_y, bfr_size_z
 
         integer, parameter :: tag = 0
         integer, parameter :: W = 1, E = 2, S = 3, N = 4, B = 5, F = 6
-        integer            :: i,j,k,err = 0, ii, jj, kk
+        integer            :: i,j,k,err = 0, ii, jj, kk, q
 
         !
         ! === buffer dimensions
@@ -1236,105 +1322,160 @@ subroutine mpi_communicate3D_real8_bfr(comm,neigh,dims,&
         bfr_size_y = bfr_dims_y(1)*bfr_dims_y(2)*bfr_dims_y(3)
         bfr_size_z = bfr_dims_z(1)*bfr_dims_z(2)*bfr_dims_z(3)
 
+        if(neigh(E) >= 0) then
+          !$acc parallel default(present) 
+          !$acc loop gang, vector collapse(3)
+          do       k = lbz,ubz
+             do    j = lby,uby
+                do i = 1,GN    
+                   ii = ex-GN+i  !ex+1-GN,ex
+                   bfr_s_E(ii,j,k) = var(ii,j,k)
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+          !$acc update host(bfr_s_E) 
+        endif
 
-        !$acc parallel default(present) async(1)
-        !$acc loop gang, vector collapse(3)
-        do       k = lbz,ubz
-           do    j = lby,uby
-              do i = 1,GN    
-                 ii = ex-GN+i  !ex+1-GN,ex
-                 bfr_s_E(ii,j,k) = var(ii,j,k)
-                 ii = sx-1+i   !sx,sx+GN-1
-                 bfr_s_W(ii,j,k) = var(ii,j,k)
-              enddo
-           enddo
-        enddo
-        !$acc end parallel
+        if(neigh(W) >= 0) then
+          !$acc parallel default(present)
+          !$acc loop gang, vector collapse(3)
+          do       k = lbz,ubz
+             do    j = lby,uby
+                do i = 1,GN    
+                   ii = sx-1+i   !sx,sx+GN-1
+                   bfr_s_W(ii,j,k) = var(ii,j,k)
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+          !$acc update host(bfr_s_W) 
+        endif
+        
+        if(neigh(N) >= 0) then
+          !$acc parallel default(present)
+          !$acc loop gang, vector collapse(3)
+          do       k = lbz,ubz
+             do    j = 1,GN    
+                do i = lbx,ubx
+                   jj = ey-GN+j !ey+1-GN,ey
+                   bfr_s_N(i,jj,k) = var(i,jj,k)
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+          !$acc update host(bfr_s_N) 
+        endif
 
-        !$acc parallel default(present) async(2)
-        !$acc loop gang, vector collapse(3)
-        do       k = lbz,ubz
-           do    j = 1,GN    
-              do i = lbx,ubx
-                 jj = ey-GN+j !ey+1-GN,ey
-                 bfr_s_N(i,jj,k) = var(i,jj,k)
-                 jj = sy-1+j  !sy,sy+GN-1
-                 bfr_s_S(i,jj,k) = var(i,jj,k)
-              enddo
-           enddo
-        enddo
-        !$acc end parallel
+        if(neigh(S) >= 0) then
+          !$acc parallel default(present)
+          !$acc loop gang, vector collapse(3)
+          do       k = lbz,ubz
+             do    j = 1,GN    
+                do i = lbx,ubx
+                   jj = sy-1+j  !sy,sy+GN-1
+                   bfr_s_S(i,jj,k) = var(i,jj,k)
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+          !$acc update host(bfr_s_S) 
+        endif
 
-        !$acc parallel default(present) async(3)
-        !$acc loop gang, vector collapse(3)
-        do       k = 1,GN 
-           do    j = lby,uby
-              do i = lbx,ubx
-                 kk = ez-GN+k  !ez+1-GN,ez
-                 bfr_s_F(i,j,kk) = var(i,j,kk)
-                 kk = sz-1+k   !sz,sz+GN-1
-                 bfr_s_B(i,j,kk) = var(i,j,kk)
-              enddo
-           enddo
-        enddo
-        !$acc end parallel
+        if(neigh(F) >= 0) then
+          !$acc parallel default(present)
+          !$acc loop gang, vector collapse(3)
+          do       k = 1,GN 
+             do    j = lby,uby
+                do i = lbx,ubx
+                   kk = ez-GN+k  !ez+1-GN,ez
+                   bfr_s_F(i,j,kk) = var(i,j,kk)
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+          !$acc update host(bfr_s_F) 
+        endif
 
-        !$acc wait(1)
-        !$acc update host(bfr_s_E) async(4)
-        !$acc update host(bfr_s_W) async(5)
-
-        !$acc wait(2)
-        !$acc update host(bfr_s_N) async(6)
-        !$acc update host(bfr_s_S) async(7)
-
-        !$acc wait(3)
-        !$acc update host(bfr_s_F) async(8)
-        !$acc update host(bfr_s_B) async(9)
+        if(neigh(B) >= 0) then
+          !$acc parallel default(present)
+          !$acc loop gang, vector collapse(3)
+          do       k = 1,GN 
+             do    j = lby,uby
+                do i = lbx,ubx
+                   kk = sz-1+k   !sz,sz+GN-1
+                   bfr_s_B(i,j,kk) = var(i,j,kk)
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+          !$acc update host(bfr_s_B) 
+        endif
 
         !
         ! === east - west communications
         !
-        call MPI_IRECV(bfr_r_W,bfr_size_x,dtype,neigh(W),tag+1,comm,req_xx(2),err)
-        call MPI_IRECV(bfr_r_E,bfr_size_x,dtype,neigh(E),tag+2,comm,req_xx(4),err)
+        q = 0
+        if(neigh(E) >= 0) then
+        call MPI_IRECV(bfr_r_E,bfr_size_x,dtype,neigh(E),tag+1,comm,req_x(q+1),err)
+        call MPI_ISEND(bfr_s_E,bfr_size_x,dtype,neigh(E),tag+2,comm,req_x(q+2),err)
+        q = q+2
+        endif
 
-        !$acc wait(4)
-        call MPI_ISEND(bfr_s_E,bfr_size_x,dtype,neigh(E),tag+1,comm,req_xx(1),err)
-        !$acc wait(5)
-        call MPI_ISEND(bfr_s_W,bfr_size_x,dtype,neigh(W),tag+2,comm,req_xx(3),err)
+        if(neigh(W) >= 0) then
+        call MPI_IRECV(bfr_r_W,bfr_size_x,dtype,neigh(W),tag+2,comm,req_x(q+1),err)
+        call MPI_ISEND(bfr_s_W,bfr_size_x,dtype,neigh(W),tag+1,comm,req_x(q+2),err)
+        q = q+2
+        endif
 
         ! wait till communications end (corner needed)
-        call MPI_waitall(size(req_xx), req_xx, MPI_STATUSES_IGNORE, err)
-        !$acc update device(bfr_r_W,bfr_r_E) async(10)
+        if(q > 0) then
+          call MPI_waitall(q, req_x, MPI_STATUSES_IGNORE, err)
+          !$acc update device(bfr_r_W,bfr_r_E)
+        endif
 
         !
         ! ==== nord-south communications
         !
-        call MPI_IRECV(bfr_r_S,bfr_size_y,dtype,neigh(S),tag+3,comm,req_yy(2),err)
-        call MPI_IRECV(bfr_r_N,bfr_size_y,dtype,neigh(N),tag+4,comm,req_yy(4),err)
+        q = 0
+        if(neigh(N) >= 0) then
+        call MPI_IRECV(bfr_r_N,bfr_size_y,dtype,neigh(N),tag+1,comm,req_y(q+1),err)
+        call MPI_ISEND(bfr_s_N,bfr_size_y,dtype,neigh(N),tag+2,comm,req_y(q+2),err)
+        q = q+2
+        endif
 
-        !$acc wait(6)
-        call MPI_ISEND(bfr_s_N,bfr_size_y,dtype,neigh(N),tag+3,comm,req_yy(1),err)
-        !$acc wait(7)
-        call MPI_ISEND(bfr_s_S,bfr_size_y,dtype,neigh(S),tag+4,comm,req_yy(3),err)
+        if(neigh(S) >= 0) then
+        call MPI_IRECV(bfr_r_S,bfr_size_y,dtype,neigh(S),tag+2,comm,req_y(q+1),err)
+        call MPI_ISEND(bfr_s_S,bfr_size_y,dtype,neigh(S),tag+1,comm,req_y(q+2),err)
+        q = q+2
+        endif
 
-        call MPI_waitall(size(req_yy), req_yy, MPI_STATUSES_IGNORE, err)
-        !$acc update device(bfr_r_N,bfr_r_S) async(11)
+        if(q > 0) then 
+          call MPI_waitall(q, req_y, MPI_STATUSES_IGNORE, err)
+          !$acc update device(bfr_r_N,bfr_r_S)
+        endif
 
         !
         ! ==== backward-forwvar communications
         !
-        call MPI_IRECV(bfr_r_B,bfr_size_z,dtype,neigh(B),tag+5,comm,req_zz(2),err)
-        call MPI_IRECV(bfr_r_F,bfr_size_z,dtype,neigh(F),tag+6,comm,req_zz(4),err)
+        q = 0
+        if(neigh(F) >= 0) then
+        call MPI_IRECV(bfr_r_F,bfr_size_z,dtype,neigh(F),tag+1,comm,req_z(q+1),err)
+        call MPI_ISEND(bfr_s_F,bfr_size_z,dtype,neigh(F),tag+2,comm,req_z(q+2),err)
+        q = q+2
+        endif
 
-        !$acc wait(8)
-        call MPI_ISEND(bfr_s_F,bfr_size_z,dtype,neigh(F),tag+5,comm,req_zz(1),err)
-        !$acc wait(9)
-        call MPI_ISEND(bfr_s_B,bfr_size_z,dtype,neigh(B),tag+6,comm,req_zz(3),err)
+        if(neigh(B) >= 0) then
+        call MPI_IRECV(bfr_r_B,bfr_size_z,dtype,neigh(B),tag+2,comm,req_z(q+1),err)
+        call MPI_ISEND(bfr_s_B,bfr_size_z,dtype,neigh(B),tag+1,comm,req_z(q+2),err)
+        q = q+2
+        endif
 
-        call MPI_waitall(size(req_zz), req_zz, MPI_STATUSES_IGNORE, err)
-        !$acc update device(bfr_r_F,bfr_r_B) async(12)
+        if(q > 0) then
+          call MPI_waitall(q, req_z, MPI_STATUSES_IGNORE, err)
+          !$acc update device(bfr_r_F,bfr_r_B)
+        endif
 
-        !$acc wait(10)
         if(neigh(W)>=0) then
         !$acc parallel default(present) async(1)
         !$acc loop gang, vector collapse(3)
@@ -1363,7 +1504,6 @@ subroutine mpi_communicate3D_real8_bfr(comm,neigh,dims,&
         !$acc end parallel
         endif
 
-        !$acc wait(11)
         if(neigh(S)>=0) then
         !$acc parallel default(present) async(3)
         !$acc loop gang, vector collapse(3)
@@ -1392,7 +1532,6 @@ subroutine mpi_communicate3D_real8_bfr(comm,neigh,dims,&
         !$acc end parallel
         endif
 
-        !$acc wait(12)
         if(neigh(B)>=0) then
         !$acc parallel default(present) async(5)
         !$acc loop gang, vector collapse(3)
@@ -1421,32 +1560,15 @@ subroutine mpi_communicate3D_real8_bfr(comm,neigh,dims,&
         !$acc end parallel 
         endif
 
-        if(neigh(W)>=0) then
-          !$acc wait(1)
-        endif
-        if(neigh(E)>=0) then
-          !$acc wait(2)
-        endif
-        if(neigh(S)>=0) then
-          !$acc wait(3)
-        endif
-        if(neigh(N)>=0) then
-          !$acc wait(4)
-        endif
-        if(neigh(B)>=0) then
-          !$acc wait(5)
-        endif
-        if(neigh(F)>=0) then
-          !$acc wait(6)
-        endif
-        
+        !$acc wait
+
         return
 end subroutine mpi_communicate3D_real8_bfr
 
 
 
 
-subroutine mpi_communicate3D_real8_bfr_cuda_aware(comm,neigh,dims,&
+subroutine mpi_communicate3D_real8_bfr_cuda_aware(comm,neigh,&
                                        bfr_s_E, bfr_s_W, bfr_r_E, bfr_r_W, &
                                        bfr_s_N, bfr_s_S, bfr_r_N, bfr_r_S, &
                                        bfr_s_B, bfr_s_F, bfr_r_B, bfr_r_F, &
@@ -1467,20 +1589,19 @@ subroutine mpi_communicate3D_real8_bfr_cuda_aware(comm,neigh,dims,&
         real(rp), allocatable, dimension(:,:,:) , intent(inout) :: bfr_r_B
         real(rp), allocatable, dimension(:,:,:) , intent(inout) :: bfr_r_F
         integer              , dimension(6)     , intent(in)    :: neigh
-        integer                                 , intent(in)    :: dims
         integer                                 , intent(in)    :: comm
 
         ! local declaration
         integer, parameter    :: dtype = MPI_RP
         integer, dimension(3) :: bfr_dims_x, bfr_dims_y, bfr_dims_z
-        integer, dimension(4) :: req_xx
-        integer, dimension(4) :: req_yy
-        integer, dimension(4) :: req_zz
+        integer, dimension(4) :: req_x
+        integer, dimension(4) :: req_y
+        integer, dimension(4) :: req_z
         integer               :: bfr_size_x, bfr_size_y, bfr_size_z
 
         integer, parameter :: tag = 0
         integer, parameter :: W = 1, E = 2, S = 3, N = 4, B = 5, F = 6
-        integer            :: i,j,k,err = 0, ii, jj, kk
+        integer            :: i,j,k,err = 0, ii, jj, kk, q
 
         !
         ! === buffer dimensions
@@ -1493,48 +1614,91 @@ subroutine mpi_communicate3D_real8_bfr_cuda_aware(comm,neigh,dims,&
         bfr_size_y = bfr_dims_y(1)*bfr_dims_y(2)*bfr_dims_y(3)
         bfr_size_z = bfr_dims_z(1)*bfr_dims_z(2)*bfr_dims_z(3)
 
+        if(neigh(E) >= 0) then
+          !$acc parallel default(present) async(1)
+          !$acc loop gang, vector collapse(3)
+          do       k = lbz,ubz
+             do    j = lby,uby
+                do i = 1,GN    
+                   ii = ex-GN+i  !ex+1-GN,ex
+                   bfr_s_E(ii,j,k) = var(ii,j,k)
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+        endif
 
-        !$acc parallel default(present) async(1)
-        !$acc loop gang, vector collapse(3)
-        do       k = lbz,ubz
-           do    j = lby,uby
-              do i = 1,GN    
-                 ii = ex-GN+i  !ex+1-GN,ex
-                 bfr_s_E(ii,j,k) = var(ii,j,k)
-                 ii = sx-1+i   !sx,sx+GN-1
-                 bfr_s_W(ii,j,k) = var(ii,j,k)
-              enddo
-           enddo
-        enddo
-        !$acc end parallel
+        if(neigh(W) >= 0) then
+          !$acc parallel default(present) async(2)
+          !$acc loop gang, vector collapse(3)
+          do       k = lbz,ubz
+             do    j = lby,uby
+                do i = 1,GN    
+                   ii = sx-1+i   !sx,sx+GN-1
+                   bfr_s_W(ii,j,k) = var(ii,j,k)
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+        endif
 
-        !$acc parallel default(present) async(2)
-        !$acc loop gang, vector collapse(3)
-        do       k = lbz,ubz
-           do    j = 1,GN    
-              do i = lbx,ubx
-                 jj = ey-GN+j !ey+1-GN,ey
-                 bfr_s_N(i,jj,k) = var(i,jj,k)
-                 jj = sy-1+j  !sy,sy+GN-1
-                 bfr_s_S(i,jj,k) = var(i,jj,k)
-              enddo
-           enddo
-        enddo
-        !$acc end parallel
+        if(neigh(N) >= 0) then
+          !$acc parallel default(present) async(3)
+          !$acc loop gang, vector collapse(3)
+          do       k = lbz,ubz
+             do    j = 1,GN    
+                do i = lbx,ubx
+                   jj = ey-GN+j !ey+1-GN,ey
+                   bfr_s_N(i,jj,k) = var(i,jj,k)
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+        endif
+        
+        if(neigh(S) >= 0) then
+          !$acc parallel default(present) async(4)
+          !$acc loop gang, vector collapse(3)
+          do       k = lbz,ubz
+             do    j = 1,GN    
+                do i = lbx,ubx
+                   jj = sy-1+j  !sy,sy+GN-1
+                   bfr_s_S(i,jj,k) = var(i,jj,k)
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+        endif
 
-        !$acc parallel default(present) async(3)
-        !$acc loop gang, vector collapse(3)
-        do       k = 1,GN 
-           do    j = lby,uby
-              do i = lbx,ubx
-                 kk = ez-GN+k  !ez+1-GN,ez
-                 bfr_s_F(i,j,kk) = var(i,j,kk)
-                 kk = sz-1+k   !sz,sz+GN-1
-                 bfr_s_B(i,j,kk) = var(i,j,kk)
-              enddo
-           enddo
-        enddo
-        !$acc end parallel
+        if(neigh(F) >= 0) then
+          !$acc parallel default(present) async(5)
+          !$acc loop gang, vector collapse(3)
+          do       k = 1,GN 
+             do    j = lby,uby
+                do i = lbx,ubx
+                   kk = ez-GN+k  !ez+1-GN,ez
+                   bfr_s_F(i,j,kk) = var(i,j,kk)
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+        endif
+
+        if(neigh(B) >= 0) then
+          !$acc parallel default(present) async(6)
+          !$acc loop gang, vector collapse(3)
+          do       k = 1,GN 
+             do    j = lby,uby
+                do i = lbx,ubx
+                   kk = sz-1+k   !sz,sz+GN-1
+                   bfr_s_B(i,j,kk) = var(i,j,kk)
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+        endif
+
+        !$acc wait
 
         !$acc host_data use_device(bfr_s_E,bfr_r_W) &
         !$acc           use_device(bfr_s_W,bfr_r_E) &
@@ -1546,39 +1710,57 @@ subroutine mpi_communicate3D_real8_bfr_cuda_aware(comm,neigh,dims,&
         !
         ! === east - west communications
         !
-        call MPI_IRECV(bfr_r_W,bfr_size_x,dtype,neigh(W),tag+1,comm,req_xx(2),err)
-        call MPI_IRECV(bfr_r_E,bfr_size_x,dtype,neigh(E),tag+2,comm,req_xx(4),err)
+        q = 0
+        if(neigh(W) >= 0) then
+        call MPI_IRECV(bfr_r_W,bfr_size_x,dtype,neigh(W),tag+1,comm,req_x(q+1),err)
+        call MPI_ISEND(bfr_s_W,bfr_size_x,dtype,neigh(W),tag+2,comm,req_x(q+2),err)
+        q = q+2
+        endif
 
-        !$acc wait(1)
-        call MPI_ISEND(bfr_s_E,bfr_size_x,dtype,neigh(E),tag+1,comm,req_xx(1),err)
-        call MPI_ISEND(bfr_s_W,bfr_size_x,dtype,neigh(W),tag+2,comm,req_xx(3),err)
+        if(neigh(E) >= 0) then
+        call MPI_IRECV(bfr_r_E,bfr_size_x,dtype,neigh(E),tag+2,comm,req_x(q+1),err)
+        call MPI_ISEND(bfr_s_E,bfr_size_x,dtype,neigh(E),tag+1,comm,req_x(q+2),err)
+        q = q+2
+        endif
 
         ! wait till communications end (corner needed)
-        call MPI_waitall(size(req_xx), req_xx, MPI_STATUSES_IGNORE, err)
+        if(q > 0) call MPI_waitall(q, req_x, MPI_STATUSES_IGNORE, err)
 
         !
         ! ==== nord-south communications
         !
-        call MPI_IRECV(bfr_r_S,bfr_size_y,dtype,neigh(S),tag+3,comm,req_yy(2),err)
-        call MPI_IRECV(bfr_r_N,bfr_size_y,dtype,neigh(N),tag+4,comm,req_yy(4),err)
+        q = 0
+        if(neigh(S) >= 0) then
+        call MPI_IRECV(bfr_r_S,bfr_size_y,dtype,neigh(S),tag+1,comm,req_y(q+1),err)
+        call MPI_ISEND(bfr_s_S,bfr_size_y,dtype,neigh(S),tag+2,comm,req_y(q+2),err)
+        q = q+2
+        endif
+        
+        if(neigh(N) >= 0) then
+        call MPI_IRECV(bfr_r_N,bfr_size_y,dtype,neigh(N),tag+2,comm,req_y(q+1),err)
+        call MPI_ISEND(bfr_s_N,bfr_size_y,dtype,neigh(N),tag+1,comm,req_y(q+2),err)
+        q = q+2
+        endif
 
-        !$acc wait(2)
-        call MPI_ISEND(bfr_s_N,bfr_size_y,dtype,neigh(N),tag+3,comm,req_yy(1),err)
-        call MPI_ISEND(bfr_s_S,bfr_size_y,dtype,neigh(S),tag+4,comm,req_yy(3),err)
-
-        call MPI_waitall(size(req_yy), req_yy, MPI_STATUSES_IGNORE, err)
+        if(q > 0) call MPI_waitall(q, req_y, MPI_STATUSES_IGNORE, err)
 
         !
         ! ==== backward-forwvar communications
         !
-        call MPI_IRECV(bfr_r_B,bfr_size_z,dtype,neigh(B),tag+5,comm,req_zz(2),err)
-        call MPI_IRECV(bfr_r_F,bfr_size_z,dtype,neigh(F),tag+6,comm,req_zz(4),err)
+        q = 0
+        if(neigh(B) >= 0) then
+        call MPI_IRECV(bfr_r_B,bfr_size_z,dtype,neigh(B),tag+1,comm,req_z(q+1),err)
+        call MPI_ISEND(bfr_s_B,bfr_size_z,dtype,neigh(B),tag+2,comm,req_z(q+2),err)
+        q = q+2
+        endif
 
-        !$acc wait(3)
-        call MPI_ISEND(bfr_s_F,bfr_size_z,dtype,neigh(F),tag+5,comm,req_zz(1),err)
-        call MPI_ISEND(bfr_s_B,bfr_size_z,dtype,neigh(B),tag+6,comm,req_zz(3),err)
+        if(neigh(F) >= 0) then
+        call MPI_IRECV(bfr_r_F,bfr_size_z,dtype,neigh(F),tag+2,comm,req_z(q+1),err)
+        call MPI_ISEND(bfr_s_F,bfr_size_z,dtype,neigh(F),tag+1,comm,req_z(q+2),err)
+        q = q+2
+        endif
 
-        call MPI_waitall(size(req_zz), req_zz, MPI_STATUSES_IGNORE, err)
+        if(q > 0) call MPI_waitall(q, req_z, MPI_STATUSES_IGNORE, err)
 
         !$acc end host_data
 
@@ -1666,24 +1848,7 @@ subroutine mpi_communicate3D_real8_bfr_cuda_aware(comm,neigh,dims,&
         !$acc end parallel 
         endif
 
-        if(neigh(W)>=0) then
-          !$acc wait(1)
-        endif
-        if(neigh(E)>=0) then
-          !$acc wait(2)
-        endif
-        if(neigh(S)>=0) then
-          !$acc wait(3)
-        endif
-        if(neigh(N)>=0) then
-          !$acc wait(4)
-        endif
-        if(neigh(B)>=0) then
-          !$acc wait(5)
-        endif
-        if(neigh(F)>=0) then
-          !$acc wait(6)
-        endif
+        !$acc wait
 
         return
 end subroutine mpi_communicate3D_real8_bfr_cuda_aware
@@ -1710,7 +1875,7 @@ end subroutine mpi_communicate3D_real8_bfr_cuda_aware
 
 
 
-subroutine mpi_communicate4D_real8_sendrecv(comm,neigh,dims,&
+subroutine mpi_communicate4D_real8_sendrecv(comm,neigh,&
                                        bfr_s_E, bfr_s_W, bfr_r_E, bfr_r_W, &
                                        bfr_s_N, bfr_s_S, bfr_r_N, bfr_r_S, &
                                        bfr_s_B, bfr_s_F, bfr_r_B, bfr_r_F, &
@@ -1732,7 +1897,6 @@ subroutine mpi_communicate4D_real8_sendrecv(comm,neigh,dims,&
         real(rp), allocatable, dimension(:,:,:,:) , intent(inout) :: bfr_r_B
         real(rp), allocatable, dimension(:,:,:,:) , intent(inout) :: bfr_r_F
         integer              , dimension(6)       , intent(in)    :: neigh
-        integer                                   , intent(in)    :: dims
         integer                                   , intent(in)    :: comm
 
         ! local declaration
@@ -1965,7 +2129,7 @@ end subroutine mpi_communicate4D_real8_sendrecv
 
 
 
-subroutine mpi_communicate4D_real8_sendrecv_cuda_aware(comm,neigh,dims,&
+subroutine mpi_communicate4D_real8_sendrecv_cuda_aware(comm,neigh,&
                                        bfr_s_E, bfr_s_W, bfr_r_E, bfr_r_W, &
                                        bfr_s_N, bfr_s_S, bfr_r_N, bfr_r_S, &
                                        bfr_s_B, bfr_s_F, bfr_r_B, bfr_r_F, &
@@ -1987,7 +2151,6 @@ subroutine mpi_communicate4D_real8_sendrecv_cuda_aware(comm,neigh,dims,&
         real(rp), allocatable, dimension(:,:,:,:) , intent(inout) :: bfr_r_B
         real(rp), allocatable, dimension(:,:,:,:) , intent(inout) :: bfr_r_F
         integer              , dimension(6)       , intent(in)    :: neigh
-        integer                                   , intent(in)    :: dims
         integer                                   , intent(in)    :: comm
 
         ! local declaration
@@ -2233,7 +2396,7 @@ end subroutine mpi_communicate4D_real8_sendrecv_cuda_aware
 
 
 
-subroutine mpi_communicate3D_real8_sendrecv(comm,neigh,dims,&
+subroutine mpi_communicate3D_real8_sendrecv(comm,neigh,&
                                        bfr_s_E, bfr_s_W, bfr_r_E, bfr_r_W, &
                                        bfr_s_N, bfr_s_S, bfr_r_N, bfr_r_S, &
                                        bfr_s_B, bfr_s_F, bfr_r_B, bfr_r_F, &
@@ -2255,7 +2418,6 @@ subroutine mpi_communicate3D_real8_sendrecv(comm,neigh,dims,&
         real(rp), allocatable, dimension(:,:,:) , intent(inout) :: bfr_r_B
         real(rp), allocatable, dimension(:,:,:) , intent(inout) :: bfr_r_F
         integer              , dimension(6)     , intent(in)    :: neigh
-        integer                                 , intent(in)    :: dims
         integer                                 , intent(in)    :: comm
 
         ! local declaration
@@ -2471,7 +2633,7 @@ end subroutine mpi_communicate3D_real8_sendrecv
 
 
 
-subroutine mpi_communicate3D_real8_sendrecv_cuda_aware(comm,neigh,dims,&
+subroutine mpi_communicate3D_real8_sendrecv_cuda_aware(comm,neigh,&
                                        bfr_s_E, bfr_s_W, bfr_r_E, bfr_r_W, &
                                        bfr_s_N, bfr_s_S, bfr_r_N, bfr_r_S, &
                                        bfr_s_B, bfr_s_F, bfr_r_B, bfr_r_F, &
@@ -2493,7 +2655,6 @@ subroutine mpi_communicate3D_real8_sendrecv_cuda_aware(comm,neigh,dims,&
         real(rp), allocatable, dimension(:,:,:) , intent(inout) :: bfr_r_B
         real(rp), allocatable, dimension(:,:,:) , intent(inout) :: bfr_r_F
         integer              , dimension(6)     , intent(in)    :: neigh
-        integer                                 , intent(in)    :: dims
         integer                                 , intent(in)    :: comm
 
         ! local declaration
@@ -2724,19 +2885,18 @@ end subroutine mpi_communicate3D_real8_sendrecv_cuda_aware
 
 
 
-subroutine mpi_communicateInt3D_isend_irecv_ddt(comm,tp_send,tp_recv,neigh,dims,var)
+subroutine mpi_communicateInt3D_isend_irecv_ddt(comm,tp_send,tp_recv,neigh,var)
         implicit none
         integer(1), allocatable, dimension(:,:,:), intent(inout) :: var
         integer                , dimension(6)    , intent(in)    :: tp_send
         integer                , dimension(6)    , intent(in)    :: tp_recv
         integer                , dimension(6)    , intent(in)    :: neigh
-        integer                                  , intent(in)    :: dims
         integer                                  , intent(in)    :: comm
 
         ! local declaration
-        integer, dimension(4) :: req_xx
-        integer, dimension(4) :: req_yy
-        integer, dimension(4) :: req_zz
+        integer, dimension(4) :: req_x
+        integer, dimension(4) :: req_y
+        integer, dimension(4) :: req_z
 
         integer, parameter :: tag = 0
         integer, parameter :: W = 1, E = 2, S = 3, N = 4, B = 5, F = 6
@@ -2747,35 +2907,35 @@ subroutine mpi_communicateInt3D_isend_irecv_ddt(comm,tp_send,tp_recv,neigh,dims,
         !
         ! === E/W communications
         !
-        call MPI_ISEND(var,1,tp_send(E),neigh(E),tag+1,comm,req_xx(1),err)
-        call MPI_IRECV(var,1,tp_recv(W),neigh(W),tag+1,comm,req_xx(2),err)
+        call MPI_ISEND(var,1,tp_send(E),neigh(E),tag+1,comm,req_x(1),err)
+        call MPI_IRECV(var,1,tp_recv(W),neigh(W),tag+1,comm,req_x(2),err)
 
-        call MPI_ISEND(var,1,tp_send(W),neigh(W),tag+2,comm,req_xx(3),err)
-        call MPI_IRECV(var,1,tp_recv(E),neigh(E),tag+2,comm,req_xx(4),err)
+        call MPI_ISEND(var,1,tp_send(W),neigh(W),tag+2,comm,req_x(3),err)
+        call MPI_IRECV(var,1,tp_recv(E),neigh(E),tag+2,comm,req_x(4),err)
 
         ! wait till communications end along x cause corners
-        call MPI_waitall(size(req_xx), req_xx, MPI_STATUSES_IGNORE, err)
+        call MPI_waitall(size(req_x), req_x, MPI_STATUSES_IGNORE, err)
 
         ! === N/S communications
         !
-        call MPI_ISEND(var,1,tp_send(N),neigh(N),tag+3,comm,req_yy(1),err)
-        call MPI_IRECV(var,1,tp_recv(S),neigh(S),tag+3,comm,req_yy(2),err)
+        call MPI_ISEND(var,1,tp_send(N),neigh(N),tag+3,comm,req_y(1),err)
+        call MPI_IRECV(var,1,tp_recv(S),neigh(S),tag+3,comm,req_y(2),err)
 
-        call MPI_ISEND(var,1,tp_send(S),neigh(S),tag+4,comm,req_yy(3),err)
-        call MPI_IRECV(var,1,tp_recv(N),neigh(N),tag+4,comm,req_yy(4),err)
+        call MPI_ISEND(var,1,tp_send(S),neigh(S),tag+4,comm,req_y(3),err)
+        call MPI_IRECV(var,1,tp_recv(N),neigh(N),tag+4,comm,req_y(4),err)
 
-        call MPI_waitall(size(req_yy), req_yy, MPI_STATUSES_IGNORE, err)
+        call MPI_waitall(size(req_y), req_y, MPI_STATUSES_IGNORE, err)
         !
         ! === B/F communications
         !
-        call MPI_ISEND(var,1,tp_send(F),neigh(F),tag+5,comm,req_zz(1),err)
-        call MPI_IRECV(var,1,tp_recv(B),neigh(B),tag+5,comm,req_zz(2),err)
+        call MPI_ISEND(var,1,tp_send(F),neigh(F),tag+5,comm,req_z(1),err)
+        call MPI_IRECV(var,1,tp_recv(B),neigh(B),tag+5,comm,req_z(2),err)
 
-        call MPI_ISEND(var,1,tp_send(B),neigh(B),tag+6,comm,req_zz(3),err)
-        call MPI_IRECV(var,1,tp_recv(F),neigh(F),tag+6,comm,req_zz(4),err)
+        call MPI_ISEND(var,1,tp_send(B),neigh(B),tag+6,comm,req_z(3),err)
+        call MPI_IRECV(var,1,tp_recv(F),neigh(F),tag+6,comm,req_z(4),err)
          
         ! wait till communications end
-        call MPI_waitall(size(req_zz), req_zz, MPI_STATUSES_IGNORE, err)
+        call MPI_waitall(size(req_z), req_z, MPI_STATUSES_IGNORE, err)
 
         !$acc update device(var)
 
@@ -2786,19 +2946,18 @@ end subroutine mpi_communicateInt3D_isend_irecv_ddt
 
 
 
-subroutine mpi_communicateInt3D_isend_irecv_ddt_cuda_aware(comm,tp_send,tp_recv,neigh,dims,var)
+subroutine mpi_communicateInt3D_isend_irecv_ddt_cuda_aware(comm,tp_send,tp_recv,neigh,var)
         implicit none
         integer(1), allocatable, dimension(:,:,:), intent(inout) :: var
         integer                , dimension(6)    , intent(in)    :: tp_send
         integer                , dimension(6)    , intent(in)    :: tp_recv
         integer                , dimension(6)    , intent(in)    :: neigh
-        integer                                  , intent(in)    :: dims
         integer                                  , intent(in)    :: comm
 
         ! local declaration
-        integer, dimension(4) :: req_xx
-        integer, dimension(4) :: req_yy
-        integer, dimension(4) :: req_zz
+        integer, dimension(4) :: req_x
+        integer, dimension(4) :: req_y
+        integer, dimension(4) :: req_z
 
         integer, parameter :: tag = 0
         integer, parameter :: W = 1, E = 2, S = 3, N = 4, B = 5, F = 6
@@ -2809,35 +2968,35 @@ subroutine mpi_communicateInt3D_isend_irecv_ddt_cuda_aware(comm,tp_send,tp_recv,
         !
         ! === E/W communications
         !
-        call MPI_ISEND(var,1,tp_send(E),neigh(E),tag+1,comm,req_xx(1),err)
-        call MPI_IRECV(var,1,tp_recv(W),neigh(W),tag+1,comm,req_xx(2),err)
+        call MPI_ISEND(var,1,tp_send(E),neigh(E),tag+1,comm,req_x(1),err)
+        call MPI_IRECV(var,1,tp_recv(W),neigh(W),tag+1,comm,req_x(2),err)
 
-        call MPI_ISEND(var,1,tp_send(W),neigh(W),tag+2,comm,req_xx(3),err)
-        call MPI_IRECV(var,1,tp_recv(E),neigh(E),tag+2,comm,req_xx(4),err)
+        call MPI_ISEND(var,1,tp_send(W),neigh(W),tag+2,comm,req_x(3),err)
+        call MPI_IRECV(var,1,tp_recv(E),neigh(E),tag+2,comm,req_x(4),err)
 
         ! wait till communications end along x cause corners
-        call MPI_waitall(size(req_xx), req_xx, MPI_STATUSES_IGNORE, err)
+        call MPI_waitall(size(req_x), req_x, MPI_STATUSES_IGNORE, err)
 
         ! === N/S communications
         !
-        call MPI_ISEND(var,1,tp_send(N),neigh(N),tag+3,comm,req_yy(1),err)
-        call MPI_IRECV(var,1,tp_recv(S),neigh(S),tag+3,comm,req_yy(2),err)
+        call MPI_ISEND(var,1,tp_send(N),neigh(N),tag+3,comm,req_y(1),err)
+        call MPI_IRECV(var,1,tp_recv(S),neigh(S),tag+3,comm,req_y(2),err)
 
-        call MPI_ISEND(var,1,tp_send(S),neigh(S),tag+4,comm,req_yy(3),err)
-        call MPI_IRECV(var,1,tp_recv(N),neigh(N),tag+4,comm,req_yy(4),err)
+        call MPI_ISEND(var,1,tp_send(S),neigh(S),tag+4,comm,req_y(3),err)
+        call MPI_IRECV(var,1,tp_recv(N),neigh(N),tag+4,comm,req_y(4),err)
 
-        call MPI_waitall(size(req_yy), req_yy, MPI_STATUSES_IGNORE, err)
+        call MPI_waitall(size(req_y), req_y, MPI_STATUSES_IGNORE, err)
         !
         ! === B/F communications
         !
-        call MPI_ISEND(var,1,tp_send(F),neigh(F),tag+5,comm,req_zz(1),err)
-        call MPI_IRECV(var,1,tp_recv(B),neigh(B),tag+5,comm,req_zz(2),err)
+        call MPI_ISEND(var,1,tp_send(F),neigh(F),tag+5,comm,req_z(1),err)
+        call MPI_IRECV(var,1,tp_recv(B),neigh(B),tag+5,comm,req_z(2),err)
 
-        call MPI_ISEND(var,1,tp_send(B),neigh(B),tag+6,comm,req_zz(3),err)
-        call MPI_IRECV(var,1,tp_recv(F),neigh(F),tag+6,comm,req_zz(4),err)
+        call MPI_ISEND(var,1,tp_send(B),neigh(B),tag+6,comm,req_z(3),err)
+        call MPI_IRECV(var,1,tp_recv(F),neigh(F),tag+6,comm,req_z(4),err)
          
         ! wait till communications end
-        call MPI_waitall(size(req_zz), req_zz, MPI_STATUSES_IGNORE, err)
+        call MPI_waitall(size(req_z), req_z, MPI_STATUSES_IGNORE, err)
 
         !$acc end host_data
 
@@ -2874,7 +3033,7 @@ end subroutine mpi_communicateInt3D_isend_irecv_ddt_cuda_aware
 
 
 
-subroutine mpi_communicateInt3D_sendrecv(comm,neigh,dims,&
+subroutine mpi_communicateInt3D_sendrecv(comm,neigh,&
                                        bfr_s_E, bfr_s_W, bfr_r_E, bfr_r_W, &
                                        bfr_s_N, bfr_s_S, bfr_r_N, bfr_r_S, &
                                        bfr_s_B, bfr_s_F, bfr_r_B, bfr_r_F, &
@@ -2896,7 +3055,6 @@ subroutine mpi_communicateInt3D_sendrecv(comm,neigh,dims,&
         integer(1), allocatable, dimension(:,:,:) , intent(inout) :: bfr_r_B
         integer(1), allocatable, dimension(:,:,:) , intent(inout) :: bfr_r_F
         integer                , dimension(6)     , intent(in)    :: neigh
-        integer                                   , intent(in)    :: dims
         integer                                   , intent(in)    :: comm
 
         ! local declaration
@@ -3112,7 +3270,7 @@ end subroutine mpi_communicateInt3D_sendrecv
 
 
 
-subroutine mpi_communicateInt3D_sendrecv_cuda_aware(comm,neigh,dims,&
+subroutine mpi_communicateInt3D_sendrecv_cuda_aware(comm,neigh,&
                                        bfr_s_E, bfr_s_W, bfr_r_E, bfr_r_W, &
                                        bfr_s_N, bfr_s_S, bfr_r_N, bfr_r_S, &
                                        bfr_s_B, bfr_s_F, bfr_r_B, bfr_r_F, &
@@ -3134,7 +3292,6 @@ subroutine mpi_communicateInt3D_sendrecv_cuda_aware(comm,neigh,dims,&
         integer(1), allocatable, dimension(:,:,:) , intent(inout) :: bfr_r_B
         integer(1), allocatable, dimension(:,:,:) , intent(inout) :: bfr_r_F
         integer                , dimension(6)     , intent(in)    :: neigh
-        integer                                   , intent(in)    :: dims
         integer                                   , intent(in)    :: comm
 
         ! local declaration
@@ -3363,7 +3520,7 @@ end subroutine mpi_communicateInt3D_sendrecv_cuda_aware
 
 
 
-subroutine mpi_communicateInt3D_isend_irecv_bfr(comm,neigh,dims,&
+subroutine mpi_communicateInt3D_isend_irecv_bfr(comm,neigh,&
                                        bfr_s_E, bfr_s_W, bfr_r_E, bfr_r_W, &
                                        bfr_s_N, bfr_s_S, bfr_r_N, bfr_r_S, &
                                        bfr_s_B, bfr_s_F, bfr_r_B, bfr_r_F, &
@@ -3384,20 +3541,19 @@ subroutine mpi_communicateInt3D_isend_irecv_bfr(comm,neigh,dims,&
         integer(1), allocatable, dimension(:,:,:) , intent(inout) :: bfr_r_B
         integer(1), allocatable, dimension(:,:,:) , intent(inout) :: bfr_r_F
         integer                , dimension(6)     , intent(in)    :: neigh
-        integer                                   , intent(in)    :: dims
         integer                                   , intent(in)    :: comm
 
         ! local declaration
         integer, parameter    :: dtype = MPI_INTEGER1
         integer, dimension(3) :: bfr_dims_x, bfr_dims_y, bfr_dims_z
-        integer, dimension(4) :: req_xx
-        integer, dimension(4) :: req_yy
-        integer, dimension(4) :: req_zz
+        integer, dimension(4) :: req_x
+        integer, dimension(4) :: req_y
+        integer, dimension(4) :: req_z
         integer               :: bfr_size_x, bfr_size_y, bfr_size_z
 
         integer, parameter :: tag = 0
         integer, parameter :: W = 1, E = 2, S = 3, N = 4, B = 5, F = 6
-        integer            :: i,j,k,err = 0, ii, jj, kk
+        integer            :: i,j,k,err = 0, ii, jj, kk, q
 
         !
         ! === buffer dimensions
@@ -3410,107 +3566,162 @@ subroutine mpi_communicateInt3D_isend_irecv_bfr(comm,neigh,dims,&
         bfr_size_y = bfr_dims_y(1)*bfr_dims_y(2)*bfr_dims_y(3)
         bfr_size_z = bfr_dims_z(1)*bfr_dims_z(2)*bfr_dims_z(3)
 
+        if(neigh(E) >= 0) then
+          !$acc parallel default(present)
+          !$acc loop gang, vector collapse(3)
+          do       k = lbz,ubz
+             do    j = lby,uby
+                do i = 1,GN    
+                   ii = ex-GN+i  !ex+1-GN,ex
+                   bfr_s_E(ii,j,k) = var(ii,j,k)
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+          !$acc update host(bfr_s_E) 
+        endif
 
-        !$acc parallel default(present) async(1)
-        !$acc loop gang, vector collapse(3)
-        do       k = lbz,ubz
-           do    j = lby,uby
-              do i = 1,GN    
-                 ii = ex-GN+i  !ex+1-GN,ex
-                 bfr_s_E(ii,j,k) = var(ii,j,k)
-                 ii = sx-1+i   !sx,sx+GN-1
-                 bfr_s_W(ii,j,k) = var(ii,j,k)
-              enddo
-           enddo
-        enddo
-        !$acc end parallel
+        if(neigh(W) >= 0) then
+          !$acc parallel default(present)
+          !$acc loop gang, vector collapse(3)
+          do       k = lbz,ubz
+             do    j = lby,uby
+                do i = 1,GN    
+                   ii = sx-1+i   !sx,sx+GN-1
+                   bfr_s_W(ii,j,k) = var(ii,j,k)
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+          !$acc update host(bfr_s_W) 
+        endif
 
-        !$acc parallel default(present) async(2)
-        !$acc loop gang, vector collapse(3)
-        do       k = lbz,ubz
-           do    j = 1,GN    
-              do i = lbx,ubx
-                 jj = ey-GN+j !ey+1-GN,ey
-                 bfr_s_N(i,jj,k) = var(i,jj,k)
-                 jj = sy-1+j  !sy,sy+GN-1
-                 bfr_s_S(i,jj,k) = var(i,jj,k)
-              enddo
-           enddo
-        enddo
-        !$acc end parallel
+        if(neigh(N) >= 0) then
+          !$acc parallel default(present)
+          !$acc loop gang, vector collapse(3)
+          do       k = lbz,ubz
+             do    j = 1,GN    
+                do i = lbx,ubx
+                   jj = ey-GN+j !ey+1-GN,ey
+                   bfr_s_N(i,jj,k) = var(i,jj,k)
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+          !$acc update host(bfr_s_N) 
+        endif
 
-        !$acc parallel default(present) async(3)
-        !$acc loop gang, vector collapse(3)
-        do       k = 1,GN 
-           do    j = lby,uby
-              do i = lbx,ubx
-                 kk = ez-GN+k  !ez+1-GN,ez
-                 bfr_s_F(i,j,kk) = var(i,j,kk)
-                 kk = sz-1+k   !sz,sz+GN-1
-                 bfr_s_B(i,j,kk) = var(i,j,kk)
-              enddo
-           enddo
-        enddo
-        !$acc end parallel
+        if(neigh(S) >= 0) then
+          !$acc parallel default(present)
+          !$acc loop gang, vector collapse(3)
+          do       k = lbz,ubz
+             do    j = 1,GN    
+                do i = lbx,ubx
+                   jj = sy-1+j  !sy,sy+GN-1
+                   bfr_s_S(i,jj,k) = var(i,jj,k)
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+          !$acc update host(bfr_s_S) 
+        endif
 
-        !$acc wait(1)
-        !$acc update host(bfr_s_E) async(4)
-        !$acc update host(bfr_s_W) async(5)
+        if(neigh(F) >= 0) then
+          !$acc parallel default(present)
+          !$acc loop gang, vector collapse(3)
+          do       k = 1,GN 
+             do    j = lby,uby
+                do i = lbx,ubx
+                   kk = ez-GN+k  !ez+1-GN,ez
+                   bfr_s_F(i,j,kk) = var(i,j,kk)
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+          !$acc update host(bfr_s_F) 
+        endif
 
-        !$acc wait(2)
-        !$acc update host(bfr_s_N) async(6)
-        !$acc update host(bfr_s_S) async(7)
-
-        !$acc wait(3)
-        !$acc update host(bfr_s_F) async(8)
-        !$acc update host(bfr_s_B) async(9)
+        if(neigh(B) >= 0) then
+          !$acc parallel default(present)
+          !$acc loop gang, vector collapse(3)
+          do       k = 1,GN 
+             do    j = lby,uby
+                do i = lbx,ubx
+                   kk = sz-1+k   !sz,sz+GN-1
+                   bfr_s_B(i,j,kk) = var(i,j,kk)
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+          !$acc update host(bfr_s_B) 
+        endif
 
         !
         ! === east - west communications
         !
-        call MPI_IRECV(bfr_r_W,bfr_size_x,dtype,neigh(W),tag+1,comm,req_xx(2),err)
-        call MPI_IRECV(bfr_r_E,bfr_size_x,dtype,neigh(E),tag+2,comm,req_xx(4),err)
+        q = 0
+        if(neigh(E) >= 0) then
+        call MPI_IRECV(bfr_r_E,bfr_size_x,dtype,neigh(E),tag+1,comm,req_x(q+1),err)
+        call MPI_ISEND(bfr_s_E,bfr_size_x,dtype,neigh(E),tag+2,comm,req_x(q+2),err)
+        q = q+2
+        endif
 
-        !$acc wait(4)
-        call MPI_ISEND(bfr_s_E,bfr_size_x,dtype,neigh(E),tag+1,comm,req_xx(1),err)
-        !$acc wait(5)
-        call MPI_ISEND(bfr_s_W,bfr_size_x,dtype,neigh(W),tag+2,comm,req_xx(3),err)
+        if(neigh(W) >= 0) then
+        call MPI_IRECV(bfr_r_W,bfr_size_x,dtype,neigh(W),tag+2,comm,req_x(q+1),err)
+        call MPI_ISEND(bfr_s_W,bfr_size_x,dtype,neigh(W),tag+1,comm,req_x(q+2),err)
+        q = q+2
+        endif
 
         ! wait till communications end (corner needed)
-        call MPI_waitall(size(req_xx), req_xx, MPI_STATUSES_IGNORE, err)
-        !$acc update device(bfr_r_W,bfr_r_E) async(10)
+        if(q > 0) then
+          call MPI_waitall(q, req_x, MPI_STATUSES_IGNORE, err)
+          !$acc update device(bfr_r_W,bfr_r_E)
+        endif
 
         !
         ! ==== nord-south communications
         !
-        call MPI_IRECV(bfr_r_S,bfr_size_y,dtype,neigh(S),tag+3,comm,req_yy(2),err)
-        call MPI_IRECV(bfr_r_N,bfr_size_y,dtype,neigh(N),tag+4,comm,req_yy(4),err)
+        q = 0
+        if(neigh(N) >= 0) then
+        call MPI_IRECV(bfr_r_N,bfr_size_y,dtype,neigh(N),tag+1,comm,req_y(q+1),err)
+        call MPI_ISEND(bfr_s_N,bfr_size_y,dtype,neigh(N),tag+2,comm,req_y(q+2),err)
+        q = q+2
+        endif
 
-        !$acc wait(6)
-        call MPI_ISEND(bfr_s_N,bfr_size_y,dtype,neigh(N),tag+3,comm,req_yy(1),err)
-        !$acc wait(7)
-        call MPI_ISEND(bfr_s_S,bfr_size_y,dtype,neigh(S),tag+4,comm,req_yy(3),err)
+        if(neigh(S) >= 0) then
+        call MPI_IRECV(bfr_r_S,bfr_size_y,dtype,neigh(S),tag+2,comm,req_y(q+1),err)
+        call MPI_ISEND(bfr_s_S,bfr_size_y,dtype,neigh(S),tag+1,comm,req_y(q+2),err)
+        q = q+2
+        endif
 
-        call MPI_waitall(size(req_yy), req_yy, MPI_STATUSES_IGNORE, err)
-        !$acc update device(bfr_r_N,bfr_r_S) async(11)
+        if(q > 0) then
+          call MPI_waitall(q, req_y, MPI_STATUSES_IGNORE, err)
+          !$acc update device(bfr_r_N,bfr_r_S)
+        endif
 
         !
         ! ==== backward-forwvar communications
         !
-        call MPI_IRECV(bfr_r_B,bfr_size_z,dtype,neigh(B),tag+5,comm,req_zz(2),err)
-        call MPI_IRECV(bfr_r_F,bfr_size_z,dtype,neigh(F),tag+6,comm,req_zz(4),err)
+        q = 0
+        if(neigh(F) >= 0) then
+        call MPI_IRECV(bfr_r_F,bfr_size_z,dtype,neigh(F),tag+1,comm,req_z(q+1),err)
+        call MPI_ISEND(bfr_s_F,bfr_size_z,dtype,neigh(F),tag+2,comm,req_z(q+2),err)
+        q = q+2
+        endif
 
-        !$acc wait(8)
-        call MPI_ISEND(bfr_s_F,bfr_size_z,dtype,neigh(F),tag+5,comm,req_zz(1),err)
-        !$acc wait(9)
-        call MPI_ISEND(bfr_s_B,bfr_size_z,dtype,neigh(B),tag+6,comm,req_zz(3),err)
+        if(neigh(B) >= 0) then
+        call MPI_IRECV(bfr_r_B,bfr_size_z,dtype,neigh(B),tag+2,comm,req_z(q+1),err)
+        call MPI_ISEND(bfr_s_B,bfr_size_z,dtype,neigh(B),tag+1,comm,req_z(q+2),err)
+        q = q+2
+        endif
 
-        call MPI_waitall(size(req_zz), req_zz, MPI_STATUSES_IGNORE, err)
-        !$acc update device(bfr_r_F,bfr_r_B) async(12)
+        if(q > 0) then
+          call MPI_waitall(q, req_z, MPI_STATUSES_IGNORE, err)
+          !$acc update device(bfr_r_F,bfr_r_B)
+        endif
 
-        !$acc wait(10)
         if(neigh(W)>=0) then
-          !$acc parallel default(present) 
+          !$acc parallel default(present) async(1)
           !$acc loop gang, vector collapse(3)
           do       k = lbz,ubz
              do    j = lby,uby
@@ -3524,7 +3735,7 @@ subroutine mpi_communicateInt3D_isend_irecv_bfr(comm,neigh,dims,&
         endif
 
         if(neigh(E)>=0) then
-          !$acc parallel default(present)
+          !$acc parallel default(present) async(2)
           !$acc loop gang, vector collapse(3)
           do       k = lbz,ubz
              do    j = lby,uby
@@ -3537,9 +3748,8 @@ subroutine mpi_communicateInt3D_isend_irecv_bfr(comm,neigh,dims,&
           !$acc end parallel
         endif
 
-        !$acc wait(11)
         if(neigh(N)>=0) then
-          !$acc parallel default(present)
+          !$acc parallel default(present) async(3)
           !$acc loop gang, vector collapse(3)
           do       k = lbz,ubz
              do    j = 1,GN 
@@ -3553,7 +3763,7 @@ subroutine mpi_communicateInt3D_isend_irecv_bfr(comm,neigh,dims,&
         endif
 
         if(neigh(S)>=0) then
-          !$acc parallel default(present)
+          !$acc parallel default(present) async(4)
           !$acc loop gang, vector collapse(3)
           do       k = lbz,ubz
              do    j = 1,GN 
@@ -3566,9 +3776,8 @@ subroutine mpi_communicateInt3D_isend_irecv_bfr(comm,neigh,dims,&
           !$acc end parallel
         endif
 
-        !$acc wait(12)
         if(neigh(F)>=0) then
-          !$acc parallel default(present)
+          !$acc parallel default(present) async(5)
           !$acc loop gang, vector collapse(3)
           do       k = 1,GN
              do    j = lby,uby
@@ -3582,7 +3791,7 @@ subroutine mpi_communicateInt3D_isend_irecv_bfr(comm,neigh,dims,&
         endif
 
         if(neigh(B)>=0) then
-          !$acc parallel default(present)
+          !$acc parallel default(present) async(6)
           !$acc loop gang, vector collapse(3)
           do       k = 1,GN
              do    j = lby,uby
@@ -3595,6 +3804,7 @@ subroutine mpi_communicateInt3D_isend_irecv_bfr(comm,neigh,dims,&
           !$acc end parallel 
         endif
 
+        !$acc wait
 
         return
 end subroutine mpi_communicateInt3D_isend_irecv_bfr
@@ -3606,7 +3816,7 @@ end subroutine mpi_communicateInt3D_isend_irecv_bfr
 
 
 
-subroutine mpi_communicateInt3D_isend_irecv_bfr_cuda_aware(comm,neigh,dims,&
+subroutine mpi_communicateInt3D_isend_irecv_bfr_cuda_aware(comm,neigh     ,&
                                        bfr_s_E, bfr_s_W, bfr_r_E, bfr_r_W, &
                                        bfr_s_N, bfr_s_S, bfr_r_N, bfr_r_S, &
                                        bfr_s_B, bfr_s_F, bfr_r_B, bfr_r_F, &
@@ -3627,20 +3837,19 @@ subroutine mpi_communicateInt3D_isend_irecv_bfr_cuda_aware(comm,neigh,dims,&
         integer(1), allocatable, dimension(:,:,:) , intent(inout) :: bfr_r_B
         integer(1), allocatable, dimension(:,:,:) , intent(inout) :: bfr_r_F
         integer                , dimension(6)     , intent(in)    :: neigh
-        integer                                   , intent(in)    :: dims
         integer                                   , intent(in)    :: comm
 
         ! local declaration
         integer, parameter    :: dtype = MPI_INTEGER1
         integer, dimension(3) :: bfr_dims_x, bfr_dims_y, bfr_dims_z
-        integer, dimension(4) :: req_xx
-        integer, dimension(4) :: req_yy
-        integer, dimension(4) :: req_zz
+        integer, dimension(4) :: req_x
+        integer, dimension(4) :: req_y
+        integer, dimension(4) :: req_z
         integer               :: bfr_size_x, bfr_size_y, bfr_size_z
 
         integer, parameter :: tag = 0
         integer, parameter :: W = 1, E = 2, S = 3, N = 4, B = 5, F = 6
-        integer            :: i,j,k,err = 0, ii, jj, kk
+        integer            :: i,j,k,err = 0, ii, jj, kk, q
 
         !
         ! === buffer dimensions
@@ -3653,48 +3862,91 @@ subroutine mpi_communicateInt3D_isend_irecv_bfr_cuda_aware(comm,neigh,dims,&
         bfr_size_y = bfr_dims_y(1)*bfr_dims_y(2)*bfr_dims_y(3)
         bfr_size_z = bfr_dims_z(1)*bfr_dims_z(2)*bfr_dims_z(3)
 
+        if(neigh(E) >= 0) then
+          !$acc parallel default(present) async(1)
+          !$acc loop gang, vector collapse(3)
+          do       k = lbz,ubz
+             do    j = lby,uby
+                do i = 1,GN    
+                   ii = ex-GN+i  !ex+1-GN,ex
+                   bfr_s_E(ii,j,k) = var(ii,j,k)
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+        endif
 
-        !$acc parallel default(present) async(1)
-        !$acc loop gang, vector collapse(3)
-        do       k = lbz,ubz
-           do    j = lby,uby
-              do i = 1,GN    
-                 ii = ex-GN+i  !ex+1-GN,ex
-                 bfr_s_E(ii,j,k) = var(ii,j,k)
-                 ii = sx-1+i   !sx,sx+GN-1
-                 bfr_s_W(ii,j,k) = var(ii,j,k)
-              enddo
-           enddo
-        enddo
-        !$acc end parallel
+        if(neigh(W) >= 0) then
+          !$acc parallel default(present) async(2)
+          !$acc loop gang, vector collapse(3)
+          do       k = lbz,ubz
+             do    j = lby,uby
+                do i = 1,GN    
+                   ii = sx-1+i   !sx,sx+GN-1
+                   bfr_s_W(ii,j,k) = var(ii,j,k)
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+        endif
 
-        !$acc parallel default(present) async(2)
-        !$acc loop gang, vector collapse(3)
-        do       k = lbz,ubz
-           do    j = 1,GN    
-              do i = lbx,ubx
-                 jj = ey-GN+j !ey+1-GN,ey
-                 bfr_s_N(i,jj,k) = var(i,jj,k)
-                 jj = sy-1+j  !sy,sy+GN-1
-                 bfr_s_S(i,jj,k) = var(i,jj,k)
-              enddo
-           enddo
-        enddo
-        !$acc end parallel
+        if(neigh(N) >= 0) then
+          !$acc parallel default(present) async(3)
+          !$acc loop gang, vector collapse(3)
+          do       k = lbz,ubz
+             do    j = 1,GN    
+                do i = lbx,ubx
+                   jj = ey-GN+j !ey+1-GN,ey
+                   bfr_s_N(i,jj,k) = var(i,jj,k)
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+        endif
 
-        !$acc parallel default(present) async(3)
-        !$acc loop gang, vector collapse(3)
-        do       k = 1,GN 
-           do    j = lby,uby
-              do i = lbx,ubx
-                 kk = ez-GN+k  !ez+1-GN,ez
-                 bfr_s_F(i,j,kk) = var(i,j,kk)
-                 kk = sz-1+k   !sz,sz+GN-1
-                 bfr_s_B(i,j,kk) = var(i,j,kk)
-              enddo
-           enddo
-        enddo
-        !$acc end parallel
+        if(neigh(S) >= 0) then
+          !$acc parallel default(present) async(4)
+          !$acc loop gang, vector collapse(3)
+          do       k = lbz,ubz
+             do    j = 1,GN    
+                do i = lbx,ubx
+                   jj = sy-1+j  !sy,sy+GN-1
+                   bfr_s_S(i,jj,k) = var(i,jj,k)
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+        endif
+
+        if(neigh(F) >= 0) then
+          !$acc parallel default(present) async(5)
+          !$acc loop gang, vector collapse(3)
+          do       k = 1,GN 
+             do    j = lby,uby
+                do i = lbx,ubx
+                   kk = ez-GN+k  !ez+1-GN,ez
+                   bfr_s_F(i,j,kk) = var(i,j,kk)
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+        endif
+
+        if(neigh(B) >= 0) then
+          !$acc parallel default(present) async(6)
+          !$acc loop gang, vector collapse(3)
+          do       k = 1,GN 
+             do    j = lby,uby
+                do i = lbx,ubx
+                   kk = sz-1+k   !sz,sz+GN-1
+                   bfr_s_B(i,j,kk) = var(i,j,kk)
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+        endif
+
+        !$acc wait
 
         !$acc host_data use_device(bfr_s_E,bfr_r_W) &
         !$acc           use_device(bfr_s_W,bfr_r_E) &
@@ -3706,39 +3958,57 @@ subroutine mpi_communicateInt3D_isend_irecv_bfr_cuda_aware(comm,neigh,dims,&
         !
         ! === east - west communications
         !
-        !$acc wait(1)
-        call MPI_IRECV(bfr_r_W,bfr_size_x,dtype,neigh(W),tag+1,comm,req_xx(2),err)
-        call MPI_IRECV(bfr_r_E,bfr_size_x,dtype,neigh(E),tag+2,comm,req_xx(4),err)
-
-        call MPI_ISEND(bfr_s_E,bfr_size_x,dtype,neigh(E),tag+1,comm,req_xx(1),err)
-        call MPI_ISEND(bfr_s_W,bfr_size_x,dtype,neigh(W),tag+2,comm,req_xx(3),err)
+        q = 0
+        if(neigh(W) >= 0) then
+        call MPI_IRECV(bfr_r_W,bfr_size_x,dtype,neigh(W),tag+1,comm,req_x(q+1),err)
+        call MPI_ISEND(bfr_s_W,bfr_size_x,dtype,neigh(W),tag+2,comm,req_x(q+2),err)
+        q = q+2
+        endif
+        
+        if(neigh(E) >= 0) then
+        call MPI_IRECV(bfr_r_E,bfr_size_x,dtype,neigh(E),tag+2,comm,req_x(q+1),err)
+        call MPI_ISEND(bfr_s_E,bfr_size_x,dtype,neigh(E),tag+1,comm,req_x(q+2),err)
+        q = q+2
+        endif
 
         ! wait till communications end (corner needed)
-        call MPI_waitall(size(req_xx), req_xx, MPI_STATUSES_IGNORE, err)
+        if(q > 0) call MPI_waitall(q, req_x, MPI_STATUSES_IGNORE, err)
 
         !
         ! ==== nord-south communications
         !
-        !$acc wait(2)
-        call MPI_IRECV(bfr_r_S,bfr_size_y,dtype,neigh(S),tag+3,comm,req_yy(2),err)
-        call MPI_IRECV(bfr_r_N,bfr_size_y,dtype,neigh(N),tag+4,comm,req_yy(4),err)
+        q = 0
+        if(neigh(S) >= 0) then
+        call MPI_IRECV(bfr_r_S,bfr_size_y,dtype,neigh(S),tag+1,comm,req_y(q+1),err)
+        call MPI_ISEND(bfr_s_S,bfr_size_y,dtype,neigh(S),tag+2,comm,req_y(q+2),err)
+        q = q+2
+        endif
 
-        call MPI_ISEND(bfr_s_N,bfr_size_y,dtype,neigh(N),tag+3,comm,req_yy(1),err)
-        call MPI_ISEND(bfr_s_S,bfr_size_y,dtype,neigh(S),tag+4,comm,req_yy(3),err)
+        if(neigh(N) >= 0) then
+        call MPI_IRECV(bfr_r_N,bfr_size_y,dtype,neigh(N),tag+2,comm,req_y(q+1),err)
+        call MPI_ISEND(bfr_s_N,bfr_size_y,dtype,neigh(N),tag+1,comm,req_y(q+2),err)
+        q = q+2
+        endif
 
-        call MPI_waitall(size(req_yy), req_yy, MPI_STATUSES_IGNORE, err)
+        if(q > 0) call MPI_waitall(q, req_y, MPI_STATUSES_IGNORE, err)
 
         !
         ! ==== backward-forwvar communications
         !
-        !$acc wait(3)
-        call MPI_IRECV(bfr_r_B,bfr_size_z,dtype,neigh(B),tag+5,comm,req_zz(2),err)
-        call MPI_IRECV(bfr_r_F,bfr_size_z,dtype,neigh(F),tag+6,comm,req_zz(4),err)
+        q = 0
+        if(neigh(B) >= 0) then
+        call MPI_IRECV(bfr_r_B,bfr_size_z,dtype,neigh(B),tag+1,comm,req_z(q+1),err)
+        call MPI_ISEND(bfr_s_B,bfr_size_z,dtype,neigh(B),tag+2,comm,req_z(q+2),err)
+        q = q+2
+        endif
 
-        call MPI_ISEND(bfr_s_F,bfr_size_z,dtype,neigh(F),tag+5,comm,req_zz(1),err)
-        call MPI_ISEND(bfr_s_B,bfr_size_z,dtype,neigh(B),tag+6,comm,req_zz(3),err)
+        if(neigh(F) >= 0) then
+        call MPI_IRECV(bfr_r_F,bfr_size_z,dtype,neigh(F),tag+2,comm,req_z(q+1),err)
+        call MPI_ISEND(bfr_s_F,bfr_size_z,dtype,neigh(F),tag+1,comm,req_z(q+2),err)
+        q = q+2
+        endif
 
-        call MPI_waitall(size(req_zz), req_zz, MPI_STATUSES_IGNORE, err)
+        if(q > 0) call MPI_waitall(q, req_z, MPI_STATUSES_IGNORE, err)
 
         !$acc end host_data
 
@@ -3826,26 +4096,7 @@ subroutine mpi_communicateInt3D_isend_irecv_bfr_cuda_aware(comm,neigh,dims,&
           !$acc end parallel 
         endif
 
-
-        if(neigh(W)>=0) then
-          !$acc wait(1)
-        endif
-        if(neigh(E)>=0) then
-          !$acc wait(2)
-        endif
-        if(neigh(N)>=0) then
-          !$acc wait(3)
-        endif
-        if(neigh(S)>=0) then
-          !$acc wait(4)
-        endif
-        if(neigh(F)>=0) then
-          !$acc wait(5)
-        endif
-        if(neigh(B)>=0) then
-          !$acc wait(6)
-        endif
-
+        !$acc wait
 
         return
 end subroutine mpi_communicateInt3D_isend_irecv_bfr_cuda_aware

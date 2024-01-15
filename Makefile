@@ -33,6 +33,8 @@ DEBUG        = #-g -DDEBUG -pedantic -fbounds-check -fcheck=all -Wall -Waliasing
 OPENMP       = #-fopenmp -DOPENMP -lgomp -lpthread
 TIME 	     = 
 MODULES      = #-J$(MODDIR)
+PREPROC      = -cpp
+INCMODULES =
 # SMART COMPILING OPTIONS
 # -----------------------------
 
@@ -40,15 +42,13 @@ MODULES      = #-J$(MODDIR)
 ifeq ($(comp),gnu)
      FC = mpif90
      MODULES = -J$(MODDIR)
-     OPT     = -O3
-     TIME    =
-     OPENMP  =
-     ifeq ($(mode),debug)
-     	DEBUG  = -g -DDEBUG -pedantic -fbounds-check -fcheck=all -Wall -Waliasing -Wextra -fmax-errors=5 -fdump-core
-     else ifeq ($(mode),time)
-     	TIME   = -DTIME
-     else ifeq ($(mode),openmp)
-     	OPENMP = -fopenmp -DOPENMP -lgomp -lpthread
+     ifeq ($(mode),cpu)
+     	OPT   = -O3
+     else ifeq ($(mode),cpu_debug)
+     	OPT   = -O3
+     	DEBUG = -g -DDEBUG -pedantic -fbounds-check -fcheck=all -Wall -Waliasing -Wextra -fmax-errors=5 -fdump-core 
+	#-finit-real=inf -ffpe-trap=invalid,zero,overflow -Wuninitialized
+     	TIME    =
      endif
 endif
 ifeq ($(comp),gnuch)
@@ -100,49 +100,51 @@ endif
 
 
 
-ifeq ($(comp),pgi)
+ifeq ($(comp),nvhpc)
 	FC = mpif90
 	MODULES = -module $(MODDIR)
-	ifeq ($(mode),debug)
-		OPT    = -O3
-		DEBUG  = 
-		TIME   = -DNVTX -lnvToolsExt
-		OPENMP =
-	else ifeq ($(mode),time)
-		OPT    = -O3
-		DEBUG  =
-		TIME   = -DTIME
-		OPENMP =
-	else ifeq ($(mode),gpu)
-		OPT    = -O3 -g -acc -ta=tesla:deepcopy -cudalib=curand#,lineinfo
-		DEBUG  = 
-		TIME   =
-		OPENMP =
-	else ifeq ($(mode),debug_gpu)
-		OPT    = -O3 -acc -ta=tesla -cudalib=curand
-		DEBUG  = -Minfo=accel -g
-		TIME   = -DNVTX -lnvToolsExt
-		OPENMP =
-	else ifeq ($(mode),debug_gpu_marconi100)
-		FC     = mpipgifort
-		OPT    = -O3 -acc -ta=tesla:deepcopy
-		DEBUG  = -Minfo=accel -g
-		TIME   = -DNVTX -cudalib=curand,nvtx3
-		OPENMP =
-	else ifeq ($(mode),marconi100)
-		FC     = mpipgifort
-		OPT    = -O3 -acc -ta=tesla:deepcopy -cudalib=curand
+	ifeq ($(mode),gpu)
+		OPT    = -O3 -acc=gpu -gpu=cc70,cc80,deepcopy,safecache -cudalib=curand -Munroll=c:7 -DNVIDIA
 		DEBUG  = 
 		TIME   = 
 		OPENMP =
-	else 
-		OPT    = -O3
-		DEBUG  =
-		TIME   =
-		OPENMP =
+	else ifeq ($(mode),gpu_debug)
+                OPT    = -O3 -acc=gpu -gpu=cc70,cc80,deepcopy,lineinfo,safecache,ptxinfo -cudalib=curand -DNVIDIA
+                DEBUG  = -g -Minfo=accel -Minit-real=snan -Minit-msg -Ktrap=inv
+                TIME   = 
+                OPENMP =
+	else ifeq ($(mode),gpu_profiling)
+                OPT    = -O3 -acc=gpu -gpu=cc70,cc80,deepcopy,lineinfo,safecache,ptxinfo -cudalib=curand,nvtx3 -DNVIDIA
+                DEBUG  = -g -Minfo=accel -Munroll=c:7
+                TIME   = -DNVTX
+                OPENMP =
 	endif
 endif
 
+
+ifeq ($(comp),cray)
+	FC = ftn
+	MODULES = -em -J $(MODDIR)
+	PREPROC = 
+	ifeq ($(mode),cpu)
+		OPT    = -O3 -hfp3 -eZ -m4
+		DEBUG  = 
+		TIME   =
+		OPENMP = 
+	else ifeq ($(mode),gpu)
+		OPT        = -O3 -hfp3 -hacc -DAMD -h acc_model=auto_async_none:fast_addr:deep_copy -eZ -m4 -lhipfort-amdgcn -lrocrand $(INCMODULES)
+		DEBUG      = 
+		TIME       =
+		OPENMP     = 
+		INCMODULES = -J /users/$$USER/EasyBuild/SW/LUMI-23.09/G/hipfort/0.4-0-cpeCray-23.09-rocm5.2/include/hipfort/amdgcn
+	else ifeq ($(mode),gpu_profiling)
+		OPT        = -O3 -hfp3 -hacc -DAMD -h acc_model=auto_async_none:fast_addr:deep_copy -eZ -m4 -lhipfort-amdgcn -lrocrand -lroctx64 $(INCMODULES)
+		DEBUG      = -g
+		TIME       = -DROCTX
+		OPENMP     = 
+		INCMODULES = -J /users/$$USER/EasyBuild/SW/LUMI-23.09/G/hipfort/0.4-0-cpeCray-23.09-rocm5.2/include/hipfort/amdgcn
+	endif
+endif
 
 
 
@@ -168,7 +170,7 @@ ifeq ($(mpidex),buffer)
 	MPIDEX = -DMPIBFR
 endif
 
-LDFLAGS := -cpp $(OPENMP) $(TIME) $(MPIDEX) $(DEBUG) $(OPT)
+LDFLAGS := $(PREPROC) $(OPENMP) $(TIME) $(MPIDEX) $(DEBUG) $(OPT)
 
 # Fortran Compiler flags
 FFLAGS    = $(LDFLAGS)
@@ -189,7 +191,6 @@ OBJECTS = $(addprefix $(OBJDIR), mpi_module.o \
 	  rhs_module.o \
 	  advection_module.o \
 	  shock_detection_module.o \
-	  eigen_matrix_module.o \
 	  fluid_functions_module.o \
 	  viscous_module.o \
 	  flux_module.o \
@@ -219,11 +220,10 @@ OBJECTS = $(addprefix $(OBJDIR), mpi_module.o \
 	  norm_module.o \
 	  integration_module.o \
 	  real_to_integer_module.o \
-	  interpolation_module.o \
 	  dirac_delta_module.o \
 	  math_tools_module.o \
 	  matrix_inversion_module.o \
-	  performance_module.o \
+	  interpolation_module.o \
 	  random_module.o \
 	  reynolds_averaged_module.o \
 	  file_module.o \
@@ -231,8 +231,9 @@ OBJECTS = $(addprefix $(OBJDIR), mpi_module.o \
 	  onlineStats.o \
 	  vtk_utils_module.o\
 	  nvtx.o \
-	  npy.o \
-	  profiling_module.o)
+	  roctx.o \
+	  profiling_module.o\
+	  npy.o)
 
 
 
@@ -250,7 +251,7 @@ $(MAINPROG): $(OBJECTS) $(SRCDIR)main.f90 Makefile
 	@echo "-------------------------------------------"
 	@echo "Creating the executable: $(MAINPROG)"
 	@echo "-------------------------------------------"
-	$(FC) $(LDFLAGS) $(SRCDIR)main.f90 $(MODULES) $(OBJECTS) -o $(MAINPROG) $(LIBS)
+	$(FC) $(LDFLAGS) $(SRCDIR)main.f90 $(MODULES) $(INCMODULES) $(OBJECTS) -o $(MAINPROG) $(LIBS)
 
 # -------------------------------------------------------
 # Compile post_Uranos main program 
@@ -269,7 +270,6 @@ $(MAINSTAT): $(OBJECTS) $(STADIR)post_stat_main.f90 Makefile
 	@echo "Creating the executable: $(MAINSTAT)"
 	@echo "-------------------------------------------"
 	$(FC) $(LDFLAGS) $(STADIR)post_stat_main.f90 $(MODULES) $(OBJECTS) -o $(MAINSTAT) $(LIBS)
-
 
 # -------------------------------------------------------
 # Compiling modules in SRC
@@ -295,14 +295,13 @@ $(OBJDIR)%.o : $(STADIR)%.f90 Makefile
 $(OBJDIR)%.o : $(LIBDIR)%.f90 Makefile
 	$(FC) $(FFLAGS) -c $< -o $@ $(MODULES) $(LIBS)
 
-	
 # Clean everything up
 .PHONY: clean
 clean: 
 	@echo "---------------------------------------"
 	@echo "Cleaning everything up"
 	@echo "---------------------------------------"
-	rm -rf *.exe *.o *.mod rm -rf *dSYM
+	rm -rf *.exe *.o *.mod *.i rm -rf *dSYM
 	rm -rf *.optrpt
 	rm -rf $(OBJDIR)
 	rm -rf $(MODDIR)
@@ -313,7 +312,7 @@ clean:
 $(OBJDIR)parameters_module.o			: $(SRCDIR)parameters_module.f90
 $(OBJDIR)allocate_module.o			: $(SRCDIR)allocate_module.f90 $(addprefix $(OBJDIR), parameters_module.o)
 $(OBJDIR)mpi_comm_module.o			: $(SRCDIR)mpi_comm_module.f90 $(addprefix $(OBJDIR), parameters_module.o mpi_module.o)
-$(OBJDIR)mpi_module.o				: $(SRCDIR)mpi_module.f90 $(addprefix $(OBJDIR), parameters_module.o performance_module.o file_module.o allocate_module.o)
+$(OBJDIR)mpi_module.o				: $(SRCDIR)mpi_module.f90 $(addprefix $(OBJDIR), parameters_module.o file_module.o allocate_module.o)
 $(OBJDIR)input_module.o				: $(SRCDIR)input_module.f90 $(addprefix $(OBJDIR), parameters_module.o mpi_module.o real_to_integer_module.o)
 $(OBJDIR)mesh_module.o				: $(SRCDIR)mesh_module.f90 $(addprefix $(OBJDIR), parameters_module.o mpi_module.o math_tools_module.o input_module.o matrix_inversion_module.o)
 $(OBJDIR)output_module.o			: $(SRCDIR)output_module.f90 $(addprefix $(OBJDIR), parameters_module.o mpi_module.o storage_module.o norm_module.o statistics_module.o fluid_functions_module.o file_module.o integration_module.o wmles_module.o fluid_functions_module.o onlineStats.o output_tch.o)
@@ -322,22 +321,20 @@ $(OBJDIR)storage_module.o			: $(SRCDIR)storage_module.f90 $(addprefix $(OBJDIR),
 $(OBJDIR)time_module.o				: $(SRCDIR)time_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o shock_detection_module.o)
 $(OBJDIR)ic_module.o				: $(SRCDIR)ic_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o fluid_functions_module.o math_tools_module.o random_module.o file_module.o df_module.o)
 $(OBJDIR)init_bc_module.o		 	: $(SRCDIR)init_bc_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o ic_module.o bc_module.o rhs_module.o)
-$(OBJDIR)bc_module.o			 	: $(SRCDIR)bc_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o fluid_functions_module.o inflow_module.o real_to_integer_module.o mpi_comm_module.o profiling_module.o)
-$(OBJDIR)rhs_module.o			 	: $(SRCDIR)rhs_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o advection_module.o viscous_module.o integration_module.o sgs_module.o profiling_module.o)
-$(OBJDIR)advection_module.o			: $(SRCDIR)advection_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o eigen_matrix_module.o flux_module.o inflow_module.o profiling_module.o)
-$(OBJDIR)eigen_matrix_module.o			: $(SRCDIR)eigen_matrix_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o)
-$(OBJDIR)shock_detection_module.o		: $(SRCDIR)shock_detection_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o fluid_functions_module.o mpi_comm_module.o profiling_module.o)
-$(OBJDIR)viscous_module.o			: $(SRCDIR)viscous_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o nvtx.o)
+$(OBJDIR)bc_module.o			 	: $(SRCDIR)bc_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o fluid_functions_module.o inflow_module.o real_to_integer_module.o mpi_comm_module.o)
+$(OBJDIR)rhs_module.o			 	: $(SRCDIR)rhs_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o advection_module.o viscous_module.o integration_module.o sgs_module.o)
+$(OBJDIR)advection_module.o			: $(SRCDIR)advection_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o flux_module.o inflow_module.o nvtx.o roctx.o)
+$(OBJDIR)shock_detection_module.o		: $(SRCDIR)shock_detection_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o fluid_functions_module.o mpi_comm_module.o)
+$(OBJDIR)viscous_module.o			: $(SRCDIR)viscous_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o nvtx.o roctx.o)
 $(OBJDIR)flux_module.o				: $(SRCDIR)flux_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o)
 $(OBJDIR)inflow_module.o			: $(SRCDIR)inflow_module.f90 $(addprefix $(OBJDIR), storage_module.o fluid_functions_module.o math_tools_module.o df_module.o)
 $(OBJDIR)sgs_module.o				: $(SRCDIR)sgs_module.f90 $(addprefix $(OBJDIR), storage_module.o mpi_module.o parameters_module.o bc_module.o wmles_module.o)
 $(OBJDIR)df_module.o				: $(SRCDIR)df_module.f90 $(addprefix $(OBJDIR), parameters_module.o mpi_module.o fluid_functions_module.o)
-$(OBJDIR)performance_module.o			: $(SRCDIR)performance_module.f90 $(addprefix $(OBJDIR), parameters_module.o)
 $(OBJDIR)GetRetau_module.o			: $(SRCDIR)GetRetau_module.f90 $(addprefix $(OBJDIR), parameters_module.o mpi_module.o fluid_functions_module.o mesh_module.o)
 $(OBJDIR)wmles_module.o				: $(SRCDIR)wmles_module.f90 $(addprefix $(OBJDIR), parameters_module.o fluid_functions_module.o)
-$(OBJDIR)profiling_module.o	                : $(SRCDIR)profiling_module.f90 $(addprefix $(OBJDIR), nvtx.o parameters_module.o)
+$(OBJDIR)profiling_module.o			: $(SRCDIR)profiling_module.f90 $(addprefix $(OBJDIR), nvtx.o roctx.o)
 $(OBJDIR)nvtx.o					: $(SRCDIR)nvtx.f90
-
+$(OBJDIR)roctx.o					: $(SRCDIR)roctx.f90
 
 $(OBJDIR)post_storage_module.o			: $(PSTDIR)post_storage_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mesh_module.o)
 $(OBJDIR)post_input_module.o			: $(PSTDIR)post_input_module.f90 $(addprefix $(OBJDIR), post_storage_module.o post_shell_tools_module.o)
@@ -360,14 +357,13 @@ $(OBJDIR)post_stat_computation_module.o		: $(STADIR)post_stat_computation_module
 $(OBJDIR)post_stat_output_bl_module.o		: $(STADIR)post_stat_output_bl_module.f90 $(addprefix $(OBJDIR), parameters_module.o post_stat_storage_module.o wmles_module.o)
 
 
-
 #---------------------------------------------------------------------------
 # Libraries
 #---------------------------------------------------------------------------
 $(OBJDIR)norm_module.o				: $(LIBDIR)norm_module.f90 $(addprefix $(OBJDIR), parameters_module.o)
 $(OBJDIR)fluid_functions_module.o		: $(LIBDIR)fluid_functions_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o interpolation_module.o)
 $(OBJDIR)integration_module.o			: $(LIBDIR)integration_module.f90 $(addprefix $(OBJDIR), parameters_module.o mpi_module.o)
-$(OBJDIR)real_to_integer_module.o		: $(LIBDIR)real_to_integer_module.f90 $(addprefix $(OBJDIR), parameters_module.o performance_module.o)
+$(OBJDIR)real_to_integer_module.o		: $(LIBDIR)real_to_integer_module.f90 $(addprefix $(OBJDIR), parameters_module.o)
 $(OBJDIR)dirac_delta_module.o			: $(LIBDIR)dirac_delta_module.f90 $(addprefix $(OBJDIR), parameters_module.o real_to_integer_module.o)
 $(OBJDIR)math_tools_module.o			: $(LIBDIR)math_tools_module.f90 $(addprefix $(OBJDIR), parameters_module.o)
 $(OBJDIR)matrix_inversion_module.o		: $(LIBDIR)matrix_inversion_module.f90 $(addprefix $(OBJDIR), parameters_module.o)
@@ -379,6 +375,10 @@ $(OBJDIR)vtk_utils_module.o			: $(LIBDIR)vtk_utils_module.f90 $(addprefix $(OBJD
 $(OBJDIR)statistics_module.o			: $(LIBDIR)statistics_module.f90 $(addprefix $(OBJDIR), parameters_module.o)
 $(OBJDIR)onlineStats.o	   			: $(LIBDIR)onlineStats.f90 $(addprefix $(OBJDIR), parameters_module.o statistics_module.o fluid_functions_module.o)
 $(OBJDIR)npy.o	                     		: $(LIBDIR)npy.f90 
+
+
+
+
 
 
 

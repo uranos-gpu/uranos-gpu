@@ -7,6 +7,7 @@ interface open_unit
   module procedure open_unit
 endinterface
 
+
 contains
 subroutine read_input_data
 ! ------------------------------------------------------------------------------
@@ -81,6 +82,8 @@ subroutine read_input_data
            trim(bc(1)) == 'subsonic_inflow'       .or. &
            trim(bc(1)) == 'nscbc_inflow'          .or. &
            trim(bc(1)) == 'nscbc_inflow_relaxed'  .or. &
+           trim(bc(1)) == 'turb_supersonic_inflow'.or. &
+           trim(bc(1)) == 'pressure_inflow'       .or. &
            trim(bc(1)) == 'shock_inflow')         then
 
            inflow = .true.
@@ -97,9 +100,12 @@ subroutine read_input_data
            trim(bc(3)) == 'istatic_dws_adiabatic'   .or. &
            trim(bc(3)) == 'vorticity_dws_adiabatic' .or. &
            trim(bc(3)) == 'aws_adiabatic'           .or. &
-           trim(bc(3)) == 'aws_isothermal') then
+           trim(bc(3)) == 'aws_isothermal'          ) then
            wmles = .true.
         endif
+
+        ! forcing viscous flux to be staggered if wmles is active
+        if(wmles)     diffusion_scheme = 'staggered'
 
         return
 end subroutine read_input_data
@@ -230,10 +236,74 @@ subroutine initProbes(x,y,z,Probe)
         case('turbulent_BL')
           call initProbesTurbulentBoundaryLayer(x,y,z,Probe)
 
+        case('supersonic_ramp')
+          call initProbesSupersonicRamp(x,y,z,Probe)
+
+        case('blades')
+          call initProbesBlades(x,y,z,Probe)
+
         endselect
 
         return
 end subroutine initProbes
+
+
+subroutine initProbesSupersonicRamp(x,y,z,Probe)
+
+        use math_tools_module
+        use real_to_integer_module
+                
+        implicit none
+        real(rp) , dimension(:), allocatable, intent(in)    :: x,y,z
+        type(prb)                           , intent(inout) :: Probe
+
+        !local declarations
+        real(rp) :: PidStr(3), PidEnd(3)
+        real(rp) :: xp, yp, zp
+        integer  :: n, err = 0
+
+        Probe%n = nint(Lx/2.0_rp)
+        allocate(Probe%i(3,Probe%n), stat = err)
+        if(err .ne. 0) stop ' Allocation error in initProbes'
+        allocate(Probe%x(3,Probe%n), stat = err)
+        if(err .ne. 0) stop ' Allocation error in initProbes'
+        allocate(Probe%rank(Probe%n), stat = err)
+        if(err .ne. 0) stop ' Allocation error in initProbes'
+
+        do n = 1,Probe%n
+
+           xp = xmin + (n-1)*Lx/(real(Probe%n))
+           yp = 0.0_rp
+           if(xp > 0.0_rp) yp = tan(DegToRad(24.0_rp))*xp
+           zp = 0.5_rp*(zmax-zmin)
+
+           Probe%x(1,n) = xp
+           Probe%x(2,n) = yp
+           Probe%x(3,n) = zp
+
+        enddo
+
+        ! find probes location within the procs
+        PidStr = (/x(sx-1), y(sy-1), z(sz-1)/)
+        PidEnd = (/x(ex+1), y(ey+1), z(ez+1)/)
+
+        do n = 1,Probe%n
+
+           if(Probe%x(1,n) >= PidStr(1) .and. Probe%x(1,n) <= PidEnd(1) .and. &
+              Probe%x(2,n) >= PidStr(2) .and. Probe%x(2,n) <= PidEnd(2)) then
+
+              Probe%i(1,n) = locNearest(x,sx,ex,Probe%x(1,n))
+              Probe%i(2,n) = locNearest(y,sy,ey,Probe%x(2,n))
+
+              Probe%rank(n) = rank
+
+           endif
+        enddo
+
+        
+        return
+end subroutine initProbesSupersonicRamp
+
 
 subroutine initProbesSupersonicIntake(x,y,z,Probe)
 
@@ -397,6 +467,86 @@ subroutine initProbesTurbulentBoundaryLayer(x,y,z,Probe)
         return
 end subroutine initProbesTurbulentBoundaryLayer
 
+subroutine initProbesBlades(x,y,z,Probe)
+
+        use real_to_integer_module, only: nearest_integer_opt
+        use allocate_module
+
+        implicit none
+        real(rp) , dimension(:), allocatable, intent(in)    :: x,y,z
+        type(prb)                           , intent(inout) :: Probe
+
+        real(rp), dimension(:), allocatable :: distx, disty
+        real(rp), dimension(3) :: PidStr, PidEnd
+        integer :: i, j, n, err 
+
+        err = 0
+
+        Probe%n = 14
+        allocate(Probe%i(3,Probe%n), stat = err)
+        if(err .ne. 0) stop ' Allocation error in initProbes'
+        allocate(Probe%x(3,Probe%n), stat = err)
+        if(err .ne. 0) stop ' Allocation error in initProbes'
+
+        Probe%i    = 0
+        Probe%x    = 0.0_rp
+
+        ! frontal probes
+        Probe%x(:, 1) = (/-0.3_rp, 0.0_rp, 0.0_rp/)
+
+        ! suction side body 2 probes
+        Probe%x(:, 2) = (/0.0850000739131077_rp, 1.8300575043978300_rp, 0.0_rp/)
+        Probe%x(:, 3) = (/0.1946723431933419_rp, 1.8390009904356440_rp, 0.0_rp/)
+        Probe%x(:, 4) = (/0.3043446124735760_rp, 1.7283382855115530_rp, 0.0_rp/)
+        Probe%x(:, 5) = (/0.3591881384244681_rp, 1.6172468845625080_rp, 0.0_rp/)
+        Probe%x(:, 6) = (/0.4140316643753603_rp, 1.4604919656451880_rp, 0.0_rp/)
+        Probe%x(:, 7) = (/0.4414386447292562_rp, 1.3649666651884040_rp, 0.0_rp/)
+        Probe%x(:, 8) = (/0.4688751903262524_rp, 1.2591378775111980_rp, 0.0_rp/)
+        Probe%x(:, 9) = (/0.4962821706801484_rp, 1.1466569101364440_rp, 0.0_rp/)
+        Probe%x(:,10) = (/0.5237039336555944_rp, 1.0332594202255830_rp, 0.0_rp/)
+        
+        ! wake points
+        Probe%x(:,11) = (/0.5652920962199310_rp, 0.42068965517241380_rp, 0.0_rp/)
+        Probe%x(:,12) = (/0.6013745704467353_rp, 0.32586206896551717_rp, 0.0_rp/)
+        Probe%x(:,13) = (/0.6391752577319589_rp, 0.22758620689655162_rp, 0.0_rp/)
+        Probe%x(:,14) = (/0.6838487972508591_rp, 0.12413793103448267_rp, 0.0_rp/)
+
+        ! move the probes according the domain periodicity
+        do i = 1,Probe%n
+           if(Probe%x(2,i) > ymax) Probe%x(2,i) = Probe%x(2,i) - 0.85_rp
+           if(Probe%x(2,i) < ymin) Probe%x(2,i) = Probe%x(2,i) + 0.85_rp
+        enddo
+
+        ! find probes location within the procs
+        PidStr = (/x(sx)  , y(sy)  , z(sz)  /)
+        PidEnd = (/x(ex+1), y(ey+1), z(ez+1)/)
+                
+        call AllocateReal(distx,sx,ex)
+        call AllocateReal(disty,sy,ey)
+
+        do n = 1,Probe%n
+
+           if(Probe%x(1,n) >= PidStr(1) .and. Probe%x(1,n) <= PidEnd(1) .and. &
+              Probe%x(2,n) >= PidStr(2) .and. Probe%x(2,n) <= PidEnd(2)) then
+                
+              do i = sx,ex
+                 distx(i) = abs(x(i) - probe%x(1,n))
+              enddo
+              do j = sy,ey
+                 disty(j) = abs(y(j) - probe%x(2,n))
+              enddo
+        
+              Probe%i(1,n) = minloc(distx,1)
+              Probe%i(2,n) = minloc(disty,1)
+
+           endif
+        enddo
+        
+        call DeallocateReal(distx)
+        call DeallocateReal(disty)
+
+        return
+end subroutine initProbesBlades
 
 
 

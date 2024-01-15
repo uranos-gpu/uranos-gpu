@@ -64,6 +64,7 @@ subroutine read_input_file
 
         ! set hybrid_weno flag
         if(scheme == 'hybrid_wenoEP') hybrid_weno = .true.
+        if(scheme == 'hybrid_tenoEP') hybrid_weno = .true.
 
         return
 end subroutine read_input_file
@@ -221,7 +222,6 @@ subroutine make_saving_directories
                 call execute_command_line('mkdir -p DATA/'//trim(data_dir)//'/GRID')
                 write(*,*) " Directory DATA/"//trim(data_dir)//"/GRID has been created."
         endif
-
 
         return
 end subroutine make_saving_directories

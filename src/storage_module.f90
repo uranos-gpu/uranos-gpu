@@ -3,16 +3,17 @@ use parameters_module
 use mpi_module
 use mesh_module
 use allocate_module
+use iso_c_binding
 implicit none
 integer            :: i,j,k,iv
 
 ! integers
 integer :: err = 0
 integer :: istop = 0
-integer :: nvAve1D = 20
-integer :: nVAve2D = 35
-integer :: nVAve2D_aux = 20
-integer :: nVWMLESData = 5
+integer, parameter :: nvAve1D = 20
+integer, parameter :: nVAve2D = 35
+integer, parameter :: nVAve2D_aux = 20
+integer, parameter :: nVWMLESData = 5
 
 ! time variables
 real(rp)  :: time, t_restart
@@ -56,6 +57,15 @@ integer(1), allocatable, dimension(:) :: ishock_x
 integer(1), allocatable, dimension(:) :: ishock_y
 integer(1), allocatable, dimension(:) :: ishock_z
 
+real(rp), allocatable, dimension(:) :: phirand, psirand
+#ifdef AMD
+real(c_double), dimension(:), allocatable :: psirandnum, phirandnum
+type(c_ptr)                               :: psirandnumptr, phirandnumptr
+integer(c_size_t)                         :: psirandsize, phirandsize
+#endif
+
+real(rp), allocatable, dimension(:) :: sponge_x
+
 
 ! statistics
 real(rp), dimension(:,:)  , allocatable :: vmean1D
@@ -67,16 +77,11 @@ real(rp), dimension(:,:,:), allocatable :: WMLES_DATA_LW,WMLES_DATA_UW,WMLES_DAT
 real(rp), dimension(:,:)  , allocatable :: vmean1D_wmles
 real(rp), dimension(:)    , allocatable :: vmean0D_wmles
 
-type weno_flag
-  integer(1), allocatable, dimension(:,:,:) :: flag
-  integer(1), allocatable, dimension(:,:,:) :: temp
-  integer(1)                                :: smooth = 1
-  integer(1)                                :: shock  = 0
-end type
-type(weno_flag) :: weno
+integer(1), allocatable, dimension(:,:,:) :: weno_flag
+integer(1), allocatable, dimension(:,:,:) :: weno_flag_xyz
 
-
-
+integer(1), parameter :: weno_smooth = 1
+integer(1), parameter :: weno_shock  = 0
 
 contains
 subroutine init_GL_variables
@@ -96,9 +101,9 @@ subroutine init_GL_variables
         t_restart = 0._rp
         
         ! evolutionary variables
-        call AllocateReal(phi  ,lbx,ubx,lby,uby,lbz,ubz,1,eqs)
-        call AllocateReal(RHS  ,lbx,ubx,lby,uby,lbz,ubz,1,eqs)
-        call AllocateReal(phi_n,lbx,ubx,lby,uby,lbz,ubz,1,eqs)
+        call AllocateReal(phi  ,lbx,ubx,lby,uby,lbz,ubz,1,5)
+        call AllocateReal(RHS  ,lbx,ubx,lby,uby,lbz,ubz,1,5)
+        call AllocateReal(phi_n,lbx,ubx,lby,uby,lbz,ubz,1,5)
 
         ! alloco le variabili di campo ausiliarie
         call AllocateReal(U  ,lbx,ubx,lby,uby,lbz,ubz)
@@ -133,17 +138,26 @@ subroutine init_GL_variables
         call AllocateInteger(ishock_y,sy-1,ey)
         call AllocateInteger(ishock_z,sz-1,ez)
 
-        if(viscous) then
-          call AllocateReal(VIS,lbx,ubx,lby,uby,lbz,ubz)
-          call AllocateReal(LMD,lbx,ubx,lby,uby,lbz,ubz)
-        endif
+        call AllocateReal(VIS,lbx,ubx,lby,uby,lbz,ubz)
+        call AllocateReal(LMD,lbx,ubx,lby,uby,lbz,ubz)
 
         if(hybrid_weno) then
-          call AllocateInteger(weno%flag,lbx,ubx,lby,uby,lbz,ubz)
-          weno%flag = weno%smooth
+          call AllocateInteger(weno_flag,lbx,ubx,lby,uby,lbz,ubz)
+          weno_flag = weno_smooth
+
+          call AllocateInteger(weno_flag_xyz,lbx,ubx,lby,uby,lbz,ubz)
                 
           call AllocateReal(SSensor,lbx,ubx,lby,uby,lbz,ubz)
         endif
+
+        call AllocateReal(phirand,1,16)
+        call AllocateReal(psirand,1,20)
+#ifdef AMD
+        allocate(phirandnum(16))
+        allocate(psirandnum(20))
+        phirandsize = 16
+        psirandsize = 20
+#endif
 
         if(wmles) then
           call AllocateReal(WMLES_DATA_LW,lbx,ubx,lbz,ubz,1,nvWmlesData)
@@ -190,6 +204,8 @@ subroutine init_Statistics_fields
           case('TTF') ! xy are periodic
 
           case('FTT') ! yz are periodic
+            call AllocateReal(vmean2D    ,lbx,ubx,lby,uby,1,nvAve2D)
+            call AllocateReal(vmean2D_aux,lbx,ubx,lby,uby,1,nvAve2D_aux)
 
           case('TFT') ! xz are periodic
             call AllocateReal(vmean1D,lby,uby,1,nvAve1D)
@@ -233,15 +249,17 @@ subroutine init_FD_coefficients
 
         endif
 
-        call AllocateReal(central_1,-central_fd_order/2,central_fd_order/2)
-        call AllocateReal(central_2,-central_fd_order/2,central_fd_order/2)
         call AllocateReal(bward_1,-bward_fd_order,0)
         call AllocateReal(bward_2,-bward_fd_order-1,0)
         call AllocateReal(fward_1,0,fward_fd_order)
         call AllocateReal(fward_2,0,fward_fd_order+1)
-        call AllocateReal(central_1_one_half,fd_L,fd_R)
-        call AllocateReal(central_2_one_half,fd_L,fd_R)
         call AllocateReal(mid_point_lele,fd_L,fd_R)
+
+        central_1 = 0.0_rp
+        central_2 = 0.0_rp
+
+        central_1_one_half = 0.0_rp
+        central_2_one_half = 0.0_rp
 
         if    (fd_order == 2) then
                 
@@ -372,48 +390,6 @@ subroutine init_FD_coefficients
 end subroutine init_FD_coefficients
 
 
-subroutine init_weno_coefficients
-        implicit none
-
-        call AllocateReal(aweno,0,weno_num-1,0,weno_num-1)
-        call AllocateReal(cweno,0,weno_num-1)
-       
-         if(weno_num == 2) then
-          aweno(0,:) = 1.0_rp/2.0_rp * [- 1.0_rp ,   3.0_rp]
-          aweno(1,:) = 1.0_rp/2.0_rp * [  1.0_rp ,   1.0_rp]
-
-          cweno(:) = 1.0_rp/3.0_rp * [1.0_rp, 2.0_rp]
-
-        elseif(weno_num == 3) then
-          aweno(0,:) = 1.0_rp/6.0_rp * [  2.0_rp , - 7.0_rp,  11.0_rp]
-          aweno(1,:) = 1.0_rp/6.0_rp * [- 1.0_rp ,   5.0_rp,   2.0_rp]
-          aweno(2,:) = 1.0_rp/6.0_rp * [  2.0_rp ,   5.0_rp, - 1.0_rp]
-
-          cweno(0) = 1.0_rp/10.0_rp
-          cweno(1) = 6.0_rp/10.0_rp
-          cweno(2) = 3.0_rp/10.0_rp
-
-        elseif(weno_num == 4) then
-          aweno(0,:) = 1.0_rp/12.0_rp * [- 3.0_rp ,  13.0_rp, -23.0_rp,  25.0_rp]
-          aweno(1,:) = 1.0_rp/12.0_rp * [  1.0_rp ,  -5.0_rp,  13.0_rp,   3.0_rp]
-          aweno(2,:) = 1.0_rp/12.0_rp * [- 1.0_rp ,   7.0_rp,   7.0_rp, - 1.0_rp]
-          aweno(3,:) = 1.0_rp/12.0_rp * [  3.0_rp ,  13.0_rp, - 5.0_rp,   1.0_rp]
-
-          cweno(:) = 1.0_rp/35.0_rp * [ 1.0_rp, 12.0_rp, 18.0_rp,  4.0_rp]
-
-        else
-          print*, 'weno order ', weno_order, ' is not implemented'
-          stop
-        endif
-
-        if(abs(sum(cweno) - 1.0_rp) > toll_equality) then
-          print*, 'WENO coefficients are unbalanced'
-          stop
-        endif
-
-        return
-end subroutine init_weno_coefficients
-
 subroutine init_RK_coefficients
         implicit none
         
@@ -438,11 +414,42 @@ subroutine init_RK_coefficients
 end subroutine init_RK_coefficients
 
 
+
+subroutine init_sponge()
+
+  implicit none
+
+  real(rp), parameter :: Ls = 1.0_rp
+  real(rp), parameter :: As = 20.0_rp
+  real(rp)            :: xini, xend, i_sizex, sponge
+  integer             :: i
+
+  call AllocateReal(sponge_x,lbx,ubx)
+
+  xini = xmax - Ls
+  xend = xmax
+  i_sizex = 1.0_rp/(xend - xini)
+
+  do i = lbx, ubx
+    sponge_x(i) = 0.0_rp
+    if(x(i) > xini) then
+
+      sponge = (x(i) - xini)*i_sizex
+      sponge = sponge * sponge
+      sponge_x(i) = As * sponge * sponge
+
+    end if
+  enddo
+
+end subroutine init_sponge
+
+
+
+
 subroutine end_all_variables
         implicit none
 
-        deallocate(central_1, central_2        , &
-                   bward_1  , bward_2          , &
+        deallocate(bward_1  , bward_2          , &
                    fward_1  , fward_2          , &
 
                    a_rk, b_rk, c_rk            , &

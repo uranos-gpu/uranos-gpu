@@ -2,6 +2,7 @@ module sgs_module
 use parameters_module, only: rp
 use mpi_module
 use mpi_comm_module
+use profiling_module
 
 implicit none
 private
@@ -24,9 +25,9 @@ subroutine compute_subgrid_model
         use storage_module   , only: phi, VIS, LMD
 
         implicit none
-#ifdef TIME
-        call mpi_stime(s_les_time)
-#endif
+
+        call StartProfRange("compute_subgrid_model")
+        call StartProfRange("sgs_model")
 
         if(dims /= 3) stop ' LES requires 3D!'
         !
@@ -55,9 +56,12 @@ subroutine compute_subgrid_model
             call secure_stop
 
         endselect
+        call EndProfRange
+
         !
         ! === commucate halos via MPI
         !
+        call StartProfRange("sgs_mpi_calls")
         if(mpi_flag) then
         call mpi_share(mpi_comm_cart,type_send_prim,type_recv_prim,my_neighbour,dims, &
                 bfr_send_E, bfr_send_W, bfr_recv_E, bfr_recv_W, &
@@ -71,15 +75,14 @@ subroutine compute_subgrid_model
                 bfr_send_B, bfr_send_F, bfr_recv_B, bfr_recv_F, &
                 LMD)
         endif
+        call EndProfRange
         !
         ! === apply physical boundary conditions to turbulent viscosity
         !
         call TrbVisBC(phi,VIS,LMD)
 
-#ifdef TIME
-        call mpi_etime(s_les_time,t_les_calls,t_les_time)
-#endif
-        
+        call EndProfRange
+
         return
 end subroutine compute_subgrid_model
 
@@ -888,6 +891,8 @@ subroutine TrbVisBC(phi,VIS,LMD)
         real(rp)                      :: tWall
         integer                       :: f
 
+        call StartProfRange("TrbVisBC")
+
         if(.not.mpi_flag) my_neighbour = MPI_PROC_NULL
 
         all_bound%node = (/ sx , ex , sy , ey , sz ,  ez/)
@@ -910,23 +915,6 @@ subroutine TrbVisBC(phi,VIS,LMD)
                  tWall = 1.0_rp
                  call WallResolvedTrbVis(bound,tWall,VIS,LMD)
 
-               !case('aws_isothermal')
-               !  tWall = 1.0_rp
-               !  call AlgebraicWallModelledTrbVis(bound,tWall,phi,VIS,LMD)
-
-               !case('aws_adiabatic')
-               !  tWall = Trat*(1.0_rp + Prandtl**(1.0_rp/3.0_rp)*0.5_rp*(gamma0-1.0_rp)*Mach**2)
-               !  call AlgebraicWallModelledTrbVis(bound,tWall,phi,VIS,LMD)
-
-               !case('dws_isothermal')
-               !  tWall = 1.0_rp
-               !  call DifferentialWallModelledTrbVis(bound,tWall,phi,VIS,LMD)
-
-               !case('dws_adiabatic')
-               !  tWall = Trat*(1.0_rp + Prandtl**(1.0_rp/3.0_rp)*0.5_rp*(gamma0-1.0_rp)*Mach**2)
-               !  call DifferentialWallModelledTrbVis(bound,tWall,phi,VIS,LMD)
-
-
                case('idws_isothermal')
                  tWall = 1.0_rp
                  call iDifferentialWallModelledTrbVis(bound,tWall,phi,VIS,LMD)
@@ -947,10 +935,6 @@ subroutine TrbVisBC(phi,VIS,LMD)
                  tWall = Trat*(1.0_rp + Prandtl**(1.0_rp/3.0_rp)*0.5_rp*(gamma0-1.0_rp)*Mach**2)
                  call iStaticDifferentialWallModelledTrbVis(bound,tWall,phi,VIS,LMD)
 
-               !case('vorticity_dws_adiabatic')
-               !  tWall = Trat*(1.0_rp + Prandtl**(1.0_rp/3.0_rp)*0.5_rp*(gamma0-1.0_rp)*Mach**2)
-               !  call VorticityDifferentialWallModelledTrbVis(bound,tWall,phi,VIS,LMD)
-
                case default
                  call ZeroGradientTrbVis(bound,VIS,LMD)
 
@@ -959,6 +943,8 @@ subroutine TrbVisBC(phi,VIS,LMD)
 
            endif
         enddo
+
+        call EndProfRange
 
 
         return
@@ -1046,7 +1032,7 @@ end subroutine ZeroGradientTrbVis
 
 subroutine WallResolvedTrbVis(b,tWall,VIS,LMD)
 
-        use fluid_functions_module, only: Sutherland
+        use fluid_functions_module, only: laminar_viscosity
         use bc_module             , only: face_type
         use parameters_module     , only: k_inf 
 
@@ -1059,7 +1045,7 @@ subroutine WallResolvedTrbVis(b,tWall,VIS,LMD)
         real(rp) :: mWall, kWall
         integer  :: i,j,k,ji,jg,bnode,bnorm
 
-        mWall = Sutherland(tWall)
+        mWall = laminar_viscosity(tWall,Tref,vis_flag)
         kWall = k_inf * mWall
 
         bnode = b%node
@@ -1098,344 +1084,13 @@ subroutine WallResolvedTrbVis(b,tWall,VIS,LMD)
 end subroutine WallResolvedTrbVis
 
 
-subroutine AlgebraicWallModelledTrbVis(b,tWall,phi,VIS,LMD)
-        
-        use parameters_module     , only: gamma0, Prandtl
-        use bc_module             , only: face_type
-        use mesh_module           , only: y
-        use storage_module        , only: central_1_one_half
-        use fluid_functions_module, only: Sutherland, ilogLaw
-        use math_tools_module     , only: Newton_Raphson
-
-        implicit none
-        real(rp), dimension(:,:,:)  , allocatable, intent(inout) :: VIS,LMD
-        real(rp), dimension(:,:,:,:), allocatable, intent(in)    :: phi
-        type(face_type)                          , intent(in)    :: b
-        real(rp)                                 , intent(in)    :: tWall
-
-        ! local declarations
-        real(rp), parameter :: toll = 1.0E-14_rp
-        integer , parameter :: imax = 100, box = 1
-        
-
-        real(rp) :: rWl, mWl, nWl, tWl, u_t, u_tModel
-        real(rp) :: y_w, d_2, id2
-        real(rp) :: r_2, u_2, w_2, u_P
-        real(rp) :: u_y, w_y
-        real(rp) :: m_EF, k_EF, m_tr, kLam, kTrb
-        real(rp) :: dyW, u_yWl, w_yWl, inum
-        integer  :: i,j,k,j0,j1,j2,jg,ji, ii, kk, num,l
-
-        mWl = Sutherland(tWall)
-
-        kLam = gamma0/(gamma0-1.0_rp)*Prandtl
-        kTrb = gamma0/(gamma0-1.0_rp)*Pr_turb
-
-        selectcase(b%face)
-
-          case('S','N')
-          j0  = b%node + b%norm
-          j1  = b%node
-          j2  = b%node - b%norm
-        
-          y_W = 0.5_rp*(y(j1) + y(j0))
-          dyW = abs(y(j1) - y(j0))
-          d_2 = abs(y(j2) - y_w)
-          id2 = 1.0_rp/d_2
-
-          do k = sz,ez
-             do i = sx,ex
-
-                rWl = 0.0_rp
-                do l = fd_L,fd_R
-                   rWl = rWl + central_1_one_half(l) * phi(i,j0+l,k,1)
-                enddo
-                nWl = mu_inf*mWl/rWl
-        
-                ! compute quantities in the second point
-                r_2   = 0.0_rp
-                u_2   = 0.0_rp
-                w_2   = 0.0_rp
-                u_yWl = 0.0_rp
-                w_yWl = 0.0_rp
-                num   = 0
-                do kk = k-box,k+box
-                   do ii = i-box,i+box
-                      r_2 = r_2 + phi(ii,j2,kk,1)
-                      u_2 = u_2 + phi(ii,j2,k,2)/phi(ii,j2,kk,1)
-                      w_2 = w_2 + phi(ii,j2,k,4)/phi(ii,j2,kk,1)
-
-                      u_yWl = u_yWl + (phi(ii,j1,kk,2)/phi(ii,j1,kk,1) &
-                                     - phi(ii,j0,kk,2)/phi(ii,j0,kk,1))/dyW
-
-                      w_yWl = w_yWl + (phi(ii,j1,kk,4)/phi(ii,j1,kk,1) &
-                                     - phi(ii,j0,kk,4)/phi(ii,j0,kk,1))/dyW
-
-                      num = num + 1
-                   enddo
-                enddo
-                inum  = 1.0_rp/real(num,rp)
-                r_2   = r_2  *inum
-                u_2   = u_2  *inum
-                w_2   = w_2  *inum
-                u_yWl = u_yWl*inum
-                w_yWl = w_yWl*inum
-
-
-                ! estimate tau wall
-                u_P = sqrt(u_2**2 + w_2**2)
-                u_y = u_2*id2
-                w_y = w_2*id2
-                tWl = mu_inf*mWl*sqrt(u_y**2 + w_y**2)
-                u_t = sqrt(tWl/rWl)
-                
-                ! compute u_tau using the log low model
-                call newton_raphson(iLogLaw,d_2,u_P,nWl,imax,toll,u_t,u_tModel)
-                ! update tauWall
-                tWl = rWl*u_tModel**2
-
-                do j = 1,GN
-
-                   jg   = b%node + b%norm*j
-                   ji   = b%node - b%norm*(j-1)
-
-                   ! compute effective wall viscosity
-                   m_EF = tWl/(mu_inf*(u_yWl + w_yWl))
-                   m_tr = m_EF - mWl
-                   k_EF = kLam*mWl + kTrb*m_tr
-        
-                   ! assign effective wall viscosity
-                   VIS(i,jg,k) = 2*m_EF - VIS(i,ji,k)
-                   LMD(i,jg,k) = 2*k_EF - LMD(i,ji,k)
-
-                enddo
-             enddo
-          enddo
-
-          case default
-            print*, ' WallModelledTrbVis is not implemented for face ', &
-                      trim(b%face)
-            stop
-
-        endselect
-
-        return
-end subroutine AlgebraicWallModelledTrbVis
-
-
-subroutine DifferentialWallModelledTrbVis(b,tWall,phi,VIS,LMD)
-
-        use parameters_module      , only: gamma0, Prandtl
-        use bc_module              , only: face_type
-        use mesh_module            , only: y, xstep, zstep
-        use fluid_functions_module , only: Sutherland, getmuT
-        use real_to_integer_module , only: locate
-        use matrix_inversion_module, only: tdma
-        use fileModule             , only: str
-        use wmles_module
-
-        implicit none
-        real(rp), dimension(:,:,:)  , allocatable, intent(inout) :: VIS,LMD
-        real(rp), dimension(:,:,:,:), allocatable, intent(in)    :: phi
-        type(face_type)                          , intent(in)    :: b
-        real(rp)                                 , intent(in)    :: tWall
-
-        ! local declaration
-        integer , parameter       :: nw = wmles_npts
-        integer , parameter       :: nl = wmles_indx
-        real(rp), dimension(1:nw) :: u_wm,T_wm
-        
-        real(rp) :: yw , hw , u_w, T_w
-        real(rp) :: r_h, irh, u_h, v_h, w_h, ekh, p_h, T_h, mlh
-        
-        real(rp) :: r_in, u_in, v_in, w_in, p_in, T_in, irin
-        real(rp) :: r_gh, u_gh, v_gh, w_gh, p_gh, T_gh, u_p
-        integer  :: j0, j1, i,j,k,jl, ji, jg
-        
-        real(rp), parameter :: ClipPar = 100.0_rp
-        real(rp)            :: clip_mu, mW
-        real(rp)            :: clip_lm, lW
-        real(rp)            :: tauW, qauW
-        real(rp)            :: idy, mu_eff, lm_eff
-        real(rp)            :: u_y, w_y, T_y
-
-        real(rp) :: h1, hl
-        real(rp) :: rhoWall0, tauWall0, utaWall0, dltWall0, inuWall0
-        real(rp) :: xPlWall0, yPlWall0, zPlWall0, yPlWalln
-        real(rp) :: xpR, ypR, zpR, AA,BB, muStar, lmStar
-        integer  :: jInt
-
-        ! set wall quantities
-        T_w = tWall
-        u_w = 0.0_rp
-        mW = Sutherland(tWall)
-        lW = gamma0/(gamma0-1.0_rp)*(1.0_rp/Prandtl)*mW
-
-        clip_mu = ClipPar
-        clip_lm = ClipPar*lW
-
-        selectcase(b%face)
-        
-          case('N','S')
-        
-          j0 = b%node + b%norm
-          j1 = b%node
-          jl = b%node - b%norm*(nl-1)
-          yW = 0.5_rp*(y(j1) + y(j0))
-
-          do k    = sz,ez
-             do i = sx,ex
-        
-                ! get les quantities at the jl node
-                r_h = phi(i,jl,k,1)
-                irh = 1.0_rp/r_h
-                u_h = phi(i,jl,k,2)*irh
-                v_h = phi(i,jl,k,3)*irh
-                w_h = phi(i,jl,k,4)*irh
-                ekh = 0.5_rp*(u_h*u_h + v_h*v_h + w_h*w_h)
-                p_h = (gamma0-1.0_rp) * (phi(i,jl,k,5) - r_h*ekh)
-                T_h = p_h*irh
-                mlh = mu_inf*Sutherland(T_h)
-
-                u_p = sqrt(u_h*u_h + w_h*w_h)
-
-                !
-                ! === compute yPlusW with Reichardt's law
-                !
-                h1 = abs(y(j1)-yW)
-                hl = abs(y(jl)-yW)
-                call LogLawWMLES(mu_inf,hl,T_w,u_p,p_h,tauWall0)
-                rhoWall0 = p_h/T_w
-                utaWall0 = sqrt(tauWall0/rhoWall0)
-
-                inuWall0 = rhoWall0*utaWall0/(mW*mu_inf)
-
-                xPlWall0 = xstep(i)*inuWall0
-                yPlWall0 = h1      *inuWall0
-                zPlWall0 = zstep(k)*inuWall0
-
-                dltWall0 = yPlWall0/h1
-                
-                !if(yPlWall0 < ypt_wm) then ! OLD VERSION
-                !if(xPlWall0 < xpt_wm .and. yPlWall0 < ypt_wm .and. zPlWall0 < zpt_wm) then
-
-                !  do j = 1,GN
-                !     jg = b%node + b%norm*j
-                !     ji = b%node - b%norm*(j-1)
-
-                !     VIS(i,jg,k) = 2*mw - VIS(i,ji,k)
-                !     LMD(i,jg,k) = 2*lw - LMD(i,ji,k)
-                !  enddo
-
-                !else
-                  !
-                  ! === looking at the grid point where yPlus>wmles_interface and get the grid
-                  ! 
-                  j = wmles_strI
-                  do
-                    ji = b%node - b%norm*(j-1)
-                    yPlWalln = yPlWall0*(y(ji)-yW)/(y(j1)-yW)
-                    if(yPlWalln > wmles_intr) exit
-                    j = j+1
-                  enddo
-                  jInt = ji
-                  hw = abs(y(jInt) - yW)
-                  !
-                  ! === get the LES field at the interface location
-                  !
-                  r_h = phi(i,jInt,k,1)
-                  irh = 1.0_rp/r_h
-                  u_h = phi(i,jInt,k,2)*irh
-                  v_h = phi(i,jInt,k,3)*irh
-                  w_h = phi(i,jInt,k,4)*irh
-                  ekh = 0.5_rp*(u_h*u_h + v_h*v_h + w_h*w_h)
-                  p_h = (gamma0-1.0_rp) * (phi(i,jInt,k,5) - r_h*ekh)
-                  T_h = p_h*irh
-                  mlh = mu_inf*Sutherland(T_h)
-
-                  u_p = sqrt(u_h*u_h + w_h*w_h)
-
-                  !
-                  ! === get the correct tauWall and qWall from ODE model
-                  !
-                  call OdeWMLES(gamma0,Prandtl,mu_inf,hw,dltWall0,u_w,u_p,T_w,T_h,p_h,u_wm,T_wm,tauW,qauW)
-        
-                  do j = 1,GN
-        
-                     jg = b%node + b%norm*j
-                     ji = b%node - b%norm*(j-1)
-
-                     ! compute primitive variabile in the inner nodes
-                     r_in = phi(i,ji,k,1)
-                     irin = 1.0_rp/r_in
-                     u_in = phi(i,ji,k,2)*irin
-                     v_in = phi(i,ji,k,3)*irin
-                     w_in = phi(i,ji,k,4)*irin
-                     p_in = (gamma0-1.0_rp)*(phi(i,ji,k,5)&
-                             -0.5_rp*r_in*(u_in*u_in + v_in*v_in + w_in*w_in))
-                     T_in = p_in*irin
-                     
-                     ! compute primitive variabile in the ghost nodes
-                     u_gh =       - u_in
-                     v_gh =       - v_in
-                     w_gh =       - w_in
-                     T_gh = 2*T_w - T_in 
-                     p_gh = p_in
-                     r_gh = p_gh/T_gh
-                  
-                     ! compute wall derivatives
-                     idy = 1.0_rp/(abs(y(ji)-y(jg)))
-                     u_y = (u_in - u_gh)*idy
-                     w_y = (w_in - w_gh)*idy
-                     T_y = (T_in - T_gh)*idy
-
-                     mu_eff = tauW/(mu_inf*sqrt(u_y*u_y + w_y*w_y))
-                     lm_eff = qauW/(mu_inf*T_y)
-                     if(mu_eff > clip_mu) mu_eff = 0.0_rp
-                     if(lm_eff > clip_lm) lm_eff = 0.0_rp
-                     if(lm_eff < 0) lm_eff = 0.0_rp
-
-                     ! blending laminar and effective viscosity
-                     xpR = xPlWall0/xpt_wm
-                     ypR = yPlWall0/ypt_wm
-                     zpR = zPlWall0/zpt_wm
-
-                     AA = max(1.0_rp-xpR,0.0_rp) + max(1.0_rp-ypR,0.0_rp) + max(1.0_rp-zpR,0.0_rp)
-                     BB = min(xpR,1.0_rp) + min(ypR,1.0_rp) + min(zpR,1.0_rp)
-                     AA = AA/3.0_rp
-                     BB = BB/3.0_rp
-
-                     muStar = mw*AA + mu_eff*BB
-                     lmStar = lw*AA + lm_eff*BB
-
-                     VIS(i,jg,k) = 2*muStar - VIS(i,ji,k)
-                     LMD(i,jg,k) = 2*lmStar - LMD(i,ji,k)
-
-                  enddo
-                !endif
-             enddo
-          enddo
-
-          case default
-          print*, 'DifferentialWallStressModel not implemented for face ', trim(b%face)
-          stop
-        
-        endselect
-        
-
-
-        
-        return
-end subroutine DifferentialWallModelledTrbVis
-
-
 
 subroutine iDifferentialWallModelledTrbVis(b,tWall,phi,VIS,LMD)
 
         use parameters_module      , only: gamma0, Prandtl
         use bc_module              , only: face_type
         use mesh_module            , only: y, xstep, zstep
-        use fluid_functions_module , only: Sutherland, getmuT
+        use fluid_functions_module , only: laminar_viscosity, getmuT
         use storage_module         , only: WMLES_DATA_LW, WMLES_DATA_UW, WMLES_DATA, &
                                            nvwmlesdata
         use wmles_module
@@ -1447,9 +1102,6 @@ subroutine iDifferentialWallModelledTrbVis(b,tWall,phi,VIS,LMD)
         real(rp)                                 , intent(in)    :: tWall
 
         ! local declaration
-        integer , parameter       :: nw = wmles_npts
-        real(rp), dimension(1:nw) :: u_wm,T_wm
-        
         real(rp) :: yw , hw , u_w, T_w
         real(rp) :: r_1, ir1, u_1, v_1, w_1, ek1, p_1, u_p
         real(rp) :: r_h, irh, u_h, v_h, w_h, ekh, p_h, T_1, T_h
@@ -1460,18 +1112,19 @@ subroutine iDifferentialWallModelledTrbVis(b,tWall,phi,VIS,LMD)
         real(rp)            :: tauW_WM, qauW_WM, tauW_WR, qauW_WR
         real(rp)            :: mu_R, lm_R
 
-        real(rp) :: rhoWall0, tauWall0
-        real(rp) :: utaWall0, dltWall0, inuWall0
-        real(rp) :: xPlWall0, yPlWall0, zPlWall0, yPlWalln
+        real(rp) :: irho0
+        real(rp) :: utau0, inuw0
+        real(rp) :: xPl0, yPl0, zPl0, yPlWalln
         integer  :: jInt, jl, b_norm, b_node, b_face, l
+        real(rp) :: dyh, idyh, iy1
 
-        real(rp) :: dyh, xpR, ypR, zpR
+        call StartProfRange("iDifferentialWallModelledTrbVis")
 
         ! set wall quantities
         T_w = tWall
         u_w = 0.0_rp
 
-        mW = Sutherland(tWall)
+        mW = laminar_viscosity(tWall,Tref,vis_flag)
         lW = k_inf*mW
 
         b_node = b%node
@@ -1488,9 +1141,11 @@ subroutine iDifferentialWallModelledTrbVis(b,tWall,phi,VIS,LMD)
           yW = 0.5_rp*(y(j1) + y(j0))
           jl = b_node - b_norm*(wmles_indx-1)
           dyh  = 0.5_rp*abs(y(j1) - y(j0))
+          idyh = 1.0_rp/dyh
+          iy1  = 1.0_rp/(y(j1)-yW)
 
           !$acc parallel default(present)
-          !$acc loop collapse(2) private(u_wm, T_wm)
+          !$acc loop gang, vector collapse(2)
           do k    = sz,ez
              do i = sx,ex
                 !
@@ -1505,32 +1160,20 @@ subroutine iDifferentialWallModelledTrbVis(b,tWall,phi,VIS,LMD)
                 p_1 = (gamma0-1.0_rp) * (phi(i,j1,k,5) - r_1*ek1)
                 T_1 = p_1*ir1
 
-                tauW_WR = mu_inf*mW*(u_1+w_1)/dyh
-                qauW_WR = mu_inf*lW*(T_1-T_w)/dyh
+                tauW_WR = mu_inf*mW*(u_1+w_1)*idyh
+                qauW_WR = mu_inf*lW*(T_1-T_w)*idyh
                 !
                 ! get the viscous length
                 !
-                !hl  = abs(y(jl)-yW)
-                !u_p = sqrt(U(i,jl,k)**2 + W(i,jl,k)**2)
-                !p_h = P(i,jl,k)
-                !call LogLawWMLES(mu_inf,hl,T_w,u_p,p_h,tauWall0)
-                tauWall0 = tauW_WR!mu_inf*mW*u_1/dyh
-                rhoWall0 = p_1/T_w
-                utaWall0 = sqrt(abs(tauWall0)/rhoWall0)
-                inuWall0 = rhoWall0*utaWall0/(mW*mu_inf)
-                !
-                ! get internal resolutions estimation
-                !
-                xPlWall0 = xstep(i)*inuWall0
-                yPlWall0 = dyh     *inuWall0
-                zPlWall0 = zstep(k)*inuWall0
-                dltWall0 = yPlWall0/dyh
+                irho0 = T_w/p_1
+                utau0 = sqrt(abs(tauW_WR)*irho0)
+                inuw0 = utau0/(irho0*mW*mu_inf)
 
-                xpR = xPlWall0/xpt_wm
-                ypR = yPlWall0/ypt_wm
-                zpR = zPlWall0/zpt_wm
+                xPl0  = xstep(i)*inuw0
+                yPl0  = dyh     *inuw0
+                zPl0  = zstep(k)*inuw0
 
-                if(xpR < 1.0_rp .and. ypR < 1.0_rp .and. zpR < 1.0_rp) then
+                if(xPl0 < xpt_wm .and. yPl0 < ypt_wm .and. zPl0 < zpt_wm) then
                   ! WALL RESOLVED
         
                   mu_R = 1.0_rp
@@ -1543,12 +1186,11 @@ subroutine iDifferentialWallModelledTrbVis(b,tWall,phi,VIS,LMD)
                   !
                   ! === looking at the grid point where yPlus>wmles_interface
                   !
-                  j = wmles_strI
-                  do
+                  ji = 1
+                  do j = wmles_strI,ey
                     ji = b_node - b_norm*(j-1)
-                    yPlWalln = yPlWall0*(y(ji)-yW)/(y(j1)-yW)
+                    yPlWalln = yPl0*(y(ji)-yW)*iy1
                     if(yPlWalln > wmles_intr) exit
-                    j = j+1
                   enddo
                   jInt = ji
                   hw = abs(y(jInt) - yW)
@@ -1570,7 +1212,7 @@ subroutine iDifferentialWallModelledTrbVis(b,tWall,phi,VIS,LMD)
                   !
                   ! === get the correct tauWall and qWall from ODE model
                   !
-                  call OdeWMLES(gamma0,Prandtl,mu_inf,hw,dltWall0,u_w,u_p,T_w,T_h,p_h,u_wm,T_wm,tauW_WM,qauW_WM)
+                  call OdeWMLES2(gamma0,Prandtl,mu_inf,Tref,vis_flag,hw,inuw0,u_w,u_p,T_w,T_h,p_h,tauW_WM,qauW_WM)
 
                   mu_R = abs(tauW_WM/tauW_WR)
                   lm_R = abs(qauW_WM/qauW_WR)
@@ -1627,12 +1269,15 @@ subroutine iDifferentialWallModelledTrbVis(b,tWall,phi,VIS,LMD)
           stop
         
         endselect
-        
 
 
+        call EndProfRange
         
         return
 end subroutine iDifferentialWallModelledTrbVis
+
+
+
 
 
 
@@ -1644,7 +1289,7 @@ subroutine iStaticDifferentialWallModelledTrbVis(b,tWall,phi,VIS,LMD)
         use parameters_module      , only: gamma0, Prandtl
         use bc_module              , only: face_type
         use mesh_module            , only: y, xstep, zstep
-        use fluid_functions_module , only: Sutherland, getmuT
+        use fluid_functions_module , only: laminar_viscosity, getmuT
         use storage_module         , only: WMLES_DATA_LW
         use wmles_module
 
@@ -1679,7 +1324,7 @@ subroutine iStaticDifferentialWallModelledTrbVis(b,tWall,phi,VIS,LMD)
         T_w = tWall
         u_w = 0.0_rp
 
-        mW = Sutherland(tWall)
+        mW = laminar_viscosity(tWall,Tref,vis_flag)
         lW = k_inf*mW
 
         selectcase(b%face)
@@ -1755,7 +1400,7 @@ subroutine iStaticDifferentialWallModelledTrbVis(b,tWall,phi,VIS,LMD)
                   ! === get the grid
                   !
                   hw = abs(y(jl) - yW)
-                  call LogLawWMLES(mu_inf,hw,T_w,u_p,p_h,tauWall0)
+                  call LogLawWMLES(mu_inf,Tref,vis_flag,hw,T_w,u_p,p_h,tauWall0)
                   rhoWall0 = p_h/T_w
                   utaWall0 = sqrt(abs(tauWall0)/rhoWall0)
                   dltWall0 = rhoWall0*utaWall0/(mW*mu_inf)
@@ -1763,7 +1408,7 @@ subroutine iStaticDifferentialWallModelledTrbVis(b,tWall,phi,VIS,LMD)
                   !
                   ! === get the correct tauWall and qWall from ODE model
                   !
-                  call OdeWMLES(gamma0,Prandtl,mu_inf,hw,dltWall0,u_w,u_p,T_w,T_h,p_h,u_wm,T_wm,tauW_WM,qauW_WM)
+                  call OdeWMLES(gamma0,Prandtl,mu_inf,Tref,vis_flag,hw,dltWall0,u_w,u_p,T_w,T_h,p_h,u_wm,T_wm,tauW_WM,qauW_WM)
 
                   mu_R = abs(tauW_WM/tauW_WR)
                   lm_R = abs(qauW_WM/qauW_WR)
@@ -1871,7 +1516,7 @@ subroutine StaticDifferentialWallModelledTrbVis(b,tWall,phi,VIS,LMD)
         use storage_module         , only: WMLES_DATA_LW,WMLES_DATA_UW,WMLES_DATA,nvwmlesdata
         use bc_module              , only: face_type
         use mesh_module            , only: y
-        use fluid_functions_module , only: Sutherland, getmuT
+        use fluid_functions_module , only: laminar_viscosity, getmuT
         use real_to_integer_module , only: locate
         use fileModule             , only: str
         use wmles_module
@@ -1903,7 +1548,7 @@ subroutine StaticDifferentialWallModelledTrbVis(b,tWall,phi,VIS,LMD)
         T_w = tWall
         u_w = 0.0_rp
 
-        mW = Sutherland(tWall)
+        mW = laminar_viscosity(tWall,Tref,vis_flag)
         lW = k_inf*mW
 
         b_norm = b%norm
@@ -1958,7 +1603,7 @@ subroutine StaticDifferentialWallModelledTrbVis(b,tWall,phi,VIS,LMD)
                 ! estimate delta_nu with Reichardt's law and get the grid
                 !
                 hw = abs(y(jl)-yW)
-                call LogLawWMLES(mu_inf,hw,T_w,u_p,p_h,tauWall0)
+                call LogLawWMLES(mu_inf,Tref,vis_flag,hw,T_w,u_p,p_h,tauWall0)
                 rhoWall0 = p_h/T_w
                 utaWall0 = sqrt(abs(tauWall0)/rhoWall0)
                 dltWall0 = rhoWall0*utaWall0/(mW*mu_inf)
@@ -1966,7 +1611,7 @@ subroutine StaticDifferentialWallModelledTrbVis(b,tWall,phi,VIS,LMD)
                 !
                 ! get the correct tauWall and qWall from ODE model
                 !
-                call OdeWMLES(gamma0,Prandtl,mu_inf,hw,dltWall0,u_w,u_p,T_w,T_h,p_h,u_wm,T_wm,&
+                call OdeWMLES(gamma0,Prandtl,mu_inf,Tref,vis_flag,hw,dltWall0,u_w,u_p,T_w,T_h,p_h,u_wm,T_wm,&
                               tauW_WM,qauW_WM)
 
                 !
@@ -2023,242 +1668,6 @@ subroutine StaticDifferentialWallModelledTrbVis(b,tWall,phi,VIS,LMD)
         
         return
 end subroutine StaticDifferentialWallModelledTrbVis
-
-
-
-subroutine VorticityDifferentialWallModelledTrbVis(b,tWall,phi,VIS,LMD)
-
-        use parameters_module      , only: gamma0, Prandtl
-        use bc_module              , only: face_type
-        use mesh_module            , only: y, xstep_i, ystep_i, zstep_i
-        use fluid_functions_module , only: Sutherland, getmuT
-        use real_to_integer_module , only: nearest_integer_opt
-        use matrix_inversion_module, only: tdma
-        use fileModule             , only: str
-        use storage_module         , only: central_1
-        use wmles_module
-        use FileModule
-
-        implicit none
-        real(rp), dimension(:,:,:)  , allocatable, intent(inout) :: VIS,LMD
-        real(rp), dimension(:,:,:,:), allocatable, intent(in)    :: phi
-        type(face_type)                          , intent(in)    :: b
-        real(rp)                                 , intent(in)    :: tWall
-
-        ! local declaration
-        integer , parameter       :: nw = wmles_npts
-        real(rp), dimension(1:nw) :: u_wm,T_wm
-        
-        real(rp) :: yw , hw , u_w, T_w
-        real(rp) :: r_h, irh, u_h, v_h, w_h, ekh, p_h, T_h, mlh
-        
-        real(rp) :: r_in, u_in, v_in, w_in, p_in, T_in, irin
-        real(rp) :: r_gh, u_gh, v_gh, w_gh, p_gh, T_gh, u_p
-        integer  :: j0, j1, i,j,k, ji, jg
-        
-        real(rp), parameter :: ClipPar = 100.0_rp
-        real(rp)            :: clip_mu, mW
-        real(rp)            :: clip_lm, lW
-        real(rp)            :: tauW, qauW
-        real(rp)            :: idy, mu_eff, lm_eff
-        real(rp)            :: u_y, w_y, T_y
-        
-        real(rp) :: irx, iry, irz
-        real(rp) :: uy , uz , vx , vz, wx, wy
-        real(rp) :: omx, omy, omz, om2, yTgT
-        real(rp) :: idx, idz
-        real(rp) :: cl1
-
-        real(rp) :: hl
-        real(rp) :: rhoWall0, tauWall0, utaWall0, dltWall0
-        integer  :: jInt, l, fdR, jOme
-
-        !integer, dimension(:), allocatable :: pdfInt
-        !type(FileType)                     :: PDFFile
-
-        ! set wall quantities
-        T_w = tWall
-        u_w = 0.0_rp
-        mW = Sutherland(tWall)
-        lW = gamma0/(gamma0-1.0_rp)*(1.0_rp/Prandtl)*mW
-
-        clip_mu = ClipPar
-        clip_lm = ClipPar*lW
-        fdR = central_fd_order/2
-
-        !allocate(pdfInt(wmles_min_id:wmles_max_id))
-        !PdfInt = 0
-
-        selectcase(b%face)
-        
-          case('S')
-        
-          j0 = b%node + b%norm
-          j1 = b%node
-          yW = 0.5_rp*(y(j1) + y(j0))
-          jInt = wmles_strI
-
-          do k    = sz,ez
-             do i = sx,ex
-       
-                ! Get JOme where vorticity becomes negligiable
-                jOme = sy
-                do j = sy,ey
-
-                   idx = xstep_i(i)
-                   idy = ystep_i(j)
-                   idz = zstep_i(k)
-
-                   uy = 0.0_rp
-                   uz = 0.0_rp
-                   vx = 0.0_rp
-                   vz = 0.0_rp
-                   wx = 0.0_rp
-                   wy = 0.0_rp
-                   do l = -fdR, fdR
-
-                      cl1 = central_1(l)
-                
-                      irx = 1.0_rp/phi(i+l,j,k,1)
-                      iry = 1.0_rp/phi(i,j+l,k,1)
-                      irz = 1.0_rp/phi(i,j,k+l,1)
-                      !
-                      uy = uy + cl1 * phi(i,j+l,k,2)*iry
-                      uz = uz + cl1 * phi(i,j,k+l,2)*irz
-                      !
-                      vx = vx + cl1 * phi(i+l,j,k,3)*irx
-                      vz = vz + cl1 * phi(i,j,k+l,3)*irz
-                      !
-                      wx = wx + cl1 * phi(i+l,j,k,4)*irx
-                      wy = wy + cl1 * phi(i,j+l,k,4)*iry
-
-                   enddo
-                   vx = vx*idx
-                   wx = wx*idx
-                   !
-                   uy = uy*idy
-                   wy = wy*idy
-                   !
-                   uz = uz*idz
-                   vz = vz*idz
-
-                   omx = wy - vz
-                   omy = uz - wx
-                   omz = vx - uy
-
-                   om2 = sqrt(omx*omx + omy*omy + omz*omz)
-
-                   if(om2 < omg_wm) then
-                     jOme = j-1
-                     exit
-                   endif
-                enddo
-
-                ! get les quantities at the jInt node
-                yTgT = abs(y(jOme)-yW)/3.0_rp
-                jInt = nearest_integer_opt(y,sy,ey,yTgT)
-                if(jInt > wmles_max_id) jInt = wmles_max_id
-                if(jInt < wmles_min_id) jInt = wmles_min_id
-
-                !do l = wmles_min_id, wmles_max_id                
-                !   if(jInt == l) then
-                !     pdfInt(l) = pdfInt(l)+1
-                !   endif
-                !enddo
-
-                r_h = phi(i,jInt,k,1)
-                irh = 1.0_rp/r_h
-                u_h = phi(i,jInt,k,2)*irh
-                v_h = phi(i,jInt,k,3)*irh
-                w_h = phi(i,jInt,k,4)*irh
-                ekh = 0.5_rp*(u_h*u_h + v_h*v_h + w_h*w_h)
-                p_h = (gamma0-1.0_rp) * (phi(i,jInt,k,5) - r_h*ekh)
-                T_h = p_h*irh
-                mlh = mu_inf*Sutherland(T_h)
-
-                u_p = sqrt(u_h*u_h + w_h*w_h)
-
-                !
-                ! === compute yPlusW with Reichardt's law
-                !
-                hl = abs(y(jInt)-yW)
-                call LogLawWMLES(mu_inf,hl,T_w,u_p,p_h,tauWall0)
-                rhoWall0 = p_h/T_w
-                utaWall0 = sqrt(tauWall0/rhoWall0)
-                dltWall0 = rhoWall0*utaWall0/(mW*mu_inf)
-                !
-                ! === looking at the grid point where yPlus>wmles_interface and get the grid
-                ! 
-                hw = abs(y(jInt) - yW)
-                !
-                ! === get the correct tauWall and qWall from ODE model
-                !
-                if(u_h<0.0_rp) u_p = -u_p
-                call OdeWMLES(gamma0,Prandtl,mu_inf,hw,dltWall0,u_w,u_p,T_w,T_h,p_h,u_wm,T_wm,tauW,qauW)
-        
-                do j = 1,GN
-        
-                   jg = b%node + b%norm*j
-                   ji = b%node - b%norm*(j-1)
-
-                   ! compute primitive variabile in the inner nodes
-                   r_in = phi(i,ji,k,1)
-                   irin = 1.0_rp/r_in
-                   u_in = phi(i,ji,k,2)*irin
-                   v_in = phi(i,ji,k,3)*irin
-                   w_in = phi(i,ji,k,4)*irin
-                   p_in = (gamma0-1.0_rp)*(phi(i,ji,k,5)&
-                           -0.5_rp*r_in*(u_in*u_in + v_in*v_in + w_in*w_in))
-                   T_in = p_in*irin
-                   
-                   ! compute primitive variabile in the ghost nodes
-                   u_gh =       - u_in
-                   v_gh =       - v_in
-                   w_gh =       - w_in
-                   T_gh = 2*T_w - T_in 
-                   p_gh = p_in
-                   r_gh = p_gh/T_gh
-                
-                   ! compute wall derivatives
-                   idy = 1.0_rp/(abs(y(ji)-y(jg)))
-                   u_y = (u_in - u_gh)*idy
-                   w_y = (w_in - w_gh)*idy
-                   T_y = (T_in - T_gh)*idy
-
-                   mu_eff = tauW/(mu_inf*sqrt(u_y*u_y + w_y*w_y))
-                   lm_eff = qauW/(mu_inf*T_y)
-                   if(mu_eff > clip_mu) mu_eff = 0.0_rp
-                   if(lm_eff > clip_lm) lm_eff = 0.0_rp
-                   if(lm_eff < 0) lm_eff = 0.0_rp
-
-                   VIS(i,jg,k) = 2*mu_eff - VIS(i,ji,k)
-                   LMD(i,jg,k) = 2*lm_eff - LMD(i,ji,k)
-
-                enddo
-             enddo
-          enddo
-
-          !PDFFile%name = 'pdf_interface'
-          !PDFFile%dir  = trim(data_dir)//'/PDF_INTERFACE'
-          !call OpenNewFIle(PDFFile,it)
-          !do l = wmles_min_id,wmles_max_id
-          !   write(PDFFile%unit,*) l,PDFInt(l)
-          !enddo
-          !call CloseFile(PDFFile)
-
-          case default
-          print*, 'DifferentialWallStressModel not implemented for face ', trim(b%face)
-          stop
-        
-        endselect
-        
-
-
-        
-        return
-end subroutine VorticityDifferentialWallModelledTrbVis
-
-
 
 
 

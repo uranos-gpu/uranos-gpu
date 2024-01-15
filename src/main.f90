@@ -30,9 +30,6 @@ program uranos
         use sgs_module
         use GetRetau_module
         use df_module
-#ifdef  TIME
-        use performance_module
-#endif        
         implicit none
 
         ! Initiale mpi environment end read inputs
@@ -54,11 +51,11 @@ program uranos
         call init_GL_variables
         call init_statistics_fields
         call init_FD_coefficients
-        call init_weno_coefficients
         call init_grid
         call init_RK_coefficients
         call init_DefaultSeed
         call initProbes(x,y,z,Probe)
+        call init_sponge
         
         ! Initialize inflow
         if(inflow) call init_inflow_profile
@@ -66,17 +63,19 @@ program uranos
         ! Initialize the solution
         call init_boundary_conditions
 
-        s_cpu_time = MPI_WTIME()
 
         ! Time loop ------------------------------
         !$acc data copyin(mid_point_lele_x,mid_point_lele_y,mid_point_lele_z) &
-        !$acc copyin(xstep_i,ystep_i,zstep_i,xsteph,ysteph,zsteph) &
-        !$acc copyin(x,y,z,xstep,ystep,zstep) &
+        !$acc copyin(xstep_i,ystep_i,zstep_i,ixsteph,iysteph,izsteph) &
+        !$acc copyin(x,y,z,xstep,ystep,zstep,ix_csi,iy_eta,iz_zta) &
         !$acc copyin(csistep_i,y_eta,y_eta2,x_csi,x_csi2,etastep_i) &
+        !$acc copyin(csistep_i, etastep_i, ztastep_i) &
+        !$acc copyin(x_csi2, y_eta2, z_zta2) &
         !$acc copyin(central_1_one_half,central_2_one_half,central_1,central_2) &
         !$acc copyin(fward_1, bward_1) &
-        !$acc copyin(aweno,cweno,weno,my_neighbour,bc) &
+        !$acc copyin(weno_num,my_neighbour,bc) &
         !$acc copyin(a_rk,b_rk,c_rk) &
+        !$acc copyin(mask_field) &
         !$acc copyin(tilde_op_x, tilde_op_y, tilde_op_z) &
         !$acc copyin(pri_1D_x, pri_1D_y, pri_1D_z) &
         !$acc copyin(phi_arr_x, phi_arr_y, phi_arr_z) &
@@ -91,16 +90,32 @@ program uranos
         !$acc copyin(i13D_bfr_send_E, i13D_bfr_send_W, i13D_bfr_recv_E, i13D_bfr_recv_W) &
         !$acc copyin(i13D_bfr_send_N, i13D_bfr_send_S, i13D_bfr_recv_N, i13D_bfr_recv_S) &
         !$acc copyin(i13D_bfr_send_B, i13D_bfr_send_F, i13D_bfr_recv_B, i13D_bfr_recv_F) &
-        !$acc copyin(DF,DF%Rnd2D,DF%N,DF%ylen,DF%zlen,DF%By,DF%Bz,DF%Fy,DF%LundMatrix) &
-        !$acc copyin(iflow,iflow%mean,iflow%turb,iflow%vf_old, iflow%vf_new) &   !!!!! >>>> WARNING HERE
+        !$acc copyin(DF_Rnd2D,DF_ylen,DF_zlen,DF_By,DF_Bz,DF_Fy,DF_LundMatrix) &
+        !$acc copyin(iflow_mean,iflow_turb,iflow_vf_old, iflow_vf_new) &   !!!!! >>>> WARNING HERE
         !$acc copyin(wmles_data,wmles_data_uw,wmles_data_lw) &
-        !$acc copy(phi,U,V,W,T,P,VIS,LMD,DIV,RHS,SSENSOR,weno%flag,phi_n)
-        
+        !$acc copyin(uFarField,vFarField,pFarField,TFarField) &
+        !$acc copyin(weno_flag_xyz, sponge_x) &
+        !$acc copy(phi,U,V,W,T,P,VIS,LMD,DIV,RHS,SSENSOR,weno_flag,phi_n) &
+#ifdef NVIDIA
+        !$acc copyin(generator,phirand,psirand)
+#endif
+
+#ifdef AMD
+       !$acc copyin(rnd2Dnum,rnd2Dnumptr,rnd2Dnumsize,rnd2Dnumshape,ic) &
+       !$acc copyin(phirand,phirandnum,phirandsize,phirandnumptr) &
+       !$acc copyin(psirand,psirandnum,psirandsize,psirandnumptr)
+#endif
+       !$acc data copyin(mask_GhostId,mask_GhostUnstr,mask_nGhost,mask_field) &
+
         ! init subgrid stresses
         if(les) call compute_subgrid_model
 
-        do while(time .le. tmax .and. istop == 0 .and. it < itmax)
+        s_cpu_time = MPI_WTIME()
 
+        str_it_time = MPI_WTIME()
+
+        do while(time .le. tmax .and. istop == 0 .and. it < itmax)
+        
                 call last_iteration(s_cpu_time,istop)
                 
                 ! compute dt under CFL condition
@@ -110,10 +125,11 @@ program uranos
                 call init_runge_kutta
 
                 ! print results sometimes
-                if(mod(it,itout) == 0) call write_all
-                if(mod(it,StOut) == 0 .and. stFlg) call write_statistics
-                if(itPrb>0)then
-                  if(mod(it,itPrb) == 0) call write_probes 
+                if(printres) then
+                  if(mod(it,itOut) == 0) call compute_average_iteration_time
+                  if(mod(it,itout) == 0) call write_restart
+                  if(mod(it,StOut) == 0 .and. stFlg) call write_restart_stat
+                  if(mod(it,StOut) == 0 .and. stFlg) call write_statistics
                 endif
 
                 ! Runge - Kutta substeps
@@ -126,22 +142,25 @@ program uranos
                    if(les) call compute_subgrid_model
 
                 enddo
+               
+                if(mod(it,rsOut) == 0 .and. printres) call dump_residuals
 
                 it = it + 1
         enddo
-        if(stFlg) call write_statistics
-        call write_all
+        if(printres) then
+          if(stFlg) call write_statistics
+          call write_restart
+        endif
         e_cpu_time = MPI_WTIME()
+        !$acc end data
+        !$acc end data
         !$acc end data
 
         call screen_elapse_time
-
-#ifdef TIME
-        call resume_time(rank,nprocs)
-#endif
 
         call end_all_variables
         call end_mpi
 
 end program uranos
+
 

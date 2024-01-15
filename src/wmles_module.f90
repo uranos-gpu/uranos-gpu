@@ -3,14 +3,14 @@ use parameters_module, only: rp
 implicit none
 
 real(rp), parameter , public :: wmles_toll = 1.0E-08_rp    !< WMLES tolerance to convergency (1.0E-14_rp)
-real(rp), parameter , public :: wmles_intr = 40.0_rp       !< WMLES DYNAMIC INTERFACE
+real(rp), parameter , public :: wmles_intr = 120.0_rp       !< WMLES DYNAMIC INTERFACE
 integer , parameter , public :: wmles_indx = 4          !< WMLES STATIC  INTERFACE
 integer , parameter , public :: wmles_npts = 30         !< WMLES NUMBER OF POINTS (50)
 integer , parameter , public :: wmles_imax = 100        !< WMLES NUMBER OF ITERATIONS
 integer , parameter , public :: wmles_strI = 4          !< WMLES STARTING INDEX
 
 real(rp), parameter , public :: xpt_wm = 40.0_rp           !< WR/WM interface along x
-real(rp), parameter , public :: ypt_wm =  5.0_rp           !< WR/WM interface along y
+real(rp), parameter , public :: ypt_wm =  3.0_rp           !< WR/WM interface along y
 real(rp), parameter , public :: zpt_wm = 20.0_rp           !< WR/WM interface along z
 
 real(rp), parameter , public :: omg_wm = 0.05_rp           !< Vorticity magnitude threshold
@@ -75,10 +75,10 @@ end subroutine Get_WMLES_Grid
 
 
 
-subroutine OdeWMLES(gamma0,Prandtl,mu_inf,hw,ReTau,u_w,u_p,T_w,T_h,p_h,u_wm,T_wm,tauW,qauW)
+subroutine OdeWMLES(gamma0,Prandtl,mu_inf,Tref,vis_flag,hw,ReTau,u_w,u_p,T_w,T_h,p_h,u_wm,T_wm,tauW,qauW)
         !$acc routine seq
         
-        use fluid_functions_module , only: Sutherland, getmuT
+        use fluid_functions_module , only: laminar_viscosity, getmuT
         use matrix_inversion_module, only: tdma
 
         implicit none
@@ -86,8 +86,9 @@ subroutine OdeWMLES(gamma0,Prandtl,mu_inf,hw,ReTau,u_w,u_p,T_w,T_h,p_h,u_wm,T_wm
         integer, parameter :: nw = wmles_npts
 
         real(rp)                 , intent(in) :: ReTau   !< local friction Reynolds number
-        real(rp)                 , intent(in) :: gamma0, Prandtl, mu_inf
+        real(rp)                 , intent(in) :: gamma0, Prandtl, mu_inf, Tref
         real(rp)                 , intent(in) :: hw, u_p, T_h, p_h, u_w, T_w
+        integer                  , intent(in) :: vis_flag
         real(rp)                 , intent(out):: tauW, qauW
         real(rp), dimension(1:nw), intent(out):: u_wm, T_wm
         
@@ -101,52 +102,67 @@ subroutine OdeWMLES(gamma0,Prandtl,mu_inf,hw,ReTau,u_w,u_p,T_w,T_h,p_h,u_wm,T_wm
 
         real(rp), parameter :: toll = wmles_toll
         integer , parameter :: itmx = wmles_imax
-        real(rp)            :: PrL, PrT, c_p
-        real(rp)            :: tauW_old, qauW_old, rerr
-        integer             :: j, iter
+        real(rp)            :: PrL, iPrL, c_p, idywall, ihw, inw
+        real(rp)            :: irsm1, rspow, dy_wall, yc_, iTw, iTh
+        real(rp)            :: alphau, alphaT
+        integer             :: i,j
 
         ! local declarations
         real(rp), dimension(0:nw) :: yf
         real(rp), dimension(1:nw) :: yc
         real(rp), dimension(0:nw) :: dy
-        real(rp)                  :: dy_wall
-        real(rp)                  :: rsOld, rs
+        real(rp), dimension(0:nw) :: idy
+
+        integer  :: iter     = 0
+        real(rp) :: tauW_old = 0.0_rp
+        real(rp) :: qauW_old = 0.0_rp
+        real(rp) :: rerr     = 2*toll
+        real(rp) :: rsOld    = 1.01_rp
+        real(rp) :: rs       = 1.01_rp
+
+        real(rp), parameter :: iPrT = 1.0_rp/0.9_rp
+
 
         !
         ! GET THE GRID
         !
-        ! build the face grid
         dy_wall = 0.1_rp/Retau
+        idywall = 1.0_rp/dy_wall
+        ihw     = 1.0_rp/hw
+        inw     = 1.0_rp/real(nw,rp)
 
         ! get the stretching parameter
-        rsOld = 1.01_rp
-        rs    = rsOld
-        iter  = 0
-        rerr  = 2*toll
         do while(rerr > toll .and. iter < itmx)
-           rs = (1.0_rp+(rs-1.0_rp)/dy_wall*hw)**(1.0_rp/nw)
+           rs = (1.0_rp+(rs-1.0_rp)*idywall*hw)**inw
 
            iter = iter + 1
            rerr = abs(rs - rsOld)
            rsOld = rs
         enddo
 
+        irsm1 = 1.0_rp/(rs-1.0_rp)
+        rspow = 1.0_rp
         yf(0) = 0.0_rp
         do j = 1,nw
-           yf(j) = dy_wall*(rs**j-1.0_rp)/(rs-1.0_rp)
+
+           ! get the grid face locations
+           rspow = rspow*rs
+           yf(j) = dy_wall*(rspow-1.0_rp)*irsm1
+
+           ! get the grid centroid locations
+           yc(j) = 0.5_rp*(yf(j) + yf(j-1))
+
         enddo
 
-        ! build the centroids grid
-        do j = 1,nw
-           yc(j) = 0.5_rp*(yf(j) + yf(j-1))
-        enddo
         ! build the between centroids
         dy(0) = yc(1)
+        idy(0) = 1.0_rp/dy(0)
         do j = 1,nw-1
-           dy(j) = yc(j+1)-yc(j)
+           dy(j)  = yc(j+1)-yc(j)
+           idy(j) = 1.0_rp/dy(j)
         enddo
         dy(nw) = yf(nw)-yc(nw)
-
+        idy(nw) = 1.0_rp/dy(nw)
 
 
         !
@@ -154,59 +170,62 @@ subroutine OdeWMLES(gamma0,Prandtl,mu_inf,hw,ReTau,u_w,u_p,T_w,T_h,p_h,u_wm,T_wm
         !
         c_p = gamma0/(gamma0-1.0_rp)
         PrL = Prandtl
-        PrT = 0.9_rp
+        iPrL= 1.0_rp/PrL
         
         ! get missing wall info
         r_w = p_h/T_w
-        mlW = mu_inf*Sutherland(T_w)
-        klW = c_p*mlW/PrL
+        iTw = 1.0_rp/T_w
+        iTh = 1.0_rp/T_h
+        mlW = mu_inf*laminar_viscosity(T_w,Tref,vis_flag)
+        klW = c_p*mlW*iPrL
 
         ! init velocities and temperature profiles
+        alphau = (u_p-u_w)*ihw
+        alphaT = (T_h-T_w)*ihw
         do j = 1,nw
-           u_wm(j) = u_w + yc(j)*(u_p-u_w)/hw
-           T_wm(j) = T_w + yc(j)*(T_h-T_w)/hw
+           yc_     = yc(j)
+           u_wm(j) = u_w + yc_*alphau
+           T_wm(j) = T_w + yc_*alphaT
         enddo
 
         ! start iterating 
-        iter     = 0
-        rerr     = 2*toll
         tauW     = 0.0_rp
         qauW     = 0.0_rp
-        tauW_old = 0.0_rp
-        qauW_old = 0.0_rp
+        rerr     = 2*toll
+        iter     = 0
         do while(rerr > toll .and. iter < itmx)
         
            tauW_old = tauW
            qauW_old = qauW
-        
-           tauW = mlW*(u_wm(1) - u_w)/dy(0)
-           qauW = klW*(T_wm(1) - T_w)/dy(0)
+
+           tauW = mlW*(u_wm(1) - u_w)*idy(0)
+           qauW = klW*(T_wm(1) - T_w)*idy(0)
         
            ! get momentum coefficients
            j = 0
            T_m    = T_w
-           r_m    = p_h/T_m
-           mLm    = mu_inf*Sutherland(T_m)
+           r_m    = p_h*iTw
+           mLm    = mu_inf*laminar_viscosity(T_m,Tref,vis_flag)
            mTm    = getMuT(r_m,tauW,yf(j),mLm)
-           k_u(j) = (mLm + mTm)/dy(j)
-           k_T(j) = c_p*(mLm/PrL + mTm/PrT)/dy(j)
+           k_u(j) = (mLm + mTm)*idy(j)
+           k_T(j) = c_p*(mLm*iPrL + mTm*iPrT)*idy(j)
 
            do j = 1,nw-1
-              T_m = 0.5_rp*(T_wm(j) + T_wm(j+1))
+              T_m    = 0.5_rp*(T_wm(j) + T_wm(j+1))
               r_m    = p_h/T_m
-              mLm    = mu_inf*Sutherland(T_m)
+              mLm    = mu_inf*laminar_viscosity(T_m,Tref,vis_flag)
               mTm    = getMuT(r_m,tauW,yf(j),mLm)
-              k_u(j) = (mLm + mTm)/dy(j)
-              k_T(j) = c_p*(mLm/PrL + mTm/PrT)/dy(j)
+              k_u(j) = (mLm + mTm)*idy(j)
+              k_T(j) = c_p*(mLm*iPrL + mTm*iPrT)*idy(j)
            enddo
 
            j = nw
            T_m    = T_h
-           r_m    = p_h/T_m
-           mLm    = mu_inf*Sutherland(T_m)
+           r_m    = p_h*iTh
+           mLm    = mu_inf*laminar_viscosity(T_m,Tref,vis_flag)
            mTm    = getMuT(r_m,tauW,yf(j),mLm)
-           k_u(j) = (mLm + mTm)/dy(j)
-           k_T(j) = c_p*(mLm/PrL + mTm/PrT)/dy(j)
+           k_u(j) = (mLm + mTm)*idy(j)
+           k_T(j) = c_p*(mLm*iPrL + mTm*iPrT)*idy(j)
         
            ! building tri-diagonal matrix for momentum equation
            do j = 1,nw 
@@ -218,9 +237,29 @@ subroutine OdeWMLES(gamma0,Prandtl,mu_inf,hw,ReTau,u_w,u_p,T_w,T_h,p_h,u_wm,T_wm
            d_(1 ) = - k_u(0 )*u_w
            d_(nw) = - k_u(nw)*u_p
         
-           call tdma(a_,b_,c_,d_,u_wm,1,nw)
+           ! forward elimination phase
+           do i=2,nw
+              b_(i) = b_(i) - a_(i)/b_(i-1)*c_(i-1)
+              d_(i) = d_(i) - a_(i)/b_(i-1)*d_(i-1)
+           end do
+           ! backward substitution phase 
+           u_wm(nw) = d_(nw)/b_(nw)
+           do i=nw-1,1,-1
+              u_wm(i) = (d_(i)-c_(i)*u_wm(i+1))/b_(i)
+           end do
         
            ! building tri-diagonal matrix for temperature
+           j = 1
+           a_(j) =  k_T(j-1)
+           b_(j) = -k_T(j) - k_T(j-1)
+           c_(j) =  k_T(j)
+        
+           u_hm = u_w!(u_wm(j) + u_wm(j-1))*0.5_rp
+           u_hp = (u_wm(j+1) + u_wm(j))*0.5_rp
+           u_dm = (u_wm(j) - u_w)
+           u_dp = (u_wm(j+1) - u_wm(j))
+           d_(j) = -k_T(0)*T_w - k_u(j)*u_hp*u_dp + k_u(j-1)*u_hm*u_dm
+
            do j = 2,nw-1
         
               a_(j) =  k_T(j-1)
@@ -235,17 +274,6 @@ subroutine OdeWMLES(gamma0,Prandtl,mu_inf,hw,ReTau,u_w,u_p,T_w,T_h,p_h,u_wm,T_wm
         
            enddo
         
-           j = 1
-           a_(j) =  k_T(j-1)
-           b_(j) = -k_T(j) - k_T(j-1)
-           c_(j) =  k_T(j)
-        
-           u_hm = u_w!(u_wm(j) + u_wm(j-1))*0.5_rp
-           u_hp = (u_wm(j+1) + u_wm(j))*0.5_rp
-           u_dm = (u_wm(j) - u_w)
-           u_dp = (u_wm(j+1) - u_wm(j))
-           d_(j) = -k_T(0)*T_w - k_u(j)*u_hp*u_dp + k_u(j-1)*u_hm*u_dm
-        
            j = nw
            a_(j) =  k_T(j-1)
            b_(j) = -k_T(j) - k_T(j-1)
@@ -257,7 +285,16 @@ subroutine OdeWMLES(gamma0,Prandtl,mu_inf,hw,ReTau,u_w,u_p,T_w,T_h,p_h,u_wm,T_wm
            u_dp = (u_p - u_wm(j))
            d_(j) = -k_T(nw)*T_h - k_u(j)*u_hp*u_dp + k_u(j-1)*u_hm*u_dm
         
-           call tdma(a_,b_,c_,d_,T_wm,1,nw)
+           ! forward elimination phase
+           do i=2,nw
+              b_(i) = b_(i) - a_(i)/b_(i-1)*c_(i-1)
+              d_(i) = d_(i) - a_(i)/b_(i-1)*d_(i-1)
+           end do
+           ! backward substitution phase 
+           T_wm(nw) = d_(nw)/b_(nw)
+           do i=nw-1,1,-1
+              T_wm(i) = (d_(i)-c_(i)*T_wm(i+1))/b_(i)
+           end do
         
            iter = iter + 1 
            rerr = max(abs(tauW - tauW_old), abs(qauW - qauW_old))
@@ -268,56 +305,291 @@ subroutine OdeWMLES(gamma0,Prandtl,mu_inf,hw,ReTau,u_w,u_p,T_w,T_h,p_h,u_wm,T_wm
 end subroutine OdeWMLES
 
 
-
-
-
-subroutine LogLawWMLES(mu_inf,d_h,T_W,u_h,p_h,tauWall)
+subroutine OdeWMLES2(gamma0,Prandtl,mu_inf,Tref,vis_flag,hw,ReTau,u_w,u_p,T_w,T_h,p_h,tauW,qauW)
         !$acc routine seq
 
-        use fluid_functions_module, only: sutherland, iReichardtLaw
+        use fluid_functions_module , only: laminar_viscosity, getmuT
 
         implicit none
-        real(rp), intent(in)  :: mu_inf
+
+        integer, parameter :: nw = wmles_npts
+
+        real(rp)                 , intent(in) :: ReTau   !< local friction Reynolds number
+        real(rp)                 , intent(in) :: gamma0, Prandtl, mu_inf, Tref
+        real(rp)                 , intent(in) :: hw, u_p, T_h, p_h, u_w, T_w
+        integer                  , intent(in) :: vis_flag
+        real(rp)                 , intent(out):: tauW, qauW
+
+        ! local declarations
+        real(rp), dimension(1:nw) :: u_wm, T_wm
+        real(rp), dimension(1:nw) :: a_,b_,c_,d_
+        real(rp), dimension(0:nw) :: k_u, k_T
+
+        real(rp) :: r_w, mlW, klW
+        real(rp) :: r_m, T_m, mLm, mTm
+        real(rp) :: u_hm, u_hp ,u_dm, u_dp
+
+        real(rp), parameter :: toll = wmles_toll
+        integer , parameter :: itmx = wmles_imax
+        real(rp)            :: PrL, iPrL, c_p, idywall, ihw, inw
+        real(rp)            :: irsm1, rspow, dy_wall, yc_, iTw, iTh
+        real(rp)            :: alphau, alphaT
+        integer             :: i,j
+
+        ! local declarations
+        real(rp), dimension(0:nw) :: yf
+        real(rp), dimension(1:nw) :: yc
+        real(rp), dimension(0:nw) :: dy
+
+        real(rp) :: tauW_tmp, qauW_tmp
+
+        integer  :: iter
+        real(rp) :: tauW_old, qauW_old
+        real(rp) :: rerr, rsOld, rs
+
+        real(rp), parameter :: iPrT = 1.0_rp/0.9_rp
+
+        iter     = 0
+        tauW_old = 0.0_rp
+        qauW_old = 0.0_rp
+        rerr     = 2*toll
+        rsOld    = 1.01_rp
+        rs       = 1.01_rp
+
+        !
+        ! GET THE GRID
+        !
+        dy_wall = 0.1_rp/Retau
+        idywall = 1.0_rp/dy_wall
+        ihw     = 1.0_rp/hw
+        inw     = 1.0_rp/real(nw,rp)
+
+        ! get the stretching parameter
+        do while(rerr > toll .and. iter < itmx)
+           rs = (1.0_rp+(rs-1.0_rp)*idywall*hw)**inw
+
+           iter = iter + 1
+           rerr = abs(rs - rsOld)
+           rsOld = rs
+        enddo
+
+        irsm1 = 1.0_rp/(rs-1.0_rp)
+        rspow = 1.0_rp
+        yf(0) = 0.0_rp
+        do j = 1,nw
+
+           ! get the grid face locations
+           rspow = rspow*rs
+           yf(j) = dy_wall*(rspow-1.0_rp)*irsm1
+
+           ! get the grid centroid locations
+           yc(j) = 0.5_rp*(yf(j) + yf(j-1))
+
+        enddo
+
+        ! build the between centroids
+        dy(0) = 1.0_rp/yc(1)
+        do j = 1,nw-1
+           dy(j)  = 1.0_rp/(yc(j+1)-yc(j))
+        enddo
+        dy(nw) = 1.0_rp/(yf(nw)-yc(nw))
+
+
+        !
+        ! SOLVE EQUATIONS
+        !
+        c_p = gamma0/(gamma0-1.0_rp)
+        PrL = Prandtl
+        iPrL= 1.0_rp/PrL
+
+        ! get missing wall info
+        r_w = p_h/T_w
+        iTw = 1.0_rp/T_w
+        iTh = 1.0_rp/T_h
+        mlW = mu_inf*laminar_viscosity(T_w,Tref,vis_flag)
+        klW = c_p*mlW*iPrL
+
+        ! init velocities and temperature profiles
+        alphau = (u_p-u_w)*ihw
+        alphaT = (T_h-T_w)*ihw
+        do j = 1,nw
+           yc_     = yc(j)
+           u_wm(j) = u_w + yc_*alphau
+           T_wm(j) = T_w + yc_*alphaT
+        enddo
+
+        ! start iterating
+        tauW_tmp = 0.0_rp
+        qauW_tmp = 0.0_rp
+        rerr     = 2*toll
+        iter     = 0
+        do while(rerr > toll .and. iter < itmx)
+
+           ! get momentum coefficients
+           j = 0
+           T_m    = T_w
+           r_m    = p_h*iTw
+           mLm    = mu_inf*laminar_viscosity(T_m,Tref,vis_flag)
+           mTm    = getMuT(r_m,tauW_tmp,yf(j),mLm)
+           k_u(j) = (mLm + mTm)*dy(j)
+           k_T(j) = c_p*(mLm*iPrL + mTm*iPrT)*dy(j)
+
+           do j = 1,nw-1
+              T_m    = 0.5_rp*(T_wm(j) + T_wm(j+1))
+              r_m    = p_h/T_m
+              mLm    = mu_inf*laminar_viscosity(T_m,Tref,vis_flag)
+              mTm    = getMuT(r_m,tauW_tmp,yf(j),mLm)
+              k_u(j) = (mLm + mTm)*dy(j)
+              k_T(j) = c_p*(mLm*iPrL + mTm*iPrT)*dy(j)
+           enddo
+
+           j = nw
+           T_m    = T_h
+           r_m    = p_h*iTh
+           mLm    = mu_inf*laminar_viscosity(T_m,Tref,vis_flag)
+           mTm    = getMuT(r_m,tauW_tmp,yf(j),mLm)
+           k_u(j) = (mLm + mTm)*dy(j)
+           k_T(j) = c_p*(mLm*iPrL + mTm*iPrT)*dy(j)
+
+           ! building tri-diagonal matrix for momentum equation
+           do j = 1,nw
+              a_(j) =   k_u(j-1)
+              b_(j) = - k_u(j)-k_u(j-1)
+              c_(j) =   k_u(j)
+              d_(j) =   0.0_rp
+           enddo
+           d_(1 ) = - k_u(0 )*u_w
+           d_(nw) = - k_u(nw)*u_p
+
+           ! forward elimination phase
+           do i=2,nw
+              b_(i) = b_(i) - a_(i)/b_(i-1)*c_(i-1)
+              d_(i) = d_(i) - a_(i)/b_(i-1)*d_(i-1)
+           end do
+           ! backward substitution phase
+           u_wm(nw) = d_(nw)/b_(nw)
+           do i=nw-1,1,-1
+              u_wm(i) = (d_(i)-c_(i)*u_wm(i+1))/b_(i)
+           end do
+
+           ! building tri-diagonal matrix for temperature
+           j = 1
+           a_(j) =  k_T(j-1)
+           b_(j) = -k_T(j) - k_T(j-1)
+           c_(j) =  k_T(j)
+
+           u_hm = u_w!(u_wm(j) + u_wm(j-1))*0.5_rp
+           u_hp = (u_wm(j+1) + u_wm(j))*0.5_rp
+           u_dm = (u_wm(j) - u_w)
+           u_dp = (u_wm(j+1) - u_wm(j))
+           d_(j) = -k_T(0)*T_w - k_u(j)*u_hp*u_dp + k_u(j-1)*u_hm*u_dm
+
+           do j = 2,nw-1
+
+              a_(j) =  k_T(j-1)
+              b_(j) = -k_T(j) - k_T(j-1)
+              c_(j) =  k_T(j)
+
+              u_hm = (u_wm(j) + u_wm(j-1))*0.5_rp
+              u_hp = (u_wm(j+1) + u_wm(j))*0.5_rp
+              u_dm = (u_wm(j) - u_wm(j-1))
+              u_dp = (u_wm(j+1) - u_wm(j))
+              d_(j) = - k_u(j)*u_hp*u_dp + k_u(j-1)*u_hm*u_dm
+
+           enddo
+
+           j = nw
+           a_(j) =  k_T(j-1)
+           b_(j) = -k_T(j) - k_T(j-1)
+           c_(j) =  k_T(j)
+
+           u_hm = (u_wm(j) + u_wm(j-1))*0.5_rp
+           u_hp = u_p!(u_wm(j+1) + u_wm(j))*0.5_rp
+           u_dm = (u_wm(j) - u_wm(j-1))
+           u_dp = (u_p - u_wm(j))
+           d_(j) = -k_T(nw)*T_h - k_u(j)*u_hp*u_dp + k_u(j-1)*u_hm*u_dm
+
+           ! forward elimination phase
+           do i=2,nw
+              b_(i) = b_(i) - a_(i)/b_(i-1)*c_(i-1)
+              d_(i) = d_(i) - a_(i)/b_(i-1)*d_(i-1)
+           end do
+           ! backward substitution phase
+           T_wm(nw) = d_(nw)/b_(nw)
+           do i=nw-1,1,-1
+              T_wm(i) = (d_(i)-c_(i)*T_wm(i+1))/b_(i)
+           end do
+
+           tauW_old = tauW_tmp
+           qauW_old = qauW_tmp
+
+           tauW_tmp = mlW*(u_wm(1) - u_w)*dy(0)
+           qauW_tmp = klW*(T_wm(1) - T_w)*dy(0)
+
+           iter = iter + 1
+           rerr = max(abs(tauW_tmp - tauW_old), abs(qauW_tmp - qauW_old))
+
+        enddo
+
+        tauW = tauW_tmp
+        qauW = qauW_tmp
+
+        return
+end subroutine OdeWMLES2
+
+
+subroutine LogLawWMLES(mu_inf,Tref,vis_flag,d_h,T_W,u_h,p_h,tauWall)
+        !$acc routine seq
+
+        use fluid_functions_module, only: laminar_viscosity, iReichardtLaw
+
+        implicit none
+        real(rp), intent(in)  :: mu_inf, Tref
         real(rp), intent(in)  :: T_W
         real(rp), intent(in)  :: d_h,u_h,p_h
+        integer , intent(in)  :: vis_flag
         real(rp), intent(out) :: tauWall
 
         ! local declarations
         real(rp), parameter :: toll = wmles_toll
         integer , parameter :: imax = wmles_imax
-        real(rp) :: r_w, m_w, n_w, t_W0, u_t0, u_T
+        real(rp)            :: ctoll
+        integer             :: iter
+        real(rp) :: irw, m_w, n_w, t_W0, u_t0, u_T, ihk
 
         real(rp) :: x0   
         real(rp) :: xnew
-        integer  :: iter                     !< iter variable
-        real(rp) :: ctoll                    !< calculated tolerance
-        real(rp) :: xold1, xold2, hk
-        
+        real(rp) :: xold1, xold2
+        real(rp) :: iReichX1, iReichX2
+
+        ctoll=2.0_rp*toll
+        iter = 0
 
         ! get wall quantities
-        r_w = p_h/T_w
-        m_w = mu_inf*Sutherland(T_W)
-        n_w = m_w/r_w
+        irw = T_w/p_h
+        m_w = mu_inf*laminar_viscosity(T_W,Tref,vis_flag)
+        n_w = m_w*irw
 
         t_W0 = m_w*u_h/d_h
-        u_t0 = sqrt(t_w0/r_w)
+        u_t0 = sqrt(t_w0*irw)
 
         ! initializin the loop
         x0    = u_t0
+        xnew  = x0
         xold1 = x0
         xold2 = x0 + 1.E-14_rp
-        ctoll = 2._rp*toll
-        iter  = 0
 
         do while ((ctoll.ge.toll).and.(iter.le.imax))
            iter = iter + 1
-           
+          
+           iReichX1 = iReichardtLaw(xold1,d_h,u_h,n_w)
+           iReichX2 = iReichardtLaw(xold2,d_h,u_h,n_w)
+
            ! calculting finite difference
-           hk = (iReichardtLaw(xold1,d_h,u_h,n_w) - &
-                 iReichardtLaw(xold2,d_h,u_h,n_w))/(xold1 - xold2)
+           ihk = (xold1 - xold2)/(iReichX1 - iReichX2)
            
            ! update x with Newton-Raphson formula
-           xnew = xold1 - iReichardtLaw(xold1,d_h,u_h,n_w)/hk
+           xnew = xold1 - iReichX1*ihk
 
            ! update tollerance
            ctoll = abs(xnew-xold1)
@@ -329,7 +601,7 @@ subroutine LogLawWMLES(mu_inf,d_h,T_W,u_h,p_h,tauWall)
         
         u_t = xnew
 
-        tauWall = r_w*u_t**2
+        tauWall = 1.0_rp/irw*u_t*u_t
 
         return
 end subroutine LogLawWMLES
@@ -340,8 +612,8 @@ end subroutine LogLawWMLES
 
 subroutine compute_tau_wall_wmles1D(jW,phi_mean,tWall,tauW)
         
-        use fluid_functions_module, only: Sutherland
-        use parameters_module     , only: rp, gamma0, mu_inf, Lx, Lz, Prandtl
+        use fluid_functions_module, only: laminar_viscosity
+        use parameters_module     , only: rp, gamma0, mu_inf, Lx, Lz, Prandtl, Tref, vis_flag
         use mpi_module            , only: sy, nx, nz
         use mesh_module           , only: y
 
@@ -371,7 +643,7 @@ subroutine compute_tau_wall_wmles1D(jW,phi_mean,tWall,tauW)
         ! get wall quantities
         T_w = tWall
         u_w = 0.0_rp
-        mW = Sutherland(t_w)
+        mW = laminar_viscosity(t_w,Tref,vis_flag)
 
         ! get les quantities at the jl node
         r_h = phi_mean(jl,1)
@@ -382,7 +654,7 @@ subroutine compute_tau_wall_wmles1D(jW,phi_mean,tWall,tauW)
         ekh = 0.5_rp*(u_h*u_h + v_h*v_h + w_h*w_h)
         p_h = (gamma0-1.0_rp) * (phi_mean(jl,5) - r_h*ekh)
         T_h = p_h*irh
-        mlh = mu_inf*Sutherland(T_h)
+        mlh = mu_inf*laminar_viscosity(T_h,Tref,vis_flag)
 
         u_p = sqrt(u_h*u_h + w_h*w_h)
 
@@ -391,7 +663,7 @@ subroutine compute_tau_wall_wmles1D(jW,phi_mean,tWall,tauW)
         !
         h1 = abs(y(j1)-yW)
         hl = abs(y(jl)-yW)
-        call LogLawWMLES(mu_inf,hl,T_w,u_p,p_h,tauWall0)
+        call LogLawWMLES(mu_inf,Tref,vis_flag,hl,T_w,u_p,p_h,tauWall0)
         rhoWall0 = p_h/T_w
         utaWall0 = sqrt(tauWall0/rhoWall0)
 
@@ -405,7 +677,7 @@ subroutine compute_tau_wall_wmles1D(jW,phi_mean,tWall,tauW)
 
         !if(yPlWall0 < 5.0_rp) then ! OLD VERSION
         if(xPlWall0 < xpt_wm .and. yPlWall0 < ypt_wm .and. zPlWall0 < zpt_wm) then
-          tauW = rhoWall0*utaWall0**2
+          tauW = mu_inf*mW*phi_mean(jW,2)/(y(j1)+1.0_rp)!rhoWall0*utaWall0**2
 
         else
 
@@ -431,7 +703,7 @@ subroutine compute_tau_wall_wmles1D(jW,phi_mean,tWall,tauW)
 
           u_p = sqrt(u_h*u_h + w_h*w_h)
           
-          call OdeWMLES(gamma0,Prandtl,mu_inf,hw,dltWall0,u_w,u_p,T_w,T_h,p_h,u_wm,T_wm,tauW,qauW)
+          call OdeWMLES(gamma0,Prandtl,mu_inf,Tref,vis_flag,hw,dltWall0,u_w,u_p,T_w,T_h,p_h,u_wm,T_wm,tauW,qauW)
 
         endif
         
@@ -440,10 +712,10 @@ end subroutine compute_tau_wall_wmles1D
 
 
 
-subroutine compute_tau_wall_wmles2D(i,phi_mean,tWall,yc,u_wm,T_wm,tauW)
+subroutine compute_tau_wall_wmles2D(i,phi_mean,tWall,u_wm,T_wm,tauW)
        
-        use fluid_functions_module, only: Sutherland
-        use parameters_module     , only: rp, gamma0, mu_inf, Lx, Lz, Prandtl
+        use fluid_functions_module, only: laminar_viscosity
+        use parameters_module     , only: rp, gamma0, mu_inf, Lx, Lz, Prandtl, Tref, vis_flag
         use mpi_module            , only: sy, nx, nz
         use mesh_module           , only: y
 
@@ -455,7 +727,6 @@ subroutine compute_tau_wall_wmles2D(i,phi_mean,tWall,yc,u_wm,T_wm,tauW)
         real(rp), dimension(:,:,:), allocatable, intent(in)  :: phi_mean
         real(rp)                               , intent(in)  :: tWall
         real(rp)                               , intent(out) :: tauW
-        real(rp), dimension(1:nw)              , intent(out) :: yc
         real(rp), dimension(1:nw)              , intent(out) :: u_wm, T_wm
         real(rp)                                             :: qauW
 
@@ -475,7 +746,7 @@ subroutine compute_tau_wall_wmles2D(i,phi_mean,tWall,yc,u_wm,T_wm,tauW)
         ! get wall quantities
         T_w = tWall
         u_w = 0.0_rp
-        mW = Sutherland(t_w)
+        mW = laminar_viscosity(t_w,Tref,vis_flag)
 
         ! get les quantities at the jl node
         r_h = phi_mean(i,jl,1)
@@ -486,14 +757,14 @@ subroutine compute_tau_wall_wmles2D(i,phi_mean,tWall,yc,u_wm,T_wm,tauW)
         ekh = 0.5_rp*(u_h*u_h + v_h*v_h + w_h*w_h)
         p_h = (gamma0-1.0_rp) * (phi_mean(i,jl,5) - r_h*ekh)
         T_h = p_h*irh
-        mlh = mu_inf*Sutherland(T_h)
+        mlh = mu_inf*laminar_viscosity(T_h,Tref,vis_flag)
 
         u_p = sqrt(u_h*u_h + w_h*w_h)
         
         ! estimate near-wall resolution with Reichardt's law
         h1 = abs(y(j1)-yW)
         hl = abs(y(jl)-yW)
-        call LogLawWMLES(mu_inf,hl,T_w,u_p,p_h,tauWall0)
+        call LogLawWMLES(mu_inf,Tref,vis_flag,hl,T_w,u_p,p_h,tauWall0)
         rhoWall0 = p_h/T_w
         utaWall0 = sqrt(tauWall0/rhoWall0)
 
@@ -528,7 +799,7 @@ subroutine compute_tau_wall_wmles2D(i,phi_mean,tWall,yc,u_wm,T_wm,tauW)
 
         ! compute tauW_WM
         u_p = sqrt(u_h*u_h + w_h*w_h)
-        call OdeWMLES(gamma0,Prandtl,mu_inf,hw,dltWall0,u_w,u_p,T_w,T_h,p_h,u_wm,T_wm,tauW_WM,qauW)
+        call OdeWMLES(gamma0,Prandtl,mu_inf,Tref,vis_flag,hw,dltWall0,u_w,u_p,T_w,T_h,p_h,u_wm,T_wm,tauW_WM,qauW)
 
         ! compute tauW_WR
         tauW_WR = mW*mu_inf*phi_mean(i,sy,2)/phi_mean(i,sy,1)/h1
@@ -554,8 +825,8 @@ end subroutine compute_tau_wall_wmles2D
 
 subroutine compute_tau_wall_improved_wmles2D(i,phi_mean,tWall,yc,u_wm,T_wm,tauW)
        
-        use fluid_functions_module, only: Sutherland
-        use parameters_module     , only: rp, gamma0, mu_inf, Prandtl
+        use fluid_functions_module, only: laminar_viscosity
+        use parameters_module     , only: rp, gamma0, mu_inf, Prandtl, Tref, vis_flag
         use mpi_module            , only: sy, nx, nz
         use mesh_module           , only: y
 
@@ -590,7 +861,7 @@ subroutine compute_tau_wall_improved_wmles2D(i,phi_mean,tWall,yc,u_wm,T_wm,tauW)
         ! get wall quantities
         T_w = tWall
         u_w = 0.0_rp
-        mW = Sutherland(t_w)
+        mW = laminar_viscosity(t_w,Tref,vis_flag)
 
         !
         ! get the numerical shear stress and heat flux
@@ -646,7 +917,7 @@ subroutine compute_tau_wall_improved_wmles2D(i,phi_mean,tWall,yc,u_wm,T_wm,tauW)
         !
         ! === get the correct tauWall and qWall from ODE model
         !
-        call OdeWMLES(gamma0,Prandtl,mu_inf,hw,dltWall0,u_w,u_p,T_w,T_h,p_h,u_wm,T_wm,tauW,qauW)
+        call OdeWMLES(gamma0,Prandtl,mu_inf,Tref,vis_flag,hw,dltWall0,u_w,u_p,T_w,T_h,p_h,u_wm,T_wm,tauW,qauW)
 
         
         return
@@ -659,10 +930,10 @@ end subroutine compute_tau_wall_improved_wmles2D
 
 
 
-subroutine compute_tau_wall_wmles2D_static(i,phi_mean,tWall,yc,u_wm,T_wm,tauW)
+subroutine compute_tau_wall_wmles2D_static(i,jInt,phi_mean,tWall,mWall,u_wm,T_wm,tauW)
        
-        use fluid_functions_module, only: Sutherland
-        use parameters_module     , only: rp, gamma0, mu_inf, Prandtl
+        use fluid_functions_module, only: laminar_viscosity
+        use parameters_module     , only: rp, gamma0, mu_inf, Prandtl, Tref, vis_flag
         use mpi_module            , only: sy
         use mesh_module           , only: y
 
@@ -670,28 +941,29 @@ subroutine compute_tau_wall_wmles2D_static(i,phi_mean,tWall,yc,u_wm,T_wm,tauW)
         integer , parameter :: nw = wmles_npts
 
         integer                                , intent(in)  :: i
+        integer                                , intent(in)  :: jInt
         real(rp), dimension(:,:,:), allocatable, intent(in)  :: phi_mean
         real(rp)                               , intent(in)  :: tWall
+        real(rp)                               , intent(in)  :: mWall
         real(rp)                               , intent(out) :: tauW
-        real(rp), dimension(1:nw)              , intent(out) :: yc, u_wm, T_wm
+        real(rp), dimension(1:nw)              , intent(out) :: u_wm, T_wm
         real(rp)                                             :: qauW
 
         ! local declaration
         
-        real(rp) :: yw , hw , u_w, T_w, mw, u_p
+        real(rp) :: yw , hw , u_w, T_w, m_w, u_p
         real(rp) :: r_h, irh, u_h, v_h, w_h, ekh, p_h, T_h, mlh
         real(rp) :: hl, rhoWall0, utaWall0,dltWall0,tauWall0
-        integer  :: j0, j1, jInt
+        integer  :: j0, j1
              
         j1 = sy
         j0 = sy-1
         yW = 0.5_rp*(y(j1) + y(j0))
-        jInt = wmles_strI
 
         ! get wall quantities
         T_w = tWall
+        m_W = mWall
         u_w = 0.0_rp
-        mW = Sutherland(t_w)
 
         ! get les quantities at the jInt node
         r_h = phi_mean(i,jInt,1)
@@ -702,7 +974,7 @@ subroutine compute_tau_wall_wmles2D_static(i,phi_mean,tWall,yc,u_wm,T_wm,tauW)
         ekh = 0.5_rp*(u_h*u_h + v_h*v_h + w_h*w_h)
         p_h = (gamma0-1.0_rp) * (phi_mean(i,jInt,5) - r_h*ekh)
         T_h = p_h*irh
-        mlh = mu_inf*Sutherland(T_h)
+        mlh = mu_inf*laminar_viscosity(T_h,Tref,vis_flag)
 
         u_p = sqrt(u_h*u_h + w_h*w_h)
         
@@ -710,16 +982,16 @@ subroutine compute_tau_wall_wmles2D_static(i,phi_mean,tWall,yc,u_wm,T_wm,tauW)
         ! === compute yPlusW with Reichardt's law
         !
         hl = abs(y(jInt)-yW)
-        call LogLawWMLES(mu_inf,hl,T_w,u_p,p_h,tauWall0)
+        call LogLawWMLES(mu_inf,Tref,vis_flag,hl,T_w,u_p,p_h,tauWall0)
         rhoWall0 = p_h/T_w
         utaWall0 = sqrt(tauWall0/rhoWall0)
-        dltWall0 = rhoWall0*utaWall0/(mW*mu_inf)
+        dltWall0 = rhoWall0*utaWall0/(m_W*mu_inf)
 
         hW = abs(y(jInt) - yW)
         
         ! get tauWall and qWall
         if(u_h<0.0_rp) u_p = -u_p
-        call OdeWMLES(gamma0,Prandtl,mu_inf,hw,dltWall0,u_w,u_p,T_w,T_h,p_h,u_wm,T_wm,tauW,qauW)
+        call OdeWMLES(gamma0,Prandtl,mu_inf,Tref,vis_flag,hw,dltWall0,u_w,u_p,T_w,T_h,p_h,u_wm,T_wm,tauW,qauW)
 
         return
 end subroutine compute_tau_wall_wmles2D_static
@@ -728,10 +1000,10 @@ end subroutine compute_tau_wall_wmles2D_static
 
 
 
-subroutine compute_tau_wall_wmles2D_vorticity(i,phi_mean,phi_mean_aux,tWall,yc,u_wm,T_wm,tauW)
+subroutine compute_tau_wall_wmles2D_vorticity(i,phi_mean,phi_mean_aux,tWall,u_wm,T_wm,tauW)
        
-        use fluid_functions_module, only: Sutherland
-        use parameters_module     , only: rp, gamma0, mu_inf, Prandtl
+        use fluid_functions_module, only: laminar_viscosity
+        use parameters_module     , only: rp, gamma0, mu_inf, Prandtl, Tref, vis_flag
         use real_to_integer_module, only: nearest_integer_opt
         use mpi_module            , only: sy, ey
         use mesh_module           , only: y
@@ -744,7 +1016,7 @@ subroutine compute_tau_wall_wmles2D_vorticity(i,phi_mean,phi_mean_aux,tWall,yc,u
         real(rp), dimension(:,:,:), allocatable, intent(in)  :: phi_mean_aux
         real(rp)                               , intent(in)  :: tWall
         real(rp)                               , intent(out) :: tauW
-        real(rp), dimension(1:nw)              , intent(out) :: yc, u_wm, T_wm
+        real(rp), dimension(1:nw)              , intent(out) :: u_wm, T_wm
         real(rp)                                             :: qauW
 
         ! local declaration
@@ -776,7 +1048,7 @@ subroutine compute_tau_wall_wmles2D_vorticity(i,phi_mean,phi_mean_aux,tWall,yc,u
         ! get wall quantities
         T_w = tWall
         u_w = 0.0_rp
-        mW = Sutherland(t_w)
+        mW = laminar_viscosity(t_w,Tref,vis_flag)
 
         ! get les quantities at the jInt node
         r_h = phi_mean(i,jInt,1)
@@ -787,7 +1059,7 @@ subroutine compute_tau_wall_wmles2D_vorticity(i,phi_mean,phi_mean_aux,tWall,yc,u
         ekh = 0.5_rp*(u_h*u_h + v_h*v_h + w_h*w_h)
         p_h = (gamma0-1.0_rp) * (phi_mean(i,jInt,5) - r_h*ekh)
         T_h = p_h*irh
-        mlh = mu_inf*Sutherland(T_h)
+        mlh = mu_inf*laminar_viscosity(T_h,Tref,vis_flag)
 
         u_p = sqrt(u_h*u_h + w_h*w_h)
         
@@ -795,7 +1067,7 @@ subroutine compute_tau_wall_wmles2D_vorticity(i,phi_mean,phi_mean_aux,tWall,yc,u
         ! === compute yPlusW with Reichardt's law
         !
         hl = abs(y(jInt)-yW)
-        call LogLawWMLES(mu_inf,hl,T_w,u_p,p_h,tauWall0)
+        call LogLawWMLES(mu_inf,Tref,vis_flag,hl,T_w,u_p,p_h,tauWall0)
         rhoWall0 = p_h/T_w
         utaWall0 = sqrt(tauWall0/rhoWall0)
         dltWall0 = rhoWall0*utaWall0/(mW*mu_inf)
@@ -804,7 +1076,7 @@ subroutine compute_tau_wall_wmles2D_vorticity(i,phi_mean,phi_mean_aux,tWall,yc,u
         
         ! get tauWall and qWall
         if(u_h<0.0_rp) u_p = -u_p
-        call OdeWMLES(gamma0,Prandtl,mu_inf,hw,dltWall0,u_w,u_p,T_w,T_h,p_h,u_wm,T_wm,tauW,qauW)
+        call OdeWMLES(gamma0,Prandtl,mu_inf,Tref,vis_flag,hw,dltWall0,u_w,u_p,T_w,T_h,p_h,u_wm,T_wm,tauW,qauW)
 
         return
 end subroutine compute_tau_wall_wmles2D_vorticity

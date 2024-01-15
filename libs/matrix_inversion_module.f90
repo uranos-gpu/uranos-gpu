@@ -2,7 +2,7 @@ module matrix_inversion_module
 
 implicit none
 private
-public matinv3, matinv4, gauss_elimination, tdma, inverse
+public matinv3, matinv4, gauss_elimination, tdma, inverse, matdet4
 
 contains
 
@@ -43,18 +43,22 @@ pure function matinv4(A) result(B)
 ! ----------------------------------------------------------------
 ! Performs a direct calculation of the inverse of a 4×4 matrix.
 ! ----------------------------------------------------------------
+    !$acc routine seq
+    use parameters_module, only: rp
+
     implicit none
-    integer , parameter  :: rp = 8 
     real(rp), intent(in) :: A(4,4)   !! Matrix
     real(rp)             :: B(4,4)   !! Inverse matrix
     real(rp)             :: detinv
 
     ! Calculate the inverse determinant of the matrix
     detinv = &
-    1.0_rp/(A(1,1)*(A(2,2)*(A(3,3)*A(4,4)-A(3,4)*A(4,3))+A(2,3)*(A(3,4)*A(4,2)-A(3,2)*A(4,4))+A(2,4)*(A(3,2)*A(4,3)-A(3,3)*A(4,2)))&
+         A(1,1)*(A(2,2)*(A(3,3)*A(4,4)-A(3,4)*A(4,3))+A(2,3)*(A(3,4)*A(4,2)-A(3,2)*A(4,4))+A(2,4)*(A(3,2)*A(4,3)-A(3,3)*A(4,2)))&
        - A(1,2)*(A(2,1)*(A(3,3)*A(4,4)-A(3,4)*A(4,3))+A(2,3)*(A(3,4)*A(4,1)-A(3,1)*A(4,4))+A(2,4)*(A(3,1)*A(4,3)-A(3,3)*A(4,1)))&
        + A(1,3)*(A(2,1)*(A(3,2)*A(4,4)-A(3,4)*A(4,2))+A(2,2)*(A(3,4)*A(4,1)-A(3,1)*A(4,4))+A(2,4)*(A(3,1)*A(4,2)-A(3,2)*A(4,1)))&
-       - A(1,4)*(A(2,1)*(A(3,2)*A(4,3)-A(3,3)*A(4,2))+A(2,2)*(A(3,3)*A(4,1)-A(3,1)*A(4,3))+A(2,3)*(A(3,1)*A(4,2)-A(3,2)*A(4,1))))
+       - A(1,4)*(A(2,1)*(A(3,2)*A(4,3)-A(3,3)*A(4,2))+A(2,2)*(A(3,3)*A(4,1)-A(3,1)*A(4,3))+A(2,3)*(A(3,1)*A(4,2)-A(3,2)*A(4,1)))
+
+    detinv = 1.0_rp/detinv
 
     ! Calculate the inverse of the matrix
     B(1,1) = detinv*(A(2,2)*(A(3,3)*A(4,4)-A(3,4)*A(4,3))+A(2,3)*(A(3,4)*A(4,2)-A(3,2)*A(4,4))+A(2,4)*(A(3,2)*A(4,3)-A(3,3)*A(4,2)))
@@ -76,6 +80,26 @@ pure function matinv4(A) result(B)
 
     return
 end function matinv4
+
+function matdet4(A) result(determinant)
+
+    use parameters_module, only: rp
+
+    real(rp), dimension(4,4), intent(in) :: A
+    real(rp)                             :: determinant
+    
+    determinant = &
+         A(1,1)*(A(2,2)*(A(3,3)*A(4,4)-A(3,4)*A(4,3))+A(2,3)*(A(3,4)*A(4,2)-A(3,2)*A(4,4))+A(2,4)*(A(3,2)*A(4,3)-A(3,3)*A(4,2)))&
+       - A(1,2)*(A(2,1)*(A(3,3)*A(4,4)-A(3,4)*A(4,3))+A(2,3)*(A(3,4)*A(4,1)-A(3,1)*A(4,4))+A(2,4)*(A(3,1)*A(4,3)-A(3,3)*A(4,1)))&
+       + A(1,3)*(A(2,1)*(A(3,2)*A(4,4)-A(3,4)*A(4,2))+A(2,2)*(A(3,4)*A(4,1)-A(3,1)*A(4,4))+A(2,4)*(A(3,1)*A(4,2)-A(3,2)*A(4,1)))&
+       - A(1,4)*(A(2,1)*(A(3,2)*A(4,3)-A(3,3)*A(4,2))+A(2,2)*(A(3,3)*A(4,1)-A(3,1)*A(4,3))+A(2,3)*(A(3,1)*A(4,2)-A(3,2)*A(4,1)))
+
+
+
+
+
+    return
+end function matdet4
 
 
 subroutine gauss_elimination(a,b,x,n)
@@ -168,9 +192,11 @@ subroutine tdma(a,b,c,r,x,s,e)
         !$acc routine seq
 
         implicit none
-        integer , parameter      :: rp = 8
-        integer , intent(in)     :: s,e
-        real(rp), dimension(s:e) :: a,b,c,r,x    
+        integer , parameter                   :: rp = 8
+        integer , intent(in)                  :: s,e
+        real(rp), dimension(s:e)              :: b,r
+        real(rp), dimension(s:e), intent(in ) :: a,c
+        real(rp), dimension(s:e), intent(out) :: x
 
         integer :: i
 

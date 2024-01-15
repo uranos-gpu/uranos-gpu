@@ -17,7 +17,6 @@ module parameters_module
         integer , parameter :: msm = MPI_SUM
         integer , parameter :: ip  = 4                   !< integer precision
         integer , parameter :: dl  = 600                 !< character default lenght
-        integer , parameter :: eqs = 5                   !< number of equations
         real(rp), parameter :: pi  = 2.0_rp*asin(1.0_rp)       !< pi
 
         ! gamma and related properties
@@ -27,7 +26,6 @@ module parameters_module
         real(rp), parameter :: cv_i = 1._rp/cv               !< inverse of cv
         real(rp), parameter :: cp_i = 1._rp/cp               !< inverse of cp
         real(rp), parameter :: toll_equality = 1.0E-13_rp    !< check for equality
-        real(rp)            :: suthc = 110.4_rp/273.15_rp    !< sutherland adimensianal coefficient
 
         ! shock bc parameter
         real(rp) :: wedge_angle = 8.0_rp
@@ -37,8 +35,8 @@ module parameters_module
         ! mpi_opt_level = 1 > sendrecv
         ! mpi_opt_level = 2 > isend/irecv + buffers
         ! mpi_opt_level = 3 > isend/irecv + derived data types
-        integer :: mpi_opt_level = 3
-        logical :: cuda_aware = .false.
+        integer :: mpi_opt_level = 2
+        logical :: cuda_aware = .true.
 
         ! input per costruire la griglia di calcolo
         integer, dimension(3) :: cart_dims
@@ -52,11 +50,25 @@ module parameters_module
         character(dl)         :: gridpoint_y
         character(dl)         :: gridpoint_z
         real(rp)              :: stretching_par
+        real(rp)              :: str_it_time, end_it_time
+
+        ! inlet boundary conditions (only for pressure inlet bc)
+        real(rp) :: total_pressure_inlet    = 1.596_rp
+        real(rp) :: total_temperature_inlet = 1.53761669412_rp
+
+        ! outlet boundary conditions (only for pressure outlet bc)
+        real(rp) :: static_rho_outlet = 0.6910582936489718_rp
+        real(rp) :: vel_u_outlet      = 0.3127685206469744_rp
+        real(rp) :: vel_v_outlet      = -1.138780644972524_rp
+        real(rp) :: static_prs_outlet = 0.8235651411736156_rp
+
+        real(rp) :: turbulent_intensity = 0.03
         
         ! input per la discretizzazione temporale
         real(rp)   :: tmax, Dt, CFL, time_from_restart
         integer    :: it,itmax, itStat = 0
-        integer    :: n_step, ik = 1, itout, StOut
+        integer    :: n_step, ik = 1, itout, StOut, rsOut = 10
+        logical    :: printres = .true.
         integer    :: itPrb = 0
         logical    :: restart_flag  = .false.
         logical    :: inflow        = .true.
@@ -75,19 +87,45 @@ module parameters_module
         integer :: fd_L, fd_R
 
         ! finite difference coefficients
-        real(rp), dimension(:), allocatable :: central_1, central_2
+        real(rp), dimension(-3:3) :: central_1
+        real(rp), dimension(-3:3) :: central_2
+        real(rp), dimension(-2:3) :: central_1_one_half
+        real(rp), dimension(-2:3) :: central_2_one_half
         real(rp), dimension(:), allocatable :: bward_1  , bward_2
         real(rp), dimension(:), allocatable :: fward_1  , fward_2
-        real(rp), dimension(:), allocatable :: central_1_one_half
-        real(rp), dimension(:), allocatable :: central_2_one_half
 
-        real(rp), dimension(:), allocatable :: mid_point_lele
+        real(rp), dimension(:),   allocatable :: mid_point_lele
         real(rp), dimension(:,:), allocatable :: mid_point_lele_x
         real(rp), dimension(:,:), allocatable :: mid_point_lele_y
         real(rp), dimension(:,:), allocatable :: mid_point_lele_z
 
-        real(rp), dimension(:,:) , allocatable :: aweno
-        real(rp), dimension(:)   , allocatable :: cweno
+        real(rp), dimension(0:1,0:1), parameter :: aweno3 = reshape( &
+                        1.0_rp/2.0_rp * [ &
+                                          - 1.0_rp ,   3.0_rp, &
+                                            1.0_rp ,   1.0_rp  &
+                                        ], shape(aweno3), order=[2,1])
+        real(rp), dimension(0:1)    , parameter :: cweno3 = &
+                        1.0_rp/3.0_rp * [1.0_rp, 2.0_rp]
+
+        real(rp), dimension(0:2,0:2), parameter :: aweno5 = reshape( &
+                        1.0_rp/6.0_rp * [ &
+                                            2.0_rp , - 7.0_rp,  11.0_rp, &
+                                          - 1.0_rp ,   5.0_rp,   2.0_rp, &
+                                            2.0_rp ,   5.0_rp, - 1.0_rp  &
+                                        ], shape(aweno5), order=[2,1])
+        real(rp), dimension(0:2)    , parameter :: cweno5 = &
+                        1.0_rp/10.0_rp * [1.0_rp, 6.0_rp, 3.0_rp]
+
+
+        real(rp), dimension(0:3,0:3), parameter :: aweno7 = reshape( &
+                        1.0_rp/12.0_rp * [ &
+                                          - 3.0_rp ,  13.0_rp, -23.0_rp,  25.0_rp, &
+                                            1.0_rp ,  -5.0_rp,  13.0_rp,   3.0_rp, &
+                                          - 1.0_rp ,   7.0_rp,   7.0_rp, - 1.0_rp, &
+                                            3.0_rp ,  13.0_rp, - 5.0_rp,   1.0_rp  &
+                                        ], shape(aweno7), order=[2,1])
+        real(rp), dimension(0:3)    , parameter :: cweno7 = &
+                        1.0_rp/35.0_rp * [ 1.0_rp, 12.0_rp, 18.0_rp,  4.0_rp]
 
         ! face type
         type face_type
@@ -100,6 +138,7 @@ module parameters_module
         type prb
           integer , dimension(:,:), allocatable :: i
           real(rp), dimension(:,:), allocatable :: x
+          integer , dimension(:)  , allocatable :: rank
           integer                               :: n
         endtype
         type(prb) :: Probe
@@ -111,7 +150,9 @@ module parameters_module
         character(50)               :: ic     !< initial  condition
         character(50), dimension(6) :: bc     !< boundary condition
         logical      , dimension(6) :: sponge = .false.   
-        real(rp)                    :: Trat  = 1.0_rp ! T_adi/T_rec ratio
+        real(rp)                    :: Trat  = 1.0_rp    ! T_adi/T_rec ratio
+        real(rp)                    :: Tref  = 273.15_rp ! Sutherland reference temperature
+        integer                     :: vis_flag = 1      ! 0 for power law, 1 for sutherland
         
         ! gruppi adimensionali
         real(rp) :: Reynolds, Mach, Prandtl, mu_inf, u_inf, k_inf, q_inf, ReTau
@@ -129,11 +170,14 @@ module parameters_module
         ! condizione logica sul CFL e suo default
         logical       :: logical_CFL = .false.
         logical       :: hybrid_weno = .false.
+        character(50) :: diffusion_scheme = 'staggered'
         character(50) :: scheme
         character(20) :: sensor
         real(rp)      :: ducrosToll = 0.05_rp
         character(20) :: L1_wave
         integer       :: fd_order
+        
+        character(len=50)  :: wmles_interface = 'dynamic'
         
         ! logical condition of viscous therms
         logical :: viscous = .false.
@@ -174,7 +218,7 @@ module parameters_module
         logical :: NPY        = .false.
         
         ! lista dei parametri di input
-        namelist /input_list/          &
+        namelist /input_list/              &
         
               &   xmin,                & 
               &   xmax,                & 
@@ -202,15 +246,24 @@ module parameters_module
               &   impin_point,         &
               &   sponge,              &
               &   Trat,                &
-              &   suthc,               &
+              &   Tref,                &
+              &   total_pressure_inlet,   &
+              &   total_temperature_inlet,& 
+              &   static_rho_outlet,      &
+              &   vel_u_outlet,           &
+              &   vel_v_outlet,           &
+              &   static_prs_outlet,      &
+              &   vis_flag,            &
               &   inflow_profile,      &
               &   smooth_inflow,       &
               &   turb_inflow,         &
+              &   turbulent_intensity, &
               &   Reynolds,            &
               &   Mach,                &
               &   Prandtl,             &
               &   logical_CFL,         &         
               &   scheme,              &         
+              &   diffusion_scheme,    &
               &   sensor,              &         
               &   ducrosToll,          &
               &   L1_wave,             &
@@ -218,10 +271,13 @@ module parameters_module
               &   weno_order,          &
               &   LES,                 &
               &   sgs_model,           &
+              &   wmles_interface,     &
               &   viscous,             &
               &   n_step,              & 
+              &   printres,            &
               &   itout,               &         
               &   StOut,               &         
+              &   rsOut,               &
               &   itPrb,               &
               &   StFlg,               &
               &   restartStat,         &

@@ -32,17 +32,28 @@ subroutine compute_hybrid_weno_flag
 
         call EndProfRange
         call StartProfRange("compute_hybrid_weno_flag_MPI") 
-
+        
         if(mpi_flag) then
         call mpi_share_int1(mpi_comm_cart,type_send_flag,type_recv_flag,&
-                my_neighbour,dims, &
+                my_neighbour, &
                 i13D_bfr_send_E, i13D_bfr_send_W, i13D_bfr_recv_E, i13D_bfr_recv_W, &
                 i13D_bfr_send_N, i13D_bfr_send_S, i13D_bfr_recv_N, i13D_bfr_recv_S, &
                 i13D_bfr_send_B, i13D_bfr_send_F, i13D_bfr_recv_B, i13D_bfr_recv_F, &
-                weno%flag)
+                weno_flag)
         endif
 
-        !call spread_hybrid_weno_flag
+        call spread_hybrid_weno_flag
+
+        if(mpi_flag) then
+        call mpi_share_int1(mpi_comm_cart,type_send_flag,type_recv_flag,&
+                my_neighbour, &
+                i13D_bfr_send_E, i13D_bfr_send_W, i13D_bfr_recv_E, i13D_bfr_recv_W, &
+                i13D_bfr_send_N, i13D_bfr_send_S, i13D_bfr_recv_N, i13D_bfr_recv_S, &
+                i13D_bfr_send_B, i13D_bfr_send_F, i13D_bfr_recv_B, i13D_bfr_recv_F, &
+                weno_flag_xyz)
+
+        endif
+
         call EndProfRange
 
         return
@@ -79,8 +90,8 @@ subroutine compute_density_shock_sensor
 
                  shock_sensor = max(abs(delta_rho1),abs(delta_rho2))
 
-                 weno%flag(i,j,k) = weno%smooth
-                 if(shock_sensor >= hw_toll) weno%flag(i,j,k) = weno%shock
+                 weno_flag(i,j,k) = weno_smooth
+                 if(shock_sensor >= hw_toll) weno_flag(i,j,k) = weno_shock
 
               enddo
           enddo
@@ -103,8 +114,8 @@ subroutine compute_density_shock_sensor
 
                    shock_sensor = max(abs(delta_rho1),abs(delta_rho2),abs(delta_rho3))
                 
-                   weno%flag(i,j,k) = weno%smooth
-                   if(shock_sensor >= hw_toll) weno%flag(i,j,k) = weno%shock
+                   weno_flag(i,j,k) = weno_smooth
+                   if(shock_sensor >= hw_toll) weno_flag(i,j,k) = weno_shock
 
                 enddo
              enddo
@@ -160,8 +171,8 @@ subroutine compute_density_jump_shock_sensor
 
                  shock_sensor = max(abs(delta_rho1),abs(delta_rho2))
                 
-                 weno%flag(i,j,k) = weno%smooth
-                 if(shock_sensor > hw_toll) weno%flag(i,j,k) = weno%shock
+                 weno_flag(i,j,k) = weno_smooth
+                 if(shock_sensor > hw_toll) weno_flag(i,j,k) = weno_shock
 
               enddo
           enddo
@@ -195,8 +206,8 @@ subroutine compute_density_jump_shock_sensor
 
                    shock_sensor = max(abs(delta_rho1),abs(delta_rho2),abs(delta_rho3))
 
-                   weno%flag(i,j,k) = weno%smooth
-                   if(shock_sensor > hw_toll) weno%flag(i,j,k) = weno%shock
+                   weno_flag(i,j,k) = weno_smooth
+                   if(shock_sensor > hw_toll) weno_flag(i,j,k) = weno_shock
 
                 enddo
             enddo
@@ -217,10 +228,9 @@ subroutine compute_ducros_sensor
         real(rp) :: vor_x, vor_y, vor_z
         real(rp) :: ux, uy, uz, vx, vy, vz, wx, wy, wz
         real(rp) :: idx, idy, idz
-        real(rp) :: cl1, irx, iry, irz
-        integer  :: i,j,k, l, fdR
+        real(rp) :: cl1
+        integer  :: i,j,k, l
 
-        fdR = central_fd_order/2
         eps = u_inf**2
 
         selectcase(dims)
@@ -244,18 +254,16 @@ subroutine compute_ducros_sensor
                 vx = 0.0_rp
                 vy = 0.0_rp
                 !$acc loop seq
-                do l = -fdR, fdR
+                do l = -3, 3
 
                    cl1 = central_1(l)
                 
-                   irx = 1.0_rp/phi(i+l,j,k,1)
-                   iry = 1.0_rp/phi(i,j+l,k,1)
                    !
-                   ux = ux + cl1 * phi(i+l,j,k,2)*irx
-                   uy = uy + cl1 * phi(i,j+l,k,2)*iry
+                   ux = ux + cl1 * U(i+l,j,k)
+                   uy = uy + cl1 * U(i,j+l,k)
                    !
-                   vx = vx + cl1 * phi(i+l,j,k,3)*irx
-                   vy = vy + cl1 * phi(i,j+l,k,3)*iry
+                   vx = vx + cl1 * V(i+l,j,k)
+                   vy = vy + cl1 * V(i,j+l,k)
 
                 enddo
                 ux = ux*idx
@@ -275,8 +283,8 @@ subroutine compute_ducros_sensor
 
                 ducros = max(-div_/sqrt((div2 + vor2 + eps)), 0.0_rp)
         
-                weno%flag(i,j,k) = weno%smooth
-                if (ducros > ducrosToll) weno%flag(i,j,k) = weno%shock
+                weno_flag(i,j,k) = weno_smooth
+                if (ducros > ducrosToll) weno_flag(i,j,k) = weno_shock
 
              enddo
           enddo
@@ -309,25 +317,21 @@ subroutine compute_ducros_sensor
                    wz = 0.0_rp
                     
                    !$acc loop seq
-                   do l = -fdR, fdR
+                   do l = -3, 3
 
                       cl1 = central_1(l)
-                
-                      irx = 1.0_rp/phi(i+l,j,k,1)
-                      iry = 1.0_rp/phi(i,j+l,k,1)
-                      irz = 1.0_rp/phi(i,j,k+l,1)
                       !
-                      ux = ux + cl1 * phi(i+l,j,k,2)*irx
-                      uy = uy + cl1 * phi(i,j+l,k,2)*iry
-                      uz = uz + cl1 * phi(i,j,k+l,2)*irz
+                      ux = ux + cl1 * U(i+l,j,k)
+                      uy = uy + cl1 * U(i,j+l,k)
+                      uz = uz + cl1 * U(i,j,k+l)
                       !
-                      vx = vx + cl1 * phi(i+l,j,k,3)*irx
-                      vy = vy + cl1 * phi(i,j+l,k,3)*iry
-                      vz = vz + cl1 * phi(i,j,k+l,3)*irz
+                      vx = vx + cl1 * V(i+l,j,k)
+                      vy = vy + cl1 * V(i,j+l,k)
+                      vz = vz + cl1 * V(i,j,k+l)
                       !
-                      wx = wx + cl1 * phi(i+l,j,k,4)*irx
-                      wy = wy + cl1 * phi(i,j+l,k,4)*iry
-                      wz = wz + cl1 * phi(i,j,k+l,4)*irz
+                      wx = wx + cl1 * W(i+l,j,k)
+                      wy = wy + cl1 * W(i,j+l,k)
+                      wz = wz + cl1 * W(i,j,k+l)
 
                    enddo
                    ux = ux*idx
@@ -357,8 +361,8 @@ subroutine compute_ducros_sensor
 
                    SSENSOR(i,j,k) = ducros
 
-                   weno%flag(i,j,k) = weno%smooth
-                   if (ducros > ducrosToll) weno%flag(i,j,k) = weno%shock
+                   weno_flag(i,j,k) = weno_smooth
+                   if (ducros > ducrosToll) weno_flag(i,j,k) = weno_shock
 
                 enddo
              enddo
@@ -414,7 +418,7 @@ subroutine compute_ducros_sensor_lower_wall
                    if(j <= jpos) then
 
                      SSENSOR(i,j,k) = 0.0_rp
-                     weno%flag(i,j,k) = weno%smooth
+                     weno_flag(i,j,k) = weno_smooth
 
                    else
 
@@ -481,8 +485,8 @@ subroutine compute_ducros_sensor_lower_wall
 
                      SSENSOR(i,j,k) = ducros
 
-                     weno%flag(i,j,k) = weno%smooth
-                     if (ducros > ducrosToll) weno%flag(i,j,k) = weno%shock
+                     weno_flag(i,j,k) = weno_smooth
+                     if (ducros > ducrosToll) weno_flag(i,j,k) = weno_shock
 
                    endif
 
@@ -506,48 +510,27 @@ end subroutine compute_ducros_sensor_lower_wall
 
 subroutine spread_hybrid_weno_flag
         implicit none
-        integer, parameter :: bfr_R = 3, bfr_L = 3
-        integer            :: i,j,k
-        
-        !$omp workshare
-        weno%temp(:,:,:) = weno%flag(:,:,:)
-        !$omp end workshare
-        
-        selectcase(dims)
+        integer :: i,j,k
+        integer :: bL, bR
 
-          !
-          ! === 2D CASES
-          !
-          case(2)
-          k = 1
-          !$omp parallel do collapse(2) default(private), shared(weno), &
-          !$omp shared(sx,ex,sy,ey,k)
-          do j    = sy-1,ey+1
-             do i = sx-1,ex+1
-                
-                weno%flag(i,j,k) = minval(weno%temp(i-bfr_L:i+bfr_R,j-bfr_L:j+bfr_R,k))
+        bL = weno_num - 1
+        bR = weno_num 
+       
+        !$acc parallel default(present)
+        !$acc loop gang, vector collapse(3)
+        do k       = sz-1,ez
+           do j    = sy-1,ey
+              do i = sx-1,ex
+                 
+                 weno_flag_xyz(i,j,k) = minval(weno_flag(i-bL:i+BR,j,k))
+                 weno_flag_xyz(i,j,k) = weno_flag_xyz(i,j,k) + 2*minval(weno_flag(i,j-bL:j+bR,k))
+                 weno_flag_xyz(i,j,k) = weno_flag_xyz(i,j,k) + 4*minval(weno_flag(i,j,k-bL:k+bR))
 
-             enddo
-          enddo
+              enddo
+           enddo
+        enddo
+        !$acc end parallel
 
-          !
-          ! === 3D CASES
-          !
-          case(3)
-          !$omp parallel do collapse(3) default(private), shared(weno), &
-          !$omp shared(sx,ex,sy,ey,sz,ez)
-          do k       = sz-1,ez+1
-             do j    = sy-1,ey+1
-                do i = sx-1,ex+1
-                   
-                   weno%flag(i,j,k) = minval(weno%temp(i-bfr_L:i+bfr_R,j-bfr_L:j+bfr_R,k-bfr_L:k+bfr_R))
-
-                enddo
-             enddo
-          enddo
-          !$omp end parallel do
-
-        endselect
 
         return
 end subroutine spread_hybrid_weno_flag

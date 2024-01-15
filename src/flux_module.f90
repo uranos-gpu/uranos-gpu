@@ -1,7 +1,4 @@
 module flux_module
-#ifdef TIME
-use performance_module
-#endif
 
 implicit none
 private
@@ -24,10 +21,6 @@ subroutine conv_flux_x(lb,ub,phi_arr_x,flx_arr_x,pri_arr_x)
         real(rp)               :: r_, ir, u_, v_, w_, p_, ek
         integer                :: i
 
-#ifdef TIME
-        call mpi_stime(s_flx_time)
-#endif
-        
         do i = lb, ub
 
            phi_(:)  = phi_arr_x(i,:)
@@ -55,9 +48,6 @@ subroutine conv_flux_x(lb,ub,phi_arr_x,flx_arr_x,pri_arr_x)
 
         enddo
 
-#ifdef TIME
-        call mpi_etime(s_flx_time,t_flx_calls,t_flx_time)
-#endif
         return
 end subroutine conv_flux_x
 
@@ -80,10 +70,6 @@ subroutine conv_flux_y(lb,ub,phi_arr_y,flx_arr_y,pri_arr_y)
         real(rp)               :: r_, ir, u_, v_, w_, p_, ek
         integer                :: j
 
-#ifdef TIME
-        call mpi_stime(s_fly_time)
-#endif
-        
         do j = lb,ub
 
            phi_(:)  = phi_arr_y(j,:)
@@ -111,10 +97,6 @@ subroutine conv_flux_y(lb,ub,phi_arr_y,flx_arr_y,pri_arr_y)
 
         enddo
 
-#ifdef TIME
-        call mpi_etime(s_fly_time,t_fly_calls,t_fly_time)
-#endif
-
         return
 end subroutine conv_flux_y
 
@@ -136,10 +118,6 @@ subroutine conv_flux_z(lb,ub,phi_arr_z,flx_arr_z,pri_arr_z)
         real(rp)               :: r_, ir, u_, v_, w_, p_, ek
         integer                :: k
 
-#ifdef TIME
-        call mpi_stime(s_flz_time)
-#endif
-        
         do k = lb,ub
 
            phi_(:) = phi_arr_z(k,:)
@@ -166,9 +144,6 @@ subroutine conv_flux_z(lb,ub,phi_arr_z,flx_arr_z,pri_arr_z)
            pri_arr_z(k,6) = r_
 
         enddo
-#ifdef TIME
-        call mpi_etime(s_flz_time,t_flz_calls,t_flz_time)
-#endif
 
         return
 end subroutine conv_flux_z
@@ -204,10 +179,6 @@ subroutine energy_preserving_tilde_op(dir,ltot,lb,ub,pri_arr,tilde_op)
         real(rp)               :: r0, r1, weight
         integer                :: k, l, kl, id
 
-#ifdef TIME
-        call mpi_stime(s_tOp_time)
-#endif
-        
         id = dir+1
         do k = lb, ub-3
         
@@ -236,9 +207,6 @@ subroutine energy_preserving_tilde_op(dir,ltot,lb,ub,pri_arr,tilde_op)
            enddo
         enddo
         
-#ifdef TIME
-        call mpi_etime(s_tOp_time,t_tOp_calls,t_tOp_time)
-#endif
         return
 end subroutine energy_preserving_tilde_op
 

@@ -28,7 +28,7 @@ subroutine WriteScreenOutput
         Mmax = 0.0_rp
 
         selectcase(pcharAll)
-        case('FFT')
+        case('FFT','FTT')
         do    j = sy,ey
            do i = sx,ex
 
@@ -57,7 +57,7 @@ subroutine WriteScreenOutput
 
         endselect
 
-        if(mod(itstat,5) == 0) then
+        if(mod(itstat,5) == 0 .or. itStat == 1) then
           write(*,*) '-----------------------------------------------------------',&
                      '-----------------------------------------------------------',&
                      '----------------- post Uranos Stat'
@@ -84,7 +84,6 @@ subroutine WriteVTKStats
 
         integer, dimension(2) :: lo, up
         type(FileType)        :: vtkFile
-        integer               :: n
 
         real(rp), allocatable, dimension(:,:) :: tmp_2D
 
@@ -94,7 +93,7 @@ subroutine WriteVTKStats
 
         selectcase(pcharAll)
 
-          case('FFT')
+          case('FFT','FTT')
 
           lo = (/1,1/)
           up = (/nx,ny/)

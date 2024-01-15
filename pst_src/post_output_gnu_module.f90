@@ -124,7 +124,7 @@ subroutine write_periodic_euler(dir)
           if(hybrid_weno) then
             do i = sx,ex
                write(PerEul%unit,fmt=10) &
-               x(i), phi(i,j0,k0,1), exact%rho(i,j0,k0), abs(error%rho(i,j0,k0)), weno%flag(i,j0,k0)
+               x(i), phi(i,j0,k0,1), exact%rho(i,j0,k0), abs(error%rho(i,j0,k0)), weno_flag(i,j0,k0)
             enddo
           else
             do i = sx,ex
@@ -184,7 +184,7 @@ subroutine print_isentropic_vortex
              rho_      = phi(i,j0,k0,1)
              rho_exact = exact%rho(i,j0,k0)
 
-             write(VortexFile%unit,10) x(i), rho_, rho_exact, abs(rho_-rho_exact), weno%flag(i,j0,k0)
+             write(VortexFile%unit,10) x(i), rho_, rho_exact, abs(rho_-rho_exact), weno_flag(i,j0,k0)
           enddo
         else
           do i = sx,ex
@@ -244,7 +244,7 @@ subroutine print_primitives(dir)
                 T_    = p_*i_rho
                 c     = sqrt(gamma0*T_)
 
-                write(PrimFile%unit,10) x(i), rho_, p_, t_, u_, c, u_/c, weno%flag(i,j0,k0)
+                write(PrimFile%unit,10) x(i), rho_, p_, t_, u_, c, u_/c, weno_flag(i,j0,k0)
 
             enddo
           else
@@ -593,7 +593,7 @@ end subroutine print_KolmogorovFlow
 
 subroutine write_turbulent_channel_statistics
 
-        use fluid_functions_module, only: iLogLaw, sutherland
+        use fluid_functions_module, only: iLogLaw, laminar_viscosity
         use math_tools_module     , only: newton_raphson
         use FileModule
 
@@ -625,7 +625,7 @@ subroutine write_turbulent_channel_statistics
         wWall = Re_av%rhw(i0,sy,k0)/rWall
         u_yWl = 2*uWall/(y(sy) - y(sy-1))
         tmpWl = 1.0_rp
-        mWall = Sutherland(tmpWl)
+        mWall = laminar_viscosity(tmpWl,Tref,vis_flag)
         nWall = mu_inf*mWall/rWall
         tauWl = mu_inf*mWall*u_yWl
         u_tau = sqrt(tauWl/rWall)
@@ -772,16 +772,12 @@ subroutine gnuplot_error_header(funit,error)
 end subroutine gnuplot_error_header
 
 
-
-
-
-
 subroutine print_swbli_ascii
 
         use FileModule
         use real_to_integer_module, only: nearest_integer_opt
         use storage_module        , only: U, P
-        use fluid_functions_module, only: Sutherland
+        use fluid_functions_module, only: laminar_viscosity
 
         implicit none
         type(FileType)      :: prsFile, velFile, CfFile, gnuFile
@@ -883,7 +879,7 @@ subroutine print_swbli_ascii
                 u_y = u_y + i_dy*central_1(s)*(U(i,1+s,1))
              enddo
                 
-             mu_w = 0.5_rp*(Sutherland(T(i,1,1)) + Sutherland(T(i,0,1)))
+             mu_w = 0.5_rp*(laminar_viscosity(T(i,1,1),Tref,vis_flag) + laminar_viscosity(T(i,0,1),Tref,vis_flag))
              cf = mu_inf * mu_w * u_y/q_inf
 
              write(CfFile%unit,'(3e18.6)') xi, cf, 0.644_rp/sqrt(Reynolds*xi)
@@ -988,7 +984,7 @@ end subroutine print_hTurb_ascii
 subroutine print_turbulent_boundary_layer_statistics
 
         use FileModule
-        use fluid_functions_module, only: Sutherland
+        use fluid_functions_module, only: laminar_viscosity
         use real_to_integer_module
         use interpolation_module
 
@@ -1015,7 +1011,7 @@ subroutine print_turbulent_boundary_layer_statistics
 !        call OpenNewFile(WallQuantities,it)
 !
 !        tmpWl = 1.0_rp + 0.5_rp*(gamma0-1.0_rp)*Prandtl**(1.0_rp/3.0_rp)*Mach**2
-!        mWall = Sutherland(tmpWl)
+!        mWall = laminar_viscosity(tmpWl)
 !        uTemp = 0.0_rp
 !
 !        do i = lbx,ubx
@@ -1068,7 +1064,7 @@ subroutine print_turbulent_boundary_layer_statistics
 !           ! compute wall properties
 !           r     = Prandtl**(1.0_rp/3.0_rp)
 !           tmpWl = 1.0_rp + r*0.5_rp*(gamma0-1.0_rp)*Mach**2
-!           mWall = Sutherland(tmpWl)
+!           mWall = laminar_viscosity(tmpWl)
 !           rWall = Re_av%r(is,sy,k0)
 !           u_yWl = Re_av%u(is,sy,k0)/y(sy)
 !           tauWl = mu_inf*mWall*u_yWl
@@ -1143,6 +1139,7 @@ end subroutine print_turbulent_boundary_layer_statistics
 subroutine write_turbulent_channel_WallModelled
         
         use FileModule
+        use fluid_functions_module, only: laminar_viscosity
         implicit none
         
         type(FileType) :: VelFile, BudFile
@@ -1187,7 +1184,8 @@ subroutine write_turbulent_channel_WallModelled
 
               ! viscous components
               T_l = Re_av%tmp(i0,j+l,k0)
-              mVis_l = T_l*sqrt(T_l) * (1.0_rp+suthc)/(T_l+suthc)
+              mVis_l = laminar_viscosity(T_l,tref,vis_flag)
+
               tVis_l = Re_av%VIS(i0,j+l,k0) - mVis_l
 
               molVis(j) = molVis(j) + cl1 * mVis_l
@@ -1299,7 +1297,7 @@ end subroutine write_turbulent_channel_WallModelled
 subroutine write_turbulent_bdlayer_WallModelled
 
         use FileModule
-        use fluid_functions_module, only: Sutherland
+        use fluid_functions_module, only: laminar_viscosity
         use real_to_integer_module, only: locate, nearest_integer_opt
         use interpolation_module  , only: polint
 
@@ -1356,7 +1354,7 @@ subroutine write_turbulent_bdlayer_WallModelled
               rhW = rhW + cl1 * Re_av%rho(i,j0+l,k0)
         
               ! molecular viscosity
-              mul = Sutherland(Re_av%tmp(i,j0+l,k0))
+              mul = laminar_viscosity(Re_av%tmp(i,j0+l,k0),Tref,vis_flag)
               muW = muW + cl1 * mul
 
               ! turbulent viscosity
@@ -1417,7 +1415,7 @@ subroutine write_turbulent_bdlayer_WallModelled
              rhW = rhW + cl1 * Re_av%rho(s,j0+l,k0)
 
              ! molecular viscosity
-             mul = Sutherland(Re_av%tmp(s,j0+l,k0))
+             mul = laminar_viscosity(Re_av%tmp(s,j0+l,k0),Tref,vis_flag)
              muW = muW + cl1 * mul
 
              ! turbulent viscosity

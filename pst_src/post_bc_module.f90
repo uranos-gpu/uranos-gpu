@@ -55,8 +55,12 @@ subroutine apply_pst_bc_conditions
 
            elseif(trim(bc(f)) == 'subsonic_inflow'      .or. &
                   trim(bc(f)) == 'nscbc_inflow'         .or. &
+                  trim(bc(f)) == 'pressure_inflow'      .or. &
+                  trim(bc(f)) == 'pressure_outlet'      .or. &
                   trim(bc(f)) == 'nscbc_inflow_relaxed' .or. &
-                  trim(bc(f)) == 'supersonic_inflow') then
+                  trim(bc(f)) == 'turb_supersonic_inflow' .or. &
+                  trim(bc(f)) == 'supersonic_inflow'     .or. &
+                  trim(bc(f)) == 'farFieldImposed') then
              call neumann(phi,bound)
 
            elseif(trim(bc(f)) == 'shock_inflow') then

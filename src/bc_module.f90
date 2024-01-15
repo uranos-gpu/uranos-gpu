@@ -20,11 +20,8 @@ subroutine set_bc_conditions
         type(face_type)               :: bound
         integer                       :: f
         real(rp)                      :: M_Max, Twall, rfc
-#ifdef TIME
-        call mpi_stime(s_bcs_time)
-#endif
-        call StartProfRange("set_bc_conditions")
 
+        call StartProfRange("set_bc_conditions")
 
         all_bound%node = (/ sx , ex , sy , ey , sz ,  ez/)
         all_bound%norm = (/ -1 ,  1 , -1 ,  1 , -1 ,  1 /)
@@ -112,21 +109,28 @@ subroutine set_bc_conditions
                if(restart_flag) then
                  call neumann(phi,bound) !yes acc
                else
-                 call inflow_bc(phi,iFlow,bound)
+                 call inflow_bc(phi,bound)
                endif
 
              case('nscbc_inflow_relaxed')
                if(restart_flag) then !binary equality is avoid in restart nscbc
                  call neumann(phi,bound) !yes acc
                else
-                 call nscbc_inflow_relaxed(phi,iFlow,bound,M_max)
+                 call nscbc_inflow_relaxed(phi,bound,M_max)
                endif
 
              case('supersonic_inflow')
                if(restart_flag) then !binary equality is avoid in restart nscbc
                  call neumann(phi,bound) !yes acc
                else
-                 call inflow_bc(phi,iFlow,bound) !yes acc
+                 call inflow_bc(phi,bound) !yes acc
+               endif
+
+             case('turb_supersonic_inflow')
+               if(restart_flag) then !binary equality is avoid in restart nscbc
+                 call neumann(phi,bound) !yes acc
+               else
+                 call turb_inflow_bc(phi,bound)
                endif
 
              case('nscbc_outflow')
@@ -139,13 +143,27 @@ subroutine set_bc_conditions
              case('shock_inflow')
                ! check the critical mach number
                if(Mach >= 1.0_rp) then
-                 call inflow_bc(phi,iFLow,bound)
+                 call inflow_bc(phi,bound)
                else
-                 call nscbc_inflow(phi,iFlow,bound)
+                 call nscbc_inflow(phi,bound)
                endif
 
              case('neumann_wall')
                 call Neumann_wall(phi,bound)
+
+             case('pressure_inflow')
+                if(restart_flag) then
+                  call neumann(phi,bound) !yes acc
+                else
+                  call pressure_inflow(phi,bound)
+                endif
+
+
+             case('pressure_outlet')
+                call pressure_outlet(phi,bound)
+
+             case('farFieldImposed')
+                call farFieldImposed(phi,bound)
 
              case default
 
@@ -158,18 +176,14 @@ subroutine set_bc_conditions
         enddo ! end do faces
 
         call EndProfRange
-#ifdef TIME
-        call mpi_etime(s_bcs_time,t_bcs_calls,t_bcs_time)
-#endif
+
         return
 end subroutine set_bc_conditions
 
 
 subroutine mpi_bc_communications
         implicit none
-#ifdef TIME
-        call mpi_stime(s_mpi_time)
-#endif
+
         call StartProfRange("mpi_bc_communications")
 
 call  mpi_share(mpi_comm_cart,type_send_cons,type_recv_cons,my_neighbour,dims, &
@@ -179,9 +193,7 @@ call  mpi_share(mpi_comm_cart,type_send_cons,type_recv_cons,my_neighbour,dims, &
                 phi)
 
         call EndProfRange
-#ifdef TIME
-        call mpi_etime(s_mpi_time,t_mpi_calls,t_mpi_time)
-#endif
+
         return
 end subroutine mpi_bc_communications
 
@@ -1062,14 +1074,13 @@ end subroutine outflow_nscbc_static
 
 
 
-subroutine nscbc_inflow(phi,iFlow,b)
+subroutine nscbc_inflow(phi,b)
 
         use math_tools_module, only: smooth_step
         use inflow_module    , only: turbulent_inflow
 
         implicit none
         real(rp), allocatable, dimension(:,:,:,:), intent(inout) :: phi
-        type(ifl)                                , intent(inout) :: Iflow
         type(face_type)                          , intent(in)    :: b
 
         ! local declarations
@@ -1086,9 +1097,9 @@ subroutine nscbc_inflow(phi,iFlow,b)
         endif
 
         step = 1.0_rp
-        if(iFlow%SmthFlag) step = smooth_step(0.0_rp, 0.3_rp*real(itmax,rp), real(it,rp))
+        if(iflow_SmthFlag) step = smooth_step(0.0_rp, 0.3_rp*real(itmax,rp), real(it,rp))
 
-        if(iFlow%TurbFlag) call turbulent_inflow(iFlow)
+        if(iflow_TurbFlag) call turbulent_inflow()
 
         aik = a_rk(ik)
         bik = b_rk(ik)
@@ -1114,9 +1125,9 @@ subroutine nscbc_inflow(phi,iFlow,b)
         !open(unit = 10, file = "DATA/"//trim(data_dir)//'/tmp1._rptxt')
         !open(unit = 11, file = "DATA/"//trim(data_dir)//'/tmp2._rptxt')
         !do j = sy,ey
-        !   write(10,*) y(j), iflow%turb(1,j,1)
+        !   write(10,*) y(j), iflow_turb(1,j,1)
         !   if(j > j1) then
-        !   write(11,*) y(j), iflow%turb(1,j-j1+j0,1)
+        !   write(11,*) y(j), iflow_turb(1,j-j1+j0,1)
         !   else
         !   write(11,*) y(j), 0.0_rp
         !   endif
@@ -1132,16 +1143,16 @@ subroutine nscbc_inflow(phi,iFlow,b)
               vf = 0.0_rp
               wf = 0.0_rp
               if(j > j1) then
-                uf = iFlow%turb(1,j-j1+j0,k)
-                vf = iFlow%turb(2,j-j1+j0,k)
-                wf = iFlow%turb(3,j-j1+j0,k)
+                uf = iflow_turb(1,j-j1+j0,k)
+                vf = iflow_turb(2,j-j1+j0,k)
+                wf = iflow_turb(3,j-j1+j0,k)
               endif
 
               rho_ = phi(i,j,k,1)
-              u_   = step*(iFlow%mean(i,j,2) + uf) 
-              v_   =      (iFlow%mean(i,j,3) + vf)
-              w_   =      (iFlow%mean(i,j,4) + wf)
-              T_   =       iFlow%mean(i,j,5)
+              u_   = step*(iflow_mean(i,j,2) + uf)
+              v_   =      (iflow_mean(i,j,3) + vf)
+              w_   =      (iflow_mean(i,j,4) + wf)
+              T_   =       iflow_mean(i,j,5)
               c    = sqrt(gamma0 * T_)
 
               ! downwinding FD along x-direction
@@ -1190,14 +1201,13 @@ subroutine nscbc_inflow(phi,iFlow,b)
         return
 end subroutine nscbc_inflow
 
-subroutine nscbc_inflow_relaxed(phi,iFlow,b,M_max)
+subroutine nscbc_inflow_relaxed(phi,b,M_max)
         
         use math_tools_module, only: smooth_step
         use inflow_module    , only: turbulent_inflow
 
         implicit none
         real(rp), allocatable, dimension(:,:,:,:), intent(inout) :: phi
-        type(ifl)                                , intent(inout) :: Iflow
         type(face_type)                          , intent(in)    :: b
         real(rp)                                 , intent(in)    :: M_max
 
@@ -1215,9 +1225,9 @@ subroutine nscbc_inflow_relaxed(phi,iFlow,b,M_max)
         endif
 
         step = 1.0_rp
-        if(iFlow%SmthFlag) step = smooth_step(0.0_rp, 0.3_rp*real(itmax,rp), real(it,rp))
+        if(iflow_SmthFlag) step = smooth_step(0.0_rp, 0.3_rp*real(itmax,rp), real(it,rp))
 
-        if(iFlow%TurbFlag) call turbulent_inflow(iFlow)
+        if(iflow_TurbFlag) call turbulent_inflow()
 
         aik = a_rk(ik)
         bik = b_rk(ik)
@@ -1251,15 +1261,15 @@ subroutine nscbc_inflow_relaxed(phi,iFlow,b,M_max)
                  vf = 0.0_rp
                  wf = 0.0_rp
                  if(j > j1) then
-                   uf = iFlow%turb(1,j-j1+j0,k)
-                   vf = iFlow%turb(2,j-j1+j0,k)
-                   wf = iFlow%turb(3,j-j1+j0,k)
+                   uf = iflow_turb(1,j-j1+j0,k)
+                   vf = iflow_turb(2,j-j1+j0,k)
+                   wf = iflow_turb(3,j-j1+j0,k)
                  endif
 
-                 u0 = step*(iFlow%mean(i,j,2) + uf) 
-                 v0 =      (iFlow%mean(i,j,3) + vf)
-                 w0 =      (iFlow%mean(i,j,4) + wf)
-                 T0 =       iFlow%mean(i,j,5)
+                 u0 = step*(iflow_mean(i,j,2) + uf)
+                 v0 =      (iflow_mean(i,j,3) + vf)
+                 w0 =      (iflow_mean(i,j,4) + wf)
+                 T0 =       iflow_mean(i,j,5)
 
                  !
                  ! ==== access memory and save scalars
@@ -1688,7 +1698,7 @@ function L1Pirozzoli(u,c,p,p_inf,i_dx) result(L1)
         return
 end function L1Pirozzoli
 
-subroutine inflow_bc(phi,iFlow,b)
+subroutine inflow_bc(phi,b)
 ! ----------------------------------------------------------------------
 !
 !       This subroutine provides a supersonic inflow boundary condition
@@ -1700,7 +1710,6 @@ subroutine inflow_bc(phi,iFlow,b)
         
         implicit none
         real(rp), allocatable, dimension(:,:,:,:), intent(inout) :: phi
-        type(ifl)                                , intent(inout) :: iFlow
         type(face_type)                          , intent(in)    :: b
 
         ! local declaration
@@ -1718,14 +1727,14 @@ subroutine inflow_bc(phi,iFlow,b)
         endif
 
         step = 1.0_rp
-        if(iFlow%SmthFlag) step = smooth_step(0.0_rp, 0.3_rp*real(itmax,rp), real(it,rp))
+        if(iflow_SmthFlag) step = smooth_step(0.0_rp, 0.3_rp*real(itmax,rp), real(it,rp))
         
-        if(iFlow%TurbFlag) call turbulent_inflow(iFlow)
+        if(iflow_TurbFlag) call turbulent_inflow()
 
         j0 = sy-1
         j1 = sy-1
         if(trim(inflow_profile) == 'smooth_body_inflow') then
-          istep = 0.22_rp/0.032_rp
+          istep = 0.0_rp
           logic_step = .true.
         endif
         if(trim(inflow_profile) == 'supersonic_ramp')    then
@@ -1735,7 +1744,7 @@ subroutine inflow_bc(phi,iFlow,b)
 
         if(logic_step) then
            !$acc parallel default(present)
-           !$acc loop gang, vector
+           !$acc loop gang, vector reduction(min:j0)
            do j = sy,ey
               if(y(j) > 0) then
                  j0 = j
@@ -1745,7 +1754,7 @@ subroutine inflow_bc(phi,iFlow,b)
            !$acc end parallel
            !
            !$acc parallel default(present)
-           !$acc loop gang, vector
+           !$acc loop gang, vector reduction(min:j1)
            do j = sy,ey
               if(y(j) > istep) then
                  j1 = j 
@@ -1754,7 +1763,7 @@ subroutine inflow_bc(phi,iFlow,b)
            enddo
            !$acc end parallel
         endif
-        
+
         !$acc parallel default(present)
         !$acc loop gang, vector collapse(2)
         do       k = sz,ez
@@ -1769,23 +1778,24 @@ subroutine inflow_bc(phi,iFlow,b)
               do i = lbx,lbx
                 
                  ! mean quantities
-                 rm = iflow%mean(i,j,1)
-                 um = iflow%mean(i,j,2)
-                 vm = iflow%mean(i,j,3)
-                 wm = iflow%mean(i,j,4)
-                 Tm = iflow%mean(i,j,5)
+                 rm = iflow_mean(i,j,1)
+                 um = iflow_mean(i,j,2)
+                 vm = iflow_mean(i,j,3)
+                 wm = iflow_mean(i,j,4)
+                 Tm = iflow_mean(i,j,5)
 
                  ! turbulent quantities
                  uf = 0.0_rp
                  vf = 0.0_rp
                  wf = 0.0_rp
                  if(j > j1) then
-                   uf = u_inf*iFlow%turb(1,j-j1+j0,k)
-                   vf = u_inf*iFlow%turb(2,j-j1+j0,k)
-                   wf = u_inf*iFlow%turb(3,j-j1+j0,k)
+                   uf = u_inf*iflow_turb(1,j-j1+j0,k)
+                   vf = u_inf*iflow_turb(2,j-j1+j0,k)
+                   wf = u_inf*iflow_turb(3,j-j1+j0,k)
                  endif
                  Tf = -alpha * uf * um / Tm
-                
+                 if(abs(Tf) > 0.5*Tm) Tf = 0.0_rp
+
                  ! global quantities
                  u_ = step*(um + uf)
                  v_ =       vm + vf
@@ -1813,6 +1823,206 @@ subroutine inflow_bc(phi,iFlow,b)
 
         return
 end subroutine inflow_bc
+
+
+
+
+
+subroutine turb_inflow_bc(phi,b)
+! ----------------------------------------------------------------------
+!
+!       This subroutine provides a supersonic inflow boundary condition
+!
+! ----------------------------------------------------------------------
+        
+        use inflow_module    , only: turbulent_inflow
+        use random_module
+#ifdef _OPENACC
+#ifdef NVIDIA
+        use curand
+        use curand_device
+        use openacc_curand
+#endif
+#ifdef AMD
+        use iso_c_binding
+        use hipfort_rocrand
+#endif
+#endif
+
+        implicit none
+        real(rp), allocatable, dimension(:,:,:,:), intent(inout) :: phi
+        type(face_type)                          , intent(in)    :: b
+
+        ! local declaration
+        real(rp) :: r_, u_, v_, w_, T_, p_
+        real(rp) :: um, vm, wm, Tm, rm
+        integer  :: i,j,k, l
+
+        integer, parameter :: Jtot = 16, Ktot = 20
+        integer            :: jj, kk, err
+        real(rp) :: A = 0.001_rp, Ay, Az, At, rand, ff
+
+        ! check face
+        if(b%face /= 'W') then
+          if(rank == root) print*, 'Inflow is not implemented for face ', b%face
+          call secure_stop
+        endif
+
+#ifdef _OPENACC
+#ifdef NVIDIA
+        !$acc host_data use_device(phirand, psirand)
+
+        err = curandGenerateUniformDouble(generator, phirand, Jtot)
+        if (err.ne.0) print*,"Error in curandGenerateUniformDouble (phirand) : ", err
+        
+        err = curandGenerateUniformDouble(generator, psirand, Jtot)
+        if (err.ne.0) print*,"Error in curandGenerateUniformDouble (psirand) : ", err
+        !$acc end host_data
+
+        !$acc parallel default(present)
+        !$acc loop gang, vector
+        do jj = 1, Jtot
+           phirand(jj) = 2*pi*phirand(jj)
+           psirand(jj) = 2*pi*psirand(jj)
+        enddo
+        !$acc end parallel
+#endif
+#ifdef AMD
+        !$acc host_data use_device(phirandnum, psirandnum, phirandnumptr, psirandnumptr)
+        phirandnumptr = c_loc(phirandnum(1))
+        err = rocrand_generate_uniform_double(generator, phirandnumptr, phirandsize)
+        if (err.ne.0) print*,"Error in rocrand_generate_uniform_double (phirand) : ", err
+
+        psirandnumptr = c_loc(psirandnum(1))
+        err = rocrand_generate_uniform_double(generator, psirandnumptr, psirandsize)
+        if (err.ne.0) print*,"Error in rocrand_generate_uniform_double (psirand) : ", err
+        !$acc end host_data
+
+        !$acc parallel default(present)
+        !$acc loop gang, vector
+        do jj = 1, Jtot
+           phirand(jj) = 2*pi*phirandnum(jj)
+           psirand(jj) = 2*pi*psirandnum(jj)
+        enddo
+        !$acc end parallel
+#endif
+
+#else
+        
+        do jj = 1,Jtot
+           call random_number(rand)
+           phirand(jj) = 2*pi*rand
+        enddo
+
+        do kk = 1,Ktot
+           call random_number(rand)
+           psirand(kk) = 2*pi*rand
+        enddo
+
+#endif
+
+        !$acc parallel default(present)
+        !$acc loop gang, vector collapse(2)
+        do       k = sz,ez
+           do    j = sy,ey
+              ! Taylor hypothesis
+              do l = 1,5
+                 do i = lbx+1,sx-1
+                    phi(i,j,k,l) = phi(i,j,k,l) - &
+                    dt*c_rk(ik)*u_inf/xstep(i)*(phi(i,j,k,l) - phi(i-1,j,k,l))
+                 enddo
+              enddo
+              do i = lbx,lbx
+
+                 Ay = 0.0_rp
+                 if(y(j) > 0.0_rp) Ay = 1.0_rp - exp(-y(j)**3)
+
+                 Az = 0.0_rp
+                 !$acc loop seq
+                 do jj = 1,Jtot
+                    Az = Az + cos(2*pi*jj*z(k)/Lz + phirand(jj))
+                 enddo
+
+                 At = 0.0_rp
+                 !$acc loop seq
+                 do kk = 1,Ktot
+                    At = At + sin(2*pi*0.02*kk*time + psirand(kk))
+                 enddo
+
+                 ff = A*Ay*Az*At
+
+                 ! mean quantities
+                 rm = iflow_mean(i,j,1)
+                 um = iflow_mean(i,j,2)
+                 vm = iflow_mean(i,j,3)
+                 wm = iflow_mean(i,j,4)
+                 Tm = iflow_mean(i,j,5)
+
+                 ! global quantities
+                 u_ = um
+                 v_ = vm
+                 w_ = wm
+                 T_ = Tm
+                 p_ = 1.0_rp
+                 r_ = p_/T_ + ff
+        
+                 ! assign to conservative variables
+                 phi(i,j,k,1) = r_
+                 phi(i,j,k,2) = r_ * u_
+                 phi(i,j,k,3) = r_ * v_
+                 phi(i,j,k,4) = r_ * w_
+                 phi(i,j,k,5) = p_/(gamma0-1.0_rp) + 0.5_rp*r_*(u_*u_ + v_*v_ + w_*w_)
+
+              enddo
+           enddo
+        enddo
+        !$acc end parallel
+
+        return
+end subroutine turb_inflow_bc
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2073,7 +2283,7 @@ subroutine nscbc_wall(phi,b,Twall)
         real(rp) :: r_in, irin, u_in, v_in, w_in, ekin, p_in, T_in
         real(rp) :: r_js, irjs, u_js, v_js, w_js, p_js
         real(rp) :: cs, i_st, p_y, v_y
-        integer  :: i,j,k,ji, jg, s, js, fdL, fdR
+        integer  :: i,j,k,ji, jg, s, js
         integer  :: node, norm
 
         aik = a_rk(ik)
@@ -2386,18 +2596,13 @@ end subroutine Neumann_wall
 
 
 
-
-
-
-
-subroutine subsonic_inflow_bernardini1(phi,iFlow,b)
+subroutine subsonic_inflow_bernardini1(phi,b)
 
         use math_tools_module, only: smooth_step
         use inflow_module    , only: turbulent_inflow 
 
         implicit none
         real(rp), allocatable, dimension(:,:,:,:), intent(inout) :: phi
-        type(ifl)                                , intent(inout) :: Iflow
         type(face_type)                          , intent(in)    :: b
 
         ! local declarations
@@ -2414,9 +2619,9 @@ subroutine subsonic_inflow_bernardini1(phi,iFlow,b)
         real(rp) :: r_, u_, v_, w_, p_, gmach
 
         step = 1.0_rp
-        if(iFlow%SmthFlag) step = smooth_step(0.0_rp, 0.3_rp*real(itmax,rp), real(it,rp))
+        if(iflow_SmthFlag) step = smooth_step(0.0_rp, 0.3_rp*real(itmax,rp), real(it,rp))
 
-        if(iFlow%TurbFlag) call turbulent_inflow(iFlow)
+        if(iflow_TurbFlag) call turbulent_inflow()
 
         if(b%face == 'W') then
 
@@ -2591,10 +2796,10 @@ subroutine subsonic_inflow_bernardini2(phi,b)
 
                 deltav = matmul(RR, deltaw)
                 
-                u_ = iflow%mean(0,j,2)
-                v_ = iflow%mean(0,j,3)
-                w_ = iflow%mean(0,j,4)
-                T_ = iflow%mean(0,j,5)
+                u_ = iflow_mean(0,j,2)
+                v_ = iflow_mean(0,j,3)
+                w_ = iflow_mean(0,j,4)
+                T_ = iflow_mean(0,j,5)
                 !p_ = p_1 - deltav(5)
                 !r_ = p_/T_
                 p_ = 1.0_rp
@@ -2623,13 +2828,241 @@ end subroutine subsonic_inflow_bernardini2
 
 
 
+subroutine pressure_inflow(phi,b)
+
+        use math_tools_module, only: smooth_step
+        use inflow_module    , only: turbulent_inflow
+
+        implicit none
+
+        real(rp), allocatable, dimension(:,:,:,:), intent(inout) :: phi
+        type(face_type)                          , intent(in)    :: b
+
+        real(rp), parameter :: gm1   = gamma0-1.0_rp
+        real(rp), parameter :: alpha = 0.75_rp*gm1/gamma0
+        real(rp), parameter :: igm1  = 1.0_rp/gm1
+        real(rp) :: r_, u_, v_, w_, p_
+        real(rp) :: um, vm, wm, Tm, rm, pm, Mm, cm
+        real(rp) :: rin, iri, uin, vin, win, cin, VVi, eki, Jin, pin
+        real(rp) :: uf, vf, wf, Tf, step
+        real(rp) :: iTratio, iTm, ConvScale
+        real(rp) :: ptot, Ttot
+        logical  :: ti_flag
+        integer  :: i,j,k, l
+
+        ptot = total_pressure_inlet
+        Ttot = total_temperature_inlet
+
+        if(b%face /= 'W') then
+          if(rank == root) print*, 'Inflow is not implemented for face ', b%face
+          stop
+        endif
+
+        step = 1.0_rp
+        if(iflow_SmthFlag) step = smooth_step(0.0_rp, 0.3_rp*real(itmax,rp), real(it,rp))
+
+        ti_flag = .false.
+        if(iflow_TurbFlag) then
+          call turbulent_inflow()
+          ti_flag = .true.
+        endif
+        
+        ConvScale = dt*c_rk(ik)*u_inf
+        
+        !$acc parallel default(present)
+        !$acc loop gang, vector collapse(2)
+        do    k = sz,ez
+           do j = sy,ey
+              !Taylor hypothesis
+              do l = 1,5
+                 do i = lbx+1,sx-1
+                    phi(i,j,k,l) = phi(i,j,k,l) - &
+                    convScale*xstep_i(i)*(phi(i,j,k,l) - phi(i-1,j,k,l))
+                 enddo
+              enddo
+        
+              i = lbx
+
+              ! outer variables
+              vm = iflow_mean(i,j,3)
+              wm = iflow_mean(i,j,4)
+              Tm = iflow_mean(i,j,5)
+              cm = sqrt(gamma0*Tm)
+
+              ! inner variables
+              rin = phi(sx,j,k,1)
+              iri = 1.0_rp/rin
+              uin = phi(sx,j,k,2)*iri
+              vin = phi(sx,j,k,3)*iri
+              win = phi(sx,j,k,4)*iri
+              eki = 0.5_rp*(uin*uin + vin*vin + win*win)
+              VVi = sqrt(2*eki)
+              pin = gm1*(phi(sx,j,k,5) - rin*eki)
+              cin = sqrt(gamma0*pin*iri)
+
+              ! inner Riemann invariant
+              Jin = - VVi + 2*cin*igm1
+
+              ! outer tangential velocity
+              um      = 2*cm*igm1 - Jin
+              Mm      = um/cm
+              iTratio = 1.0_rp/(1.0_rp + 0.5*gm1*Mm*Mm)
+              pm      = Ptot*iTratio**cp
+              Tm      = Ttot*iTratio
+              iTm     = 1.0_rp/Tm
+              rm      = pm*iTm
+
+              ! turbulent quantities
+              uf = 0.0_rp
+              vf = 0.0_rp
+              wf = 0.0_rp
+              if(ti_flag) then
+                uf = u_inf*iflow_turb(1,j,k)
+                vf = u_inf*iflow_turb(2,j,k)
+                wf = u_inf*iflow_turb(3,j,k)
+              endif
+              Tf = -alpha * uf * um * iTm
+              if(abs(Tf) > 0.5*Tm) Tf = 0.0_rp
+
+              r_ = rm
+              u_ = um + uf
+              v_ = vm + vf
+              w_ = wm + wf
+              p_ = pm + rm*Tf
+
+              ! assign to conservative variables
+              phi(i,j,k,1) = r_
+              phi(i,j,k,2) = r_ * u_
+              phi(i,j,k,3) = r_ * v_
+              phi(i,j,k,4) = r_ * w_
+              phi(i,j,k,5) = p_*igm1 + 0.5_rp*r_*(u_*u_ + v_*v_ + w_*w_)
+
+           enddo
+        enddo
+        !$acc end parallel
 
 
+        return
+end subroutine pressure_inflow
 
 
+subroutine pressure_outlet(phi,b)
+        implicit none
+
+        real(rp), allocatable, dimension(:,:,:,:), intent(inout) :: phi
+        type(face_type)                          , intent(in)    :: b
+
+        ! local declarations
+        real(rp), parameter :: gm1  = gamma0 - 1.0_rp
+        real(rp), parameter :: igm1 = 1.0_rp/gm1
+        real(rp), parameter :: gm1g = gm1/gamma0
+        real(rp), parameter :: i_gm = 1.0_rp/gamma0
+        real(rp) :: rin, iri, uin, vin, win, eki, VVi, pin, cin
+        real(rp) :: Sb, Jm, Jp, cb, rb, ub, vb, wb, pout
+
+        if(b%face /= 'E') then
+          if(rank == root) print*, 'Pressure outlet is not implemented for face ', b%face
+          stop
+        endif
+        
+        pout = static_prs_outlet
+
+        !$acc parallel default(present)
+        !$acc loop gang, vector collapse(3)
+        do   k = sz,ez
+         do  j = sy,ey
+          do i = ex+1,ubx
+            
+             rin = phi(ex,j,k,1)
+             iri = 1.0_rp/rin
+             uin = phi(ex,j,k,2)*iri
+             vin = phi(ex,j,k,3)*iri
+             win = phi(ex,j,k,4)*iri
+             eki = 0.5_rp*(uin*uin + vin*vin + win*win)
+             VVi = sqrt(2.0_rp*eki)
+             pin = gm1*(phi(ex,j,k,5) - rin*eki)
+             cin = sqrt(gamma0*pin*iri)
+
+             Sb = pin*(iri**gamma0)
+             Jm = - uin + 2.0_rp*cin*igm1
+
+             cb = sqrt(gamma0*(pout**gm1g)*(Sb**i_gm))
+
+             Jp = Jm - 4.0_rp*igm1*cb
+
+             rb = (cb*cb/(gamma0*Sb))**(igm1)
+             ub = -0.5_rp*(Jm + Jp)
+             vb = vin
+             wb = win
+
+             if(VVi < cin) then
+
+             phi(i,j,k,1) = rb
+             phi(i,j,k,2) = rb * ub
+             phi(i,j,k,3) = rb * vb
+             phi(i,j,k,4) = rb * wb
+             phi(i,j,k,5) = pout*igm1 + 0.5_rp*rb*(ub*ub + vb*vb + wb*wb)
+
+             else
+
+             phi(i,j,k,1) = rin
+             phi(i,j,k,2) = rin * uin
+             phi(i,j,k,3) = rin * vin
+             phi(i,j,k,4) = rin * win
+             phi(i,j,k,5) = pin*igm1 + 0.5_rp*rb*(uin*uin + vin*vin + win*win)
+
+             endif
 
 
+          enddo
+         enddo
+        enddo
+        !$acc end parallel
 
+        return
+end subroutine pressure_outlet
+
+
+subroutine farFieldImposed(phi,b)                      
+        implicit none                             
+
+        real(rp), allocatable, dimension(:,:,:,:), intent(inout) :: phi
+        type(face_type)                          , intent(in)    :: b
+
+        real(rp), parameter :: igm1 = 1.0_rp/(gamma0 - 1.0_rp)
+        real(rp)           :: u_, v_, w_, p_, T_, r_
+
+        if(b%face /= 'N') then
+          if(rank == root) print*, 'farFieldImposed is not implemented for face ', b%face
+          stop
+        endif
+        
+        !$acc parallel default(present)
+        !$acc loop gang, vector collapse(3)
+        do       k = sz,ez
+           do    j = ey+1,uby
+              do i = sx,ex
+                
+                 u_ = u_inf!uFarField(i)
+                 v_ = 0.0_rp!vFarField(i)
+                 w_ = 0.0_rp
+                 p_ = 1.0_rp!pFarField(i)
+                 T_ = 1.0_rp!tFarField(i)
+                 r_ = p_/T_
+
+                 phi(i,j,k,1) = r_
+                 phi(i,j,k,2) = r_*u_
+                 phi(i,j,k,3) = r_*v_
+                 phi(i,j,k,4) = r_*w_
+                 phi(i,j,k,5) = p_*igm1 + 0.5_rp*r_*(u_*u_ + v_*v_ + w_*w_)
+
+              enddo
+           enddo
+        enddo
+        !$acc end parallel
+
+        return
+end subroutine farFieldImposed
 
 
 

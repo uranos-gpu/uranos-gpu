@@ -1,6 +1,7 @@
 module mesh_module
 use mpi_module
 use math_tools_module
+use allocate_module
 
 implicit none
 private
@@ -9,8 +10,9 @@ real(rp), public, allocatable, dimension(:) :: xstep, ystep, zstep
 real(rp), public, allocatable, dimension(:) :: xstep_i, ystep_i, zstep_i
 
 real(rp), public, allocatable, dimension(:) :: x_csi , y_eta , z_zta  !< Jacobian of the trasformated coordinates
+real(rp), public, allocatable, dimension(:) :: ix_csi , iy_eta , iz_zta  !< Inverse of the Jacobian of the trasformated coordinates
 real(rp), public, allocatable, dimension(:) :: x_csi2, y_eta2, z_zta2 !< Jacobian of the trasformated coordinates
-real(rp), public, allocatable, dimension(:) :: xsteph, ysteph, zsteph !< grid step at the grid interface location
+real(rp), public, allocatable, dimension(:) :: ixsteph, iysteph, izsteph !< grid step at the grid interface location
 real(rp), public, allocatable, dimension(:) :: csistep_i, etastep_i, ztastep_i
 
 public init_grid, compute_grid_point
@@ -38,47 +40,48 @@ subroutine init_grid
   lbzG = lbz - 3; ubzG = ubz + 3
 
   ! ========================== x coordinate ======================== !
-  allocate(x        (lbxG:ubxG ), stat = err); if(err.ne.0) stop ' Allocation error!'; x         = 0.0_rp
-  allocate(xstep    (lbx :ubx  ), stat = err); if(err.ne.0) stop ' Allocation error!'; xstep     = 0.0_rp
-  allocate(xstep_i  (lbx :ubx  ), stat = err); if(err.ne.0) stop ' Allocation error!'; xstep_i   = 0.0_rp
-  allocate(csistep_i(lbx :ubx  ), stat = err); if(err.ne.0) stop ' Allocation error!'; csistep_i = 0.0_rp
-  allocate(x_csi    (lbx :ubx  ), stat = err); if(err.ne.0) stop ' Allocation error!'; x_csi     = 0.0_rp
-  allocate(x_csi2   (lbx :ubx  ), stat = err); if(err.ne.0) stop ' Allocation error!'; x_csi2    = 0.0_rp
-  allocate(xsteph   (lbx :ubx  ), stat = err); if(err.ne.0) stop ' Allocation error!'; xsteph    = 0.0_rp
-
+  call AllocateReal(x        ,lbxG,ubxG)
+  call AllocateReal(xstep    ,lbx,ubx)
+  call AllocateReal(xstep_i  ,lbx,ubx)
+  call AllocateReal(csistep_i,lbx,ubx)
+  call AllocateReal(x_csi    ,lbx,ubx)
+  call AllocateReal(ix_csi   ,lbx,ubx)
+  call AllocateReal(x_csi2   ,lbx,ubx)
+  call AllocateReal(ixsteph  ,lbx,ubx)
   
   Lx = xmax - xmin
   call compute_grid_point(x     ,nx,lbxG,ubxG,xmin,xmax,stretching_par,gridpoint_x)
   call compute_grid_diff1(x,x_csi ,nx,lbx ,ubx ,xmin,xmax,stretching_par,gridpoint_x)
   call compute_grid_diff2(x,x_csi2,nx,lbx ,ubx ,xmin,xmax,stretching_par,gridpoint_x)
 
-  call compute_grid_steps(lbx,ubx,nx,x_csi,xstep,xstep_i,csistep_i,xsteph)
+  call compute_grid_steps(lbx,ubx,nx,x_csi,xstep,xstep_i,csistep_i,ixsteph,ix_csi)
 
   ! ========================== y coordinate ======================== !
-  allocate(y        (lbyG:ubyG ), stat = err); if(err.ne.0) stop ' Allocation error!'; y         = 0.0_rp
-  allocate(ystep    (lby :uby  ), stat = err); if(err.ne.0) stop ' Allocation error!'; ystep     = 0.0_rp
-  allocate(ystep_i  (lby :uby  ), stat = err); if(err.ne.0) stop ' Allocation error!'; ystep_i   = 0.0_rp
-  allocate(etastep_i(lby :uby  ), stat = err); if(err.ne.0) stop ' Allocation error!'; etastep_i = 0.0_rp
-  allocate(y_eta    (lby :uby  ), stat = err); if(err.ne.0) stop ' Allocation error!'; y_eta     = 0.0_rp
-  allocate(y_eta2   (lby :uby  ), stat = err); if(err.ne.0) stop ' Allocation error!'; y_eta2    = 0.0_rp
-  allocate(ysteph   (lby :uby  ), stat = err); if(err.ne.0) stop ' Allocation error!'; ysteph    = 0.0_rp
-
+  call AllocateReal(y        ,lbyG,ubyG)
+  call AllocateReal(ystep    ,lby ,uby )
+  call AllocateReal(ystep_i  ,lby ,uby )
+  call AllocateReal(etastep_i,lby ,uby )
+  call AllocateReal(y_eta    ,lby ,uby )
+  call AllocateReal(iy_eta   ,lby ,uby )
+  call AllocateReal(y_eta2   ,lby ,uby )
+  call AllocateReal(iysteph  ,lby ,uby )
         
   Ly = ymax - ymin
   call compute_grid_point(y     ,ny,lbyG,ubyG,ymin,ymax,stretching_par,gridpoint_y)
   call compute_grid_diff1(y,y_eta ,ny,lby ,uby ,ymin,ymax,stretching_par,gridpoint_y)
   call compute_grid_diff2(y,y_eta2,ny,lby ,uby ,ymin,ymax,stretching_par,gridpoint_y)
 
-  call compute_grid_steps(lby,uby,ny,y_eta,ystep,ystep_i,etastep_i,ysteph)
+  call compute_grid_steps(lby,uby,ny,y_eta,ystep,ystep_i,etastep_i,iysteph,iy_eta)
 
   ! ========================== z coordinate ======================== !
-  allocate(z        (lbzG:ubzG ), stat = err); if(err.ne.0) stop ' Allocation error!'; z         = 0.0_rp
-  allocate(zstep    (lbz :ubz  ), stat = err); if(err.ne.0) stop ' Allocation error!'; zstep     = 0.0_rp
-  allocate(zstep_i  (lbz :ubz  ), stat = err); if(err.ne.0) stop ' Allocation error!'; zstep_i   = 0.0_rp
-  allocate(ztastep_i(lbz :ubz  ), stat = err); if(err.ne.0) stop ' Allocation error!'; ztastep_i = 0.0_rp
-  allocate(z_zta    (lbz :ubz  ), stat = err); if(err.ne.0) stop ' Allocation error!'; z_zta     = 0.0_rp
-  allocate(z_zta2   (lbz :ubz  ), stat = err); if(err.ne.0) stop ' Allocation error!'; z_zta2    = 0.0_rp
-  allocate(zsteph   (lbz :ubz  ), stat = err); if(err.ne.0) stop ' Allocation error!'; zsteph    = 0.0_rp
+  call AllocateReal(z        ,lbzG,ubzG)
+  call AllocateReal(zstep    ,lbz ,ubz )
+  call AllocateReal(zstep_i  ,lbz ,ubz )
+  call AllocateReal(ztastep_i,lbz ,ubz )
+  call AllocateReal(z_zta    ,lbz ,ubz )
+  call AllocateReal(iz_zta   ,lbz ,ubz )
+  call AllocateReal(z_zta2   ,lbz ,ubz )
+  call AllocateReal(izsteph  ,lbz ,ubz )
 
   if    (dims == 2) then
 
@@ -87,7 +90,8 @@ subroutine init_grid
     zstep_i   = 1.0_rp
     ztastep_i = 1.0_rp
     z_zta     = 0.0_rp
-    zsteph    = 0.0_rp
+    iz_zta    = 0.0_rp
+    izsteph   = 0.0_rp
 
   elseif(dims == 3) then
 
@@ -95,7 +99,7 @@ subroutine init_grid
     call compute_grid_point(z     ,nz,lbzG,ubzG,zmin,zmax,stretching_par,gridpoint_z)
     call compute_grid_diff1(z,z_zta,nz,lbz ,ubz ,zmin,zmax,stretching_par,gridpoint_z)
     call compute_grid_diff2(z,z_zta2,nz,lbz ,ubz ,zmin,zmax,stretching_par,gridpoint_z)
-    call compute_grid_steps(lbz,ubz,nz,z_zta,zstep,zstep_i,ztastep_i,zsteph)
+    call compute_grid_steps(lbz,ubz,nz,z_zta,zstep,zstep_i,ztastep_i,izsteph,iz_zta)
 
   endif
   !
@@ -240,18 +244,19 @@ subroutine compute_grid_diff2(x,x_csi2,nx,lb,ub,xmin,xmax,alpha,gridType)
 end subroutine compute_grid_diff2
 
 
-subroutine compute_grid_steps(lb,ub,nx,x_csi,xstep,xstep_i,csistep_i,xsteph)
+subroutine compute_grid_steps(lb,ub,nx,x_csi,xstep,xstep_i,csistep_i,ixsteph,ix_csi)
 
         implicit none
         real(rp), dimension(:), allocatable, intent(in)    :: x_csi
         real(rp), dimension(:), allocatable, intent(inout) :: xstep
         real(rp), dimension(:), allocatable, intent(inout) :: xstep_i
         real(rp), dimension(:), allocatable, intent(inout) :: csistep_i
-        real(rp), dimension(:), allocatable, intent(inout) :: xsteph
+        real(rp), dimension(:), allocatable, intent(inout) :: ixsteph
+        real(rp), dimension(:), allocatable, intent(inout) :: ix_csi
         integer                            , intent(in)    :: nx, lb,ub
        
         real(rp), dimension(:), allocatable :: midC
-        real(rp) :: delta_csi
+        real(rp) :: delta_csi, xsteph_
         integer  :: i, l, fdL, fdR
 
         do i = lb,ub
@@ -267,6 +272,8 @@ subroutine compute_grid_steps(lb,ub,nx,x_csi,xstep,xstep_i,csistep_i,xsteph)
 
            ! inverse of physical step
            csistep_i(i) = 1.0_rp/delta_csi
+
+           ix_csi(i) = 1.0_rp/x_csi(i)
         enddo
 
         !
@@ -307,10 +314,11 @@ subroutine compute_grid_steps(lb,ub,nx,x_csi,xstep,xstep_i,csistep_i,xsteph)
         end select
 
         do i = lb + 3, ub - 3
-           xsteph(i) = 0.0_rp
+           xsteph_ = 0.0_rp
            do l = fdL, fdR
-              xsteph(i) = xsteph(i) + midC(l)*xstep(i+l)
+              xsteph_ = xsteph_ + midC(l)*xstep(i+l)
            enddo
+           ixsteph(i) = 1.0_rp/xsteph_
         enddo
 
         deallocate(midC)
@@ -333,7 +341,7 @@ subroutine ReadMeshFile(x,nx,lb,ub,xmin,xmax,GridType)
 
         ! local declarations
         real(rp), dimension(:), allocatable :: tmp
-        real(rp), parameter                 :: toll = 2.5_rp
+        real(rp), parameter                 :: toll = 10.0_rp
         character(dl) :: meshFile
         character(9)  :: gchr
         integer       :: meshUnit = 51, err = 0, ngGrid = 7, i, pts

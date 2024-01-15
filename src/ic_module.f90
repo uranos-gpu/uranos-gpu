@@ -1258,6 +1258,22 @@ subroutine init_turbulent_channel(status)
 end subroutine init_turbulent_channel
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 subroutine init_nscbc_perturbation(status,dir)
         implicit none
         integer     , intent(out) :: status
@@ -1832,7 +1848,7 @@ end subroutine init_LaminarBoundaryLayer
 
 subroutine init_TurbulentBoundaryLayerMean(status)
 
-        use fluid_functions_module, only: MuskerProfile, CompressibleCorrection, BoundaryLayerQuantities, Sutherland
+        use fluid_functions_module, only: MuskerProfile, CompressibleCorrection, BoundaryLayerQuantities, laminar_viscosity
         use real_to_integer_module, only: locate
         use interpolation_module  , only: polint
         use FileModule 
@@ -2140,7 +2156,7 @@ subroutine init_TurbulentBoundaryLayerMean(status)
         call OpenNewFile(frictionFile,it)
         do i = lbx,ubx
            u_y     = U(i,sy,sz)/y_tmp(1)
-           mu_wall = Sutherland(tWall)
+           mu_wall = laminar_viscosity(tWall,Tref,vis_flag)
            write(frictionFile%unit,*) x(i), mu_wall*mu_inf*u_y/q_inf
         enddo
         call CloseFile(frictionFile)
@@ -2187,7 +2203,7 @@ subroutine init_TBLNoise(status)
         allocate(y_tmp(0:ny), stat = err)
         if(err .ne. 0) stop ' Allocation error in init_TBLNoise'
 
-        allocate(DF%Rnd3D(3, 1-GN:nx+GN+1, 1-Df%N:ny+DF%N, 1-DF%N:nz+DF%N), stat = err)
+        allocate(DF_Rnd3D(3, 1-GN:nx+GN+1, 1-DF_N:ny+DF_N, 1-DF_N:nz+DF_N), stat = err)
         if(err .ne. 0) stop ' Allocation error in init_TBLNoise'
 
         allocate(vf(3,1-GN:nx+GN+1, 1:ny, 1:nz), stat = err)
@@ -2201,13 +2217,13 @@ subroutine init_TBLNoise(status)
         y_tmp(0) = 0.0_rp
 
         ! create a 3D random field
-        call DFRandomField3D(nx,ny,nz,gn,DF)
+        call DFRandomField3D(nx,ny,nz,gn)
 
         ! filter the random data 
-        call DFConvolution3D(1-GN,nx+GN+1,1,ny,1,nz,DF,vf)
+        call DFConvolution3D(1-GN,nx+GN+1,1,ny,1,nz,vf)
 
         ! enforce statistics
-        call DFEnforceReynoldsStresses3D(1-GN,nx+GN+1,1,ny,1,nz,vf,DF,uf)
+        call DFEnforceReynoldsStresses3D(1-GN,nx+GN+1,1,ny,1,nz,vf,uf)
 
         ! extrapolation on north face
         do j = 1,GN
@@ -2309,15 +2325,11 @@ subroutine init_TBLNoise(status)
 #endif
 
 
-        deallocate(y_tmp,uf,vf,DF%Rnd3D)
+        deallocate(y_tmp,uf,vf,DF_Rnd3D)
         status = 0
 
         return
 end subroutine init_TBLNoise
-
-
-
-
 
 
 

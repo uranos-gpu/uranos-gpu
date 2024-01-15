@@ -1,7 +1,4 @@
 module viscous_module
-#ifdef TIME
-use performance_module
-#endif
 use profiling_module
 use parameters_module
 use mpi_module
@@ -11,7 +8,7 @@ use storage_module
 
 implicit none
 private
-public viscous_fluxes, viscous_flux_3D_staggered, viscous_flux_3D
+public viscous_fluxes
 
 contains
 subroutine viscous_fluxes(dims)
@@ -19,229 +16,318 @@ subroutine viscous_fluxes(dims)
         implicit none
         integer, intent(in) :: dims
 
-#ifdef TIME
-        call mpi_stime(s_vis_time)
-#endif
         call StartProfRange("viscous_fluxes")
         
-        !!$acc data copyin(mid_point_lele_x,mid_point_lele_y,mid_point_lele_z) &
-        !!$acc copyin(xstep_i,ystep_i,zstep_i,xsteph,ysteph,zsteph) &
-        !!$acc copyin(U,V,W,T,VIS,LMD) &
-        !!$acc copyin(central_2_one_half,central_1,central_2) &
-        !!$acc copyin(csistep_i,y_eta,y_eta2,x_csi,x_csi2,etastep_i) &
-        !!$acc copy(DIV,RHS) 
         selectcase(dims)
 
           case(2)
             call viscous_flux_2D(U,V,T,VIS,LMD,DIV,RHS)
             call DivergencyGradient2D(U,V,VIS,DIV,RHS)
+
           case(3)
-            call viscous_flux_3D_staggered(U,V,W,T,VIS,LMD,DIV,RHS)
+            if    (diffusion_scheme == 'laplacian') then
+                call viscous_flux_3D_laplacian
+            elseif(diffusion_scheme == 'staggered') then
+                call viscous_flux_3D_staggered
+            else
+                if(rank == root) print*, "Diffusion scheme ", trim(diffusion_scheme), " is not implemented"
+                stop
+            endif
+
             call DivergencyGradient3D(U,V,W,VIS,DIV,RHS)
 
         endselect
-        !!$acc end data
 
         call EndProfRange
-#ifdef TIME
-        call mpi_etime(s_vis_time,t_vis_calls,t_vis_time)
-#endif
 
         return
 end subroutine viscous_fluxes
 
 
-subroutine viscous_flux_3D
+subroutine viscous_flux_3D_laplacian
 
         use parameters_module, only: rp, mu_inf
         use mpi_module       , only: sx,ex,sy,ey,sz,ez
-        use mesh_module      , only: csistep_i,etastep_i,ztastep_i, x_csi, y_eta, z_zta, x_csi2, y_eta2, z_zta2
-        use storage_module   , only: U, V, W, T, VIS, DIV, RHS, LMD, &
-                                     central_fd_order, central_1, central_2
+        use mesh_module      , only: csistep_i,etastep_i,ztastep_i, ix_csi, iy_eta, iz_zta, x_csi2, y_eta2, z_zta2
 
         implicit none
-
-        real(rp), dimension(3)   :: div_D, div_sigma, D_dm
-        real(rp), dimension(3)   :: du, dv, dw, dT, dm, dl
-        real(rp), dimension(3)   :: d2u, d2v, d2w, d2T
-        real(rp), dimension(3)   :: i_st, i_st2
-        real(rp), dimension(3)   :: ix_xi, d2xi_dx2
-        real(rp), dimension(3)   :: vel
-        real(rp), dimension(3,3) :: grad_v, grad_vT, div_vI, D
-        real(rp)                 :: cl1, cl2
         real(rp), parameter      :: two3 = 2.0_rp/3.0_rp
-        real(rp)                 :: mu_, rl_, heat_flux, div_sigma_v
-        real(rp)                 :: div_, sum_D_grad
-        integer                  :: fL, fR , l, i,j,k
 
-        fL = + central_fd_order/2
-        fR = + central_fd_order/2
-
-        !$omp parallel do collapse(3) default(private), &
-        !$omp shared(U,V,W,T,VIS,LMD,DIV,RHS,mu_inf,central_1,central_2), &
-        !$omp shared(sx,ex,sy,ey,sz,ez,csistep_i,etastep_i,ztastep_i, x_csi, y_eta, z_zta, x_csi2, y_eta2, z_zta2,fL,fR)
-        do k = sz,ez
-           do j = sy,ey
+        real(rp) :: div_D_1, div_sigma_1, D_dm_1
+        real(rp) :: div_D_2, div_sigma_2, D_dm_2
+        real(rp) :: div_D_3, div_sigma_3, D_dm_3
+        real(rp) :: d2u_1, d2v_1, d2w_1, d2T_1
+        real(rp) :: d2u_2, d2v_2, d2w_2, d2T_2
+        real(rp) :: d2u_3, d2v_3, d2w_3, d2T_3
+        real(rp) :: i_st_x, i_st_y, i_st_z
+        real(rp) :: i_st2_x, i_st2_y, i_st2_z
+        real(rp) :: ix_xi_1, ix_xi_2, ix_xi_3
+        real(rp) :: d2xi_dx2_1, d2xi_dx2_2, d2xi_dx2_3
+        real(rp) :: u_, v_, w_
+        real(rp) :: du_1, du_2, du_3
+        real(rp) :: dv_1, dv_2, dv_3
+        real(rp) :: dw_1, dw_2, dw_3
+        real(rp) :: dT_1, dT_2, dT_3
+        real(rp) :: dm_1, dm_2, dm_3
+        real(rp) :: dl_1, dl_2, dl_3
+        real(rp) :: D11, D12, D13
+        real(rp) :: D21, D22, D23
+        real(rp) :: D31, D32, D33
+        real(rp) :: cl1, cl2
+        real(rp) :: mu_, rl_, heat_flux, div_sigma_v
+        real(rp) :: div_, sum_D_grad
+        integer  :: l, i,j,k
+        
+        !$acc parallel default(present)
+        !$acc loop gang, vector collapse(3)
+        do       k = sz,ez
+           do    j = sy,ey
               do i = sx,ex
+                      
+                 i_st_x = csistep_i(i)
+                 i_st_y = etastep_i(j)
+                 i_st_z = ztastep_i(k)
 
-                 i_st(1) = csistep_i(i)
-                 i_st(2) = etastep_i(j)
-                 i_st(3) = ztastep_i(k)
-
-                 i_st2(:) = i_st(:)*i_st(:)
+                 i_st2_x = i_st_x*i_st_x
+                 i_st2_y = i_st_y*i_st_y
+                 i_st2_z = i_st_z*i_st_z
                  
                  ! --- MOMENTUM VISCOUS THERM ---!
-                 vel(1)  = U(i,j,k)
-                 vel(2)  = V(i,j,k)
-                 vel(3)  = W(i,j,k)
-                 mu_     = VIS(i,j,k)
-                 rl_     = LMD(i,j,k)
+                 u_  = U(i,j,k)
+                 v_  = V(i,j,k)
+                 w_  = W(i,j,k)
+                 mu_ = VIS(i,j,k)
+                 rl_ = LMD(i,j,k)
                 
-                 du = 0.0_rp
-                 dv = 0.0_rp
-                 dw = 0.0_rp
-                 dT = 0.0_rp
-                 dm = 0.0_rp
-                 dl = 0.0_rp
-                 do l = 1,fR
+                 du_1 = 0.0_rp
+                 du_2 = 0.0_rp
+                 du_3 = 0.0_rp
+                 !
+                 dv_1 = 0.0_rp
+                 dv_2 = 0.0_rp
+                 dv_3 = 0.0_rp
+                 !
+                 dw_1 = 0.0_rp
+                 dw_2 = 0.0_rp
+                 dw_3 = 0.0_rp
+                 !
+                 dT_1 = 0.0_rp
+                 dT_2 = 0.0_rp
+                 dT_3 = 0.0_rp
+                 !
+                 dm_1 = 0.0_rp
+                 dm_2 = 0.0_rp
+                 dm_3 = 0.0_rp
+                 !
+                 dl_1 = 0.0_rp
+                 dl_2 = 0.0_rp
+                 dl_3 = 0.0_rp
+                 do l = 1,3
                     cl1 = central_1(l)
 
-                    du(1) = du(1) + cl1 * (U(i+l,j,k) - U(i-l,j,k))
-                    du(2) = du(2) + cl1 * (U(i,j+l,k) - U(i,j-l,k))
-                    du(3) = du(3) + cl1 * (U(i,j,k+l) - U(i,j,k-l))
+                    du_1 = du_1 + cl1 * (U(i+l,j,k) - U(i-l,j,k))
+                    du_2 = du_2 + cl1 * (U(i,j+l,k) - U(i,j-l,k))
+                    du_3 = du_3 + cl1 * (U(i,j,k+l) - U(i,j,k-l))
 
-                    dv(1) = dv(1) + cl1 * (V(i+l,j,k) - V(i-l,j,k))
-                    dv(2) = dv(2) + cl1 * (V(i,j+l,k) - V(i,j-l,k))
-                    dv(3) = dv(3) + cl1 * (V(i,j,k+l) - V(i,j,k-l))
+                    dv_1 = dv_1 + cl1 * (V(i+l,j,k) - V(i-l,j,k))
+                    dv_2 = dv_2 + cl1 * (V(i,j+l,k) - V(i,j-l,k))
+                    dv_3 = dv_3 + cl1 * (V(i,j,k+l) - V(i,j,k-l))
 
-                    dw(1) = dw(1) + cl1 * (W(i+l,j,k) - W(i-l,j,k))
-                    dw(2) = dw(2) + cl1 * (W(i,j+l,k) - W(i,j-l,k))
-                    dw(3) = dw(3) + cl1 * (W(i,j,k+l) - W(i,j,k-l))
+                    dw_1 = dw_1 + cl1 * (W(i+l,j,k) - W(i-l,j,k))
+                    dw_2 = dw_2 + cl1 * (W(i,j+l,k) - W(i,j-l,k))
+                    dw_3 = dw_3 + cl1 * (W(i,j,k+l) - W(i,j,k-l))
 
-                    dT(1) = dT(1) + cl1 * (T(i+l,j,k) - T(i-l,j,k))
-                    dT(2) = dT(2) + cl1 * (T(i,j+l,k) - T(i,j-l,k))
-                    dT(3) = dT(3) + cl1 * (T(i,j,k+l) - T(i,j,k-l))
+                    dT_1 = dT_1 + cl1 * (T(i+l,j,k) - T(i-l,j,k))
+                    dT_2 = dT_2 + cl1 * (T(i,j+l,k) - T(i,j-l,k))
+                    dT_3 = dT_3 + cl1 * (T(i,j,k+l) - T(i,j,k-l))
 
-                    dm(1) = dm(1) + cl1 * (VIS(i+l,j,k) - VIS(i-l,j,k))
-                    dm(2) = dm(2) + cl1 * (VIS(i,j+l,k) - VIS(i,j-l,k))
-                    dm(3) = dm(3) + cl1 * (VIS(i,j,k+l) - VIS(i,j,k-l))
+                    dm_1 = dm_1 + cl1 * (VIS(i+l,j,k) - VIS(i-l,j,k))
+                    dm_2 = dm_2 + cl1 * (VIS(i,j+l,k) - VIS(i,j-l,k))
+                    dm_3 = dm_3 + cl1 * (VIS(i,j,k+l) - VIS(i,j,k-l))
 
-                    dl(1) = dl(1) + cl1 * (LMD(i+l,j,k) - LMD(i-l,j,k))
-                    dl(2) = dl(2) + cl1 * (LMD(i,j+l,k) - LMD(i,j-l,k))
-                    dl(3) = dl(3) + cl1 * (LMD(i,j,k+l) - LMD(i,j,k-l))
+                    dl_1 = dl_1 + cl1 * (LMD(i+l,j,k) - LMD(i-l,j,k))
+                    dl_2 = dl_2 + cl1 * (LMD(i,j+l,k) - LMD(i,j-l,k))
+                    dl_3 = dl_3 + cl1 * (LMD(i,j,k+l) - LMD(i,j,k-l))
 
                  enddo
-                 du = i_st*du
-                 dv = i_st*dv
-                 dw = i_st*dw
-                 dT = i_st*dT
-                 dm = i_st*dm
-                 dl = i_st*dl
-                        
-                 d2u = 0.0_rp
-                 d2v = 0.0_rp
-                 d2w = 0.0_rp
-                 d2T = 0.0_rp
-                 do l = -fL, fR
+                 du_1 = i_st_x*du_1
+                 du_2 = i_st_y*du_2
+                 du_3 = i_st_z*du_3
+
+                 dv_1 = i_st_x*dv_1
+                 dv_2 = i_st_y*dv_2
+                 dv_3 = i_st_z*dv_3
+
+                 dw_1 = i_st_x*dw_1
+                 dw_2 = i_st_y*dw_2
+                 dw_3 = i_st_z*dw_3
+
+                 dT_1 = i_st_x*dT_1
+                 dT_2 = i_st_y*dT_2
+                 dT_3 = i_st_z*dT_3
+
+                 dm_1 = i_st_x*dm_1
+                 dm_2 = i_st_y*dm_2
+                 dm_3 = i_st_z*dm_3
+
+                 dl_1 = i_st_x*dl_1
+                 dl_2 = i_st_y*dl_2
+                 dl_3 = i_st_z*dl_3
+
+                 d2u_1 = 0.0_rp
+                 d2u_2 = 0.0_rp
+                 d2u_3 = 0.0_rp
+                 !
+                 d2v_1 = 0.0_rp
+                 d2v_2 = 0.0_rp
+                 d2v_3 = 0.0_rp
+                 !
+                 d2w_1 = 0.0_rp
+                 d2w_2 = 0.0_rp
+                 d2w_3 = 0.0_rp
+                 !
+                 d2T_1 = 0.0_rp
+                 d2T_2 = 0.0_rp
+                 d2T_3 = 0.0_rp
+                 do l = -3, 3
 
                     cl2 = central_2(l)
 
-                    d2u(1) = d2u(1) + cl2 * U(i+l,j,k)
-                    d2u(2) = d2u(2) + cl2 * U(i,j+l,k)
-                    d2u(3) = d2u(3) + cl2 * U(i,j,k+l)
+                    d2u_1 = d2u_1 + cl2 * U(i+l,j,k)
+                    d2u_2 = d2u_2 + cl2 * U(i,j+l,k)
+                    d2u_3 = d2u_3 + cl2 * U(i,j,k+l)
 
-                    d2v(1) = d2v(1) + cl2 * V(i+l,j,k)
-                    d2v(2) = d2v(2) + cl2 * V(i,j+l,k)
-                    d2v(3) = d2v(3) + cl2 * V(i,j,k+l)
+                    d2v_1 = d2v_1 + cl2 * V(i+l,j,k)
+                    d2v_2 = d2v_2 + cl2 * V(i,j+l,k)
+                    d2v_3 = d2v_3 + cl2 * V(i,j,k+l)
 
-                    d2w(1) = d2w(1) + cl2 * W(i+l,j,k)
-                    d2w(2) = d2w(2) + cl2 * W(i,j+l,k)
-                    d2w(3) = d2w(3) + cl2 * W(i,j,k+l)
+                    d2w_1 = d2w_1 + cl2 * W(i+l,j,k)
+                    d2w_2 = d2w_2 + cl2 * W(i,j+l,k)
+                    d2w_3 = d2w_3 + cl2 * W(i,j,k+l)
 
-                    d2T(1) = d2T(1) + cl2 * T(i+l,j,k)
-                    d2T(2) = d2T(2) + cl2 * T(i,j+l,k)
-                    d2T(3) = d2T(3) + cl2 * T(i,j,k+l)
+                    d2T_1 = d2T_1 + cl2 * T(i+l,j,k)
+                    d2T_2 = d2T_2 + cl2 * T(i,j+l,k)
+                    d2T_3 = d2T_3 + cl2 * T(i,j,k+l)
 
                  enddo
-                 d2u = i_st2*d2u
-                 d2v = i_st2*d2v
-                 d2w = i_st2*d2w
-                 d2T = i_st2*d2T
-        
-                 ! metrics
-                 ix_xi(1) = 1.0_rp/(x_csi(i))
-                 ix_xi(2) = 1.0_rp/(y_eta(j))
-                 ix_xi(3) = 1.0_rp/(z_zta(k))
+                 d2u_1 = i_st2_x*d2u_1
+                 d2u_2 = i_st2_y*d2u_2
+                 d2u_3 = i_st2_z*d2u_3
 
-                 d2xi_dx2(1) = - x_csi2(i)*ix_xi(1)**3
-                 d2xi_dx2(2) = - y_eta2(j)*ix_xi(2)**3
-                 d2xi_dx2(3) = - z_zta2(k)*ix_xi(3)**3
+                 d2v_1 = i_st2_x*d2v_1
+                 d2v_2 = i_st2_y*d2v_2
+                 d2v_3 = i_st2_z*d2v_3
+
+                 d2w_1 = i_st2_x*d2w_1
+                 d2w_2 = i_st2_y*d2w_2
+                 d2w_3 = i_st2_z*d2w_3
+
+                 d2T_1 = i_st2_x*d2T_1
+                 d2T_2 = i_st2_y*d2T_2
+                 d2T_3 = i_st2_z*d2T_3
+
+                 ! metrics
+                 ix_xi_1 = ix_csi(i)
+                 ix_xi_2 = iy_eta(j)
+                 ix_xi_3 = iz_zta(k)
+
+                 d2xi_dx2_1 = - x_csi2(i)*ix_xi_1**3
+                 d2xi_dx2_2 = - y_eta2(j)*ix_xi_2**3
+                 d2xi_dx2_3 = - z_zta2(k)*ix_xi_3**3
 
                  ! compute second derivative in physical space
-                 d2u(:) = d2u(:)*(ix_xi)**2 + du(:) * d2xi_dx2(:)
-                 d2v(:) = d2v(:)*(ix_xi)**2 + dv(:) * d2xi_dx2(:)
-                 d2w(:) = d2w(:)*(ix_xi)**2 + dw(:) * d2xi_dx2(:)
-                 d2T(:) = d2T(:)*(ix_xi)**2 + dT(:) * d2xi_dx2(:)
+                 d2u_1 = d2u_1*(ix_xi_1)**2 + du_1 * d2xi_dx2_1
+                 d2u_2 = d2u_2*(ix_xi_2)**2 + du_2 * d2xi_dx2_2
+                 d2u_3 = d2u_3*(ix_xi_3)**2 + du_3 * d2xi_dx2_3
+                 !
+                 d2v_1 = d2v_1*(ix_xi_1)**2 + dv_1 * d2xi_dx2_1
+                 d2v_2 = d2v_2*(ix_xi_2)**2 + dv_2 * d2xi_dx2_2
+                 d2v_3 = d2v_3*(ix_xi_3)**2 + dv_3 * d2xi_dx2_3
+                 !
+                 d2w_1 = d2w_1*(ix_xi_1)**2 + dw_1 * d2xi_dx2_1
+                 d2w_2 = d2w_2*(ix_xi_2)**2 + dw_2 * d2xi_dx2_2
+                 d2w_3 = d2w_3*(ix_xi_3)**2 + dw_3 * d2xi_dx2_3
+                 !
+                 d2T_1 = d2T_1*(ix_xi_1)**2 + dT_1 * d2xi_dx2_1
+                 d2T_2 = d2T_2*(ix_xi_2)**2 + dT_2 * d2xi_dx2_2
+                 d2T_3 = d2T_3*(ix_xi_3)**2 + dT_3 * d2xi_dx2_3
 
                  ! compute derivative in physical space
-                 du = du*ix_xi
-                 dv = dv*ix_xi
-                 dw = dw*ix_xi
-                 dT = dT*ix_xi
-                 dm = dm*ix_xi
-                 dl = dl*ix_xi
+                 du_1 = du_1*ix_xi_1
+                 du_2 = du_2*ix_xi_2
+                 du_3 = du_3*ix_xi_3
+                 !
+                 dv_1 = dv_1*ix_xi_1
+                 dv_2 = dv_2*ix_xi_2
+                 dv_3 = dv_3*ix_xi_3
+                 !
+                 dw_1 = dw_1*ix_xi_1
+                 dw_2 = dw_2*ix_xi_2
+                 dw_3 = dw_3*ix_xi_3
+                 !
+                 dT_1 = dT_1*ix_xi_1
+                 dT_2 = dT_2*ix_xi_2
+                 dT_3 = dT_3*ix_xi_3
+                 !
+                 dm_1 = dm_1*ix_xi_1
+                 dm_2 = dm_2*ix_xi_2
+                 dm_3 = dm_3*ix_xi_3
+                 !
+                 dl_1 = dl_1*ix_xi_1
+                 dl_2 = dl_2*ix_xi_2
+                 dl_3 = dl_3*ix_xi_3
 
                  ! calculating D
-                 grad_v(1,:) = du(:)
-                 grad_v(2,:) = dv(:)
-                 grad_v(3,:) = dw(:)
-
-                 grad_vT(:,1) = du(:)
-                 grad_vT(:,2) = dv(:)
-                 grad_vT(:,3) = dw(:)
-                
-                 div_ = du(1) + dv(2) + dw(3)
-                 div_vI = 0.0_rp
-                 div_vI(1,1) = div_
-                 div_vI(2,2) = div_
-                 div_vI(3,3) = div_
+                 div_ = du_1 + dv_2 + dw_3
                  DIV(i,j,k)  = div_
 
-                 D = grad_v + grad_vT - two3 * div_vI
+                 D11 = du_1 + du_1 - two3 * div_
+                 D12 = du_2 + dv_1
+                 D13 = du_3 + dw_1
+
+                 D21 = dv_1 + du_2
+                 D22 = dv_2 + dv_2 - two3 * div_
+                 D23 = dv_3 + dw_2
+
+                 D31 = dw_1 + du_3
+                 D32 = dw_2 + dv_3
+                 D33 = dw_3 + dw_3 - two3 * div_
 
                  ! calculating div(D)
-                 div_D(1) = d2u(1) + d2u(2) + d2u(3)
-                 div_D(2) = d2v(1) + d2v(2) + d2v(3)
-                 div_D(3) = d2w(1) + d2w(2) + d2w(3)
+                 div_D_1 = d2u_1 + d2u_2 + d2u_3
+                 div_D_2 = d2v_1 + d2v_2 + d2v_3
+                 div_D_3 = d2w_1 + d2w_2 + d2w_3
 
-                 D_dm(1) = D(1,1)*dm(1) + D(1,2)*dm(2) + D(1,3)*dm(3)
-                 D_dm(2) = D(2,1)*dm(1) + D(2,2)*dm(2) + D(2,3)*dm(3)
-                 D_dm(3) = D(3,1)*dm(1) + D(3,2)*dm(2) + D(3,3)*dm(3)
+                 D_dm_1 = D11*dm_1 + D12*dm_2 + D13*dm_3
+                 D_dm_2 = D21*dm_1 + D22*dm_2 + D23*dm_3
+                 D_dm_3 = D31*dm_1 + D32*dm_2 + D33*dm_3
 
                  ! calculating div(sigma)
-                 div_sigma = mu_ * div_D + D_dm
+                 div_sigma_1 = mu_ * div_D_1 + D_dm_1
+                 div_sigma_2 = mu_ * div_D_2 + D_dm_2
+                 div_sigma_3 = mu_ * div_D_3 + D_dm_3
 
                  ! --- ENERGY VISCOUS THERM --- !
-                 sum_D_grad = D(1,1)*grad_v(1,1) + D(1,2)*grad_v(1,2) + D(1,3)*grad_v(1,3) + &
-                              D(2,1)*grad_v(2,1) + D(2,2)*grad_v(2,2) + D(2,3)*grad_v(2,3) + &
-                              D(3,1)*grad_v(3,1) + D(3,2)*grad_v(3,2) + D(3,3)*grad_v(3,3)
+                 sum_D_grad = D11*du_1 + D12*du_2 + D13*du_3 + &
+                              D21*dv_1 + D22*dv_2 + D23*dv_3 + &
+                              D31*dw_1 + D32*dw_2 + D33*dw_3
 
-                 div_sigma_v = div_sigma(1) * vel(1) + div_sigma(2) * vel(2) + div_sigma(3) * vel(3) + mu_*sum_D_grad
+                 div_sigma_v = div_sigma_1 * u_ + div_sigma_2 * v_ + div_sigma_3 * w_ + mu_*sum_D_grad
                  
-                 heat_flux = rl_ * (d2T(1) + d2T(2) + d2T(3)) + dl(1)*dT(1) + dl(2)*dT(2) + dl(3)*dT(3)
+                 heat_flux = rl_ * (d2T_1 + d2T_2 + d2T_3) + dl_1*dT_1 + dl_2*dT_2 + dl_3*dT_3
 
-                 RHS(i,j,k,2) = RHS(i,j,k,2) + mu_inf * (div_sigma(1))
-                 RHS(i,j,k,3) = RHS(i,j,k,3) + mu_inf * (div_sigma(2))
-                 RHS(i,j,k,4) = RHS(i,j,k,4) + mu_inf * (div_sigma(3))
+                 RHS(i,j,k,2) = RHS(i,j,k,2) + mu_inf * (div_sigma_1)
+                 RHS(i,j,k,3) = RHS(i,j,k,3) + mu_inf * (div_sigma_2)
+                 RHS(i,j,k,4) = RHS(i,j,k,4) + mu_inf * (div_sigma_3)
                  RHS(i,j,k,5) = RHS(i,j,k,5) + mu_inf * (div_sigma_v + heat_flux)  
                 
-              enddo ! i
-           enddo ! j
-        enddo ! k
-        !$omp end parallel do
+              enddo
+           enddo
+        enddo
+        !$acc end parallel
 
         return
-end subroutine viscous_flux_3D
+end subroutine viscous_flux_3D_laplacian
 
 subroutine viscous_flux_2D(U,V,T,VIS,LMD,DIV,RHS)
 
@@ -291,7 +377,7 @@ subroutine viscous_flux_2D(U,V,T,VIS,LMD,DIV,RHS)
         k = 1
 
         !$omp parallel do collapse(2) default(private), &
-        !$omp shared(U,V,T,VIS,LMD,DIV,RHS,mu_inf,k,central_1,central_2), &
+        !$omp shared(U,V,T,VIS,LMD,DIV,RHS,mu_inf,k,central_1,central_2,mask), &
         !$omp shared(sx,ex,sy,ey,csistep_i,etastep_i,x_csi,y_eta,x_csi2,y_eta2,fL,fR)
 
         !$acc parallel default(present)
@@ -575,7 +661,7 @@ subroutine DivergencyGradient3D(U,V,W,VIS,DIV,RHS)
                  GradDiv_z = 0.0_rp
 
                  !$acc loop seq
-                 do l = 1,fR
+                 do l = 1,3
                     cl1 = central_1(l)
 
                     GradDiv_x = GradDiv_x + cl1 * (DIV(i+l,j,k) - DIV(i-l,j,k))
@@ -609,14 +695,9 @@ end subroutine DivergencyGradient3D
 
 
 
-subroutine viscous_flux_3D_staggered(U,V,W,T,VIS,LMD,DIV,RHS)
+subroutine viscous_flux_3D_staggered
 
         implicit none
-        real(rp), allocatable, dimension(:,:,:,:), intent(inout) :: RHS
-        real(rp), allocatable, dimension(:,:,:)  , intent(inout) :: DIV
-        real(rp), allocatable, dimension(:,:,:)  , intent(in)    :: U, V, W, T
-        real(rp), allocatable, dimension(:,:,:)  , intent(in)    :: VIS, LMD
-
         real(rp), parameter :: two3 = 2.0_rp/3.0_rp
 
         real(rp)               :: DC_xx, DC_xy, DC_xz
@@ -632,10 +713,6 @@ subroutine viscous_flux_3D_staggered(U,V,W,T,VIS,LMD,DIV,RHS)
         real(rp)               :: DC_dm_x, DC_dm_y, DC_dm_z
         real(rp)               :: div_sigma_x, div_sigma_y, div_sigma_z
         real(rp)               :: Lapl_x, Lapl_y, Lapl_z
-        real(rp)               :: d_mdu_x, d_mdu_y, d_mdu_z
-        real(rp)               :: d_mdv_x, d_mdv_y, d_mdv_z
-        real(rp)               :: d_mdw_x, d_mdw_y, d_mdw_z
-        real(rp)               :: d_ldT_x, d_ldT_y, d_ldT_z
         real(rp)               :: du_x, du_y, du_z
         real(rp)               :: dv_x, dv_y, dv_z
         real(rp)               :: dw_x, dw_y, dw_z
@@ -662,7 +739,7 @@ subroutine viscous_flux_3D_staggered(U,V,W,T,VIS,LMD,DIV,RHS)
         do   k = sz,ez
          do  j = sy,ey
           do i = sx,ex
-
+        
              ! velocity
              vel_x  = U(i,j,k)
              vel_y  = V(i,j,k)
@@ -685,7 +762,7 @@ subroutine viscous_flux_3D_staggered(U,V,W,T,VIS,LMD,DIV,RHS)
              rlB = 0.0_rp
 
              !$acc loop seq 
-             do l = fd_L,fd_R
+             do l = -2,3
 
                clxR = mid_point_lele_x(l,i)
                clyR = mid_point_lele_y(l,j)
@@ -733,9 +810,9 @@ subroutine viscous_flux_3D_staggered(U,V,W,T,VIS,LMD,DIV,RHS)
              dm_x = 0.0_rp
              dm_y = 0.0_rp
              dm_z = 0.0_rp
-
+        
              !$acc loop seq 
-             do l = 1,fR
+             do l = 1,3
                 cl1 = central_1(l)
 
                 du_x = du_x + cl1 * (U(i+l,j,k) - U(i-l,j,k))
@@ -815,33 +892,27 @@ subroutine viscous_flux_3D_staggered(U,V,W,T,VIS,LMD,DIV,RHS)
              !
              ! === 2nd DERIVATIVE
              !
-             i_stR_x = 1.0_rp/xsteph(i)
-             i_stL_x = 1.0_rp/xsteph(i-1)
+             i_stR_x = ixsteph(i)
+             i_stL_x = ixsteph(i-1)
 
-             i_stR_y = 1.0_rp/ysteph(j)
-             i_stL_y = 1.0_rp/ysteph(j-1)
+             i_stR_y = iysteph(j)
+             i_stL_y = iysteph(j-1)
 
-             i_stR_z = 1.0_rp/zsteph(k)
-             i_stL_z = 1.0_rp/zsteph(k-1)
+             i_stR_z = izsteph(k)
+             i_stL_z = izsteph(k-1)
 
-             d_mdu_x = 0.0_rp
-             d_mdu_y = 0.0_rp
-             d_mdu_z = 0.0_rp
+             lapl_x = 0.0_rp
+             lapl_y = 0.0_rp
+             lapl_z = 0.0_rp
              !
-             d_mdv_x = 0.0_rp
-             d_mdv_y = 0.0_rp
-             d_mdv_z = 0.0_rp
-             !
-             d_mdw_x = 0.0_rp
-             d_mdw_y = 0.0_rp
-             d_mdw_z = 0.0_rp
-             !
-             d_ldT_x = 0.0_rp
-             d_ldT_y = 0.0_rp
-             d_ldT_z = 0.0_rp
+             heat_flux = 0.0_rp
+
+             lapl_x = 0.0_rp
+             lapl_y = 0.0_rp
+             lapl_z = 0.0_rp
 
              !$acc loop seq 
-             do l = fd_L, fd_R
+             do l = -2, 3
 
                cl    = central_2_one_half(l) 
                c2R_x = i_stR_x * cl
@@ -853,46 +924,31 @@ subroutine viscous_flux_3D_staggered(U,V,W,T,VIS,LMD,DIV,RHS)
                c2R_z = i_stR_z * cl
                c2L_z = i_stL_z * cl
                
-               d_mdu_x=d_mdu_x + c2R_x*muE*U(i+l,j,k) - c2L_x*muW*U(i-1+l,j,k)
-               d_mdu_y=d_mdu_y + c2R_y*muN*U(i,j+l,k) - c2L_y*muS*U(i,j-1+l,k)
-               d_mdu_z=d_mdu_z + c2R_z*muF*U(i,j,k+l) - c2L_z*muB*U(i,j,k-1+l)
+               lapl_x = lapl_x &
+                    + i_st_x*(c2R_x*muE*U(i+l,j,k) - c2L_x*muW*U(i-1+l,j,k)) &
+                    + i_st_y*(c2R_y*muN*U(i,j+l,k) - c2L_y*muS*U(i,j-1+l,k)) &
+                    + i_st_z*(c2R_z*muF*U(i,j,k+l) - c2L_z*muB*U(i,j,k-1+l))
 
-               d_mdv_x=d_mdv_x + c2R_x*muE*V(i+l,j,k) - c2L_x*muW*V(i-1+l,j,k)
-               d_mdv_y=d_mdv_y + c2R_y*muN*V(i,j+l,k) - c2L_y*muS*V(i,j-1+l,k)
-               d_mdv_z=d_mdv_z + c2R_z*muF*V(i,j,k+l) - c2L_z*muB*V(i,j,k-1+l)
+               lapl_y = lapl_y &
+                    + i_st_x*(c2R_x*muE*V(i+l,j,k) - c2L_x*muW*V(i-1+l,j,k)) &
+                    + i_st_y*(c2R_y*muN*V(i,j+l,k) - c2L_y*muS*V(i,j-1+l,k)) &
+                    + i_st_z*(c2R_z*muF*V(i,j,k+l) - c2L_z*muB*V(i,j,k-1+l))
 
-               d_mdw_x=d_mdw_x + c2R_x*muE*W(i+l,j,k) - c2L_x*muW*W(i-1+l,j,k)
-               d_mdw_y=d_mdw_y + c2R_y*muN*W(i,j+l,k) - c2L_y*muS*W(i,j-1+l,k)
-               d_mdw_z=d_mdw_z + c2R_z*muF*W(i,j,k+l) - c2L_z*muB*W(i,j,k-1+l)
+               lapl_z = lapl_z &
+                    + i_st_x*(c2R_x*muE*W(i+l,j,k) - c2L_x*muW*W(i-1+l,j,k)) &
+                    + i_st_y*(c2R_y*muN*W(i,j+l,k) - c2L_y*muS*W(i,j-1+l,k)) &
+                    + i_st_z*(c2R_z*muF*W(i,j,k+l) - c2L_z*muB*W(i,j,k-1+l))
 
-               d_lDT_x=d_lDT_x + c2R_x*rlE*T(i+l,j,k) - c2L_x*rlW*T(i-1+l,j,k)
-               d_lDT_y=d_lDT_y + c2R_y*rlN*T(i,j+l,k) - c2L_y*rlS*T(i,j-1+l,k)
-               d_lDT_z=d_lDT_z + c2R_z*rlF*T(i,j,k+l) - c2L_z*rlB*T(i,j,k-1+l)
+               heat_flux = heat_flux &
+                    + i_st_x*(c2R_x*rlE*T(i+l,j,k) - c2L_x*rlW*T(i-1+l,j,k)) &
+                    + i_st_y*(c2R_y*rlN*T(i,j+l,k) - c2L_y*rlS*T(i,j-1+l,k)) &
+                    + i_st_z*(c2R_z*rlF*T(i,j,k+l) - c2L_z*rlB*T(i,j,k-1+l))
 
              enddo
-
-             d_mdu_x = i_st_x*d_mdu_x
-             d_mdv_x = i_st_x*d_mdv_x
-             d_mdw_x = i_st_x*d_mdw_x
-             d_lDT_x = i_st_x*d_lDT_x
-             !
-             d_mdu_y = i_st_y*d_mdu_y
-             d_mdv_y = i_st_y*d_mdv_y
-             d_mdw_y = i_st_y*d_mdw_y
-             d_lDT_y = i_st_y*d_lDT_y
-             !
-             d_mdu_z = i_st_z*d_mdu_z
-             d_mdv_z = i_st_z*d_mdv_z
-             d_mdw_z = i_st_z*d_mdw_z
-             d_lDT_z = i_st_z*d_lDT_z
 
              !
              ! === MOMENTUM COMPONENTS
              !
-             ! 1) u Laplacian
-             lapl_x = d_mdu_x + d_mdu_y + d_mdu_z
-             lapl_y = d_mdv_x + d_mdv_y + d_mdv_z
-             lapl_z = d_mdw_x + d_mdw_y + d_mdw_z
         
              ! 2) DCompressible x Gradient(mu)
              DC_dm_x = DC_xx*dm_x + DC_xy*dm_y + DC_xz*dm_z
@@ -911,9 +967,9 @@ subroutine viscous_flux_3D_staggered(U,V,W,T,VIS,LMD,DIV,RHS)
 
              ! 2) mu Gradient(V) x Gradient(V)
              muGradVGradV = &
-             mu_*(Grad_V_xx**2 + Grad_V_xy**2 + Grad_V_xz**2 + &
-                  Grad_V_yx**2 + Grad_V_yy**2 + Grad_V_yz**2 + &
-                  Grad_V_zx**2 + Grad_V_zy**2 + Grad_V_zz**2)
+             mu_*(Grad_V_xx*Grad_V_xx + Grad_V_xy*Grad_V_xy+ Grad_V_xz*Grad_V_xz + &
+                  Grad_V_yx*Grad_V_yx + Grad_V_yy*Grad_V_yy+ Grad_V_yz*Grad_V_yz + &
+                  Grad_V_zx*Grad_V_zx + Grad_V_zy*Grad_V_zy+ Grad_V_zz*Grad_V_zz)
 
              ! 3) Gradient(mu) x DC x Velocity
              DC_dm_v = DC_dm_x*vel_x + DC_dm_y*vel_y + DC_dm_z*vel_z
@@ -925,7 +981,6 @@ subroutine viscous_flux_3D_staggered(U,V,W,T,VIS,LMD,DIV,RHS)
                   DC_zx*grad_v_zx + DC_zy*grad_v_zy + DC_zz*grad_v_zz)
 
              div_sigma_v = Lapl_v + muGradVGradV + DC_dm_v + mu_DC_GradV       
-             heat_flux   = d_lDT_x + d_lDT_y + d_lDT_z
 
              RHS(i,j,k,2) = RHS(i,j,k,2) + mu_inf * (div_sigma_x)
              RHS(i,j,k,3) = RHS(i,j,k,3) + mu_inf * (div_sigma_y)

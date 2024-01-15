@@ -190,7 +190,7 @@ subroutine compute_schlieren_density
 !
 !       This subroutine compute the numerical schlieren of a variable
 !       Ref: Boukharfane "A combined ghost-point-forcing / direct-forcing 
-!                         immersed boundary method (IBM) for compressible
+!                         immersed boundary method for compressible
 !                         flow simulations", Computer and Fluids 2018
 !
 ! ---------------------------------------------------------------------
@@ -453,7 +453,7 @@ subroutine compute_molecular_viscosity
               do i = lbx,ubx
 
                  T_  = T(i,j,k)
-                 VIS(i,j,k) = T_*sqrt(T_) * (1.0_rp+suthc)/(T_+suthc)
+                 VIS(i,j,k) = laminar_viscosity(T_,tref,vis_flag)
 
               enddo
            enddo

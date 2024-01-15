@@ -26,13 +26,18 @@ use post_stat_computation_module
 use m_npy
 
         implicit none
-        character(100) :: path
+        character(400) :: path
+
 
         ! read input file and main directory
         call ReadInputFile
         call init_Reynolds
+
         call ReadInputDirectoryContent('BINARY_STAT',MainDir)
-        if(wmles) call ReadInputDirectoryContent('BINARY_WMLES_STAT',WmlesDir)
+        if(wmles) then
+          call ReadInputDirectoryContent('BINARY_WMLES_STAT',WmlesDir)
+        endif
+
         call GetRestartFile(MainDir,file_ini,file_end)
         call GetPeriodicDirs
         call InitStatsFields

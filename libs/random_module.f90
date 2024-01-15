@@ -1,7 +1,15 @@
 module random_module
 use parameters_module, only: rp
 #ifdef _OPENACC
+#ifdef NVIDIA
+use curand
+use curand_device
 use openacc_curand
+#endif
+#ifdef AMD
+use iso_c_binding
+use hipfort_rocrand
+#endif
 #endif
 
 implicit none
@@ -10,7 +18,12 @@ integer, public, allocatable, dimension(:,:,:)   :: seedField2DYZ
 integer, public, allocatable, dimension(:,:,:,:) :: seedField3D
 
 #ifdef _OPENACC
-type(curandStateXORWOW), public :: cudaState
+#ifdef NVIDIA
+type(curandGenerator), public :: generator
+#endif
+#ifdef AMD
+type(c_ptr),       public :: generator
+#endif
 #endif
 
 public init_DefaultSeed, rnd,  mpi_random_field2D, random_normal
@@ -18,17 +31,23 @@ public init_DefaultSeed, rnd,  mpi_random_field2D, random_normal
 contains
 subroutine init_DefaultSeed
 #ifdef _OPENACC
-        implicit none
-        real(rp) :: a, b
-        integer  :: seed, seq, offset
+      implicit none
+      integer(8), parameter :: seed = 1234
+      integer(8)            :: err
 
-        seed   = 12
-        seq    = 0
-        offset = 0
+#ifdef NVIDIA
+      err = curandCreateGenerator(generator, CURAND_RNG_PSEUDO_XORWOW)
+      err = curandSetPseudoRandomGeneratorSeed (generator, seed)
 
-        !$acc parallel num_gangs(1) vector_length(1)
-        call curand_init(seed, seq, offset, cudaState)
-        !$acc end parallel
+      if (err.ne.0) print*,"Error in curandCreateGenerator: ",err
+#endif
+#ifdef AMD
+      err = rocrand_Create_Generator(generator, ROCRAND_RNG_PSEUDO_XORWOW)
+      if (err.ne.0) print*,"Error in rocrand_Create_Generator: ",err
+
+      err = rocrand_Set_Seed(generator, seed)
+      if (err.ne.0) print*,"Error in rocrand_Set_Seed: ",err
+#endif
 
 #else
 
