@@ -75,7 +75,6 @@ program uranos
         !$acc copyin(fward_1, bward_1) &
         !$acc copyin(weno_num,my_neighbour,bc) &
         !$acc copyin(a_rk,b_rk,c_rk) &
-        !$acc copyin(mask_field) &
         !$acc copyin(tilde_op_x, tilde_op_y, tilde_op_z) &
         !$acc copyin(pri_1D_x, pri_1D_y, pri_1D_z) &
         !$acc copyin(phi_arr_x, phi_arr_y, phi_arr_z) &
@@ -93,7 +92,6 @@ program uranos
         !$acc copyin(DF_Rnd2D,DF_ylen,DF_zlen,DF_By,DF_Bz,DF_Fy,DF_LundMatrix) &
         !$acc copyin(iflow_mean,iflow_turb,iflow_vf_old, iflow_vf_new) &   !!!!! >>>> WARNING HERE
         !$acc copyin(wmles_data,wmles_data_uw,wmles_data_lw) &
-        !$acc copyin(uFarField,vFarField,pFarField,TFarField) &
         !$acc copyin(weno_flag_xyz, sponge_x) &
         !$acc copy(phi,U,V,W,T,P,VIS,LMD,DIV,RHS,SSENSOR,weno_flag,phi_n) &
 #ifdef NVIDIA
@@ -105,7 +103,6 @@ program uranos
        !$acc copyin(phirand,phirandnum,phirandsize,phirandnumptr) &
        !$acc copyin(psirand,psirandnum,psirandsize,psirandnumptr)
 #endif
-       !$acc data copyin(mask_GhostId,mask_GhostUnstr,mask_nGhost,mask_field) &
 
         ! init subgrid stresses
         if(les) call compute_subgrid_model
@@ -152,8 +149,6 @@ program uranos
           call write_restart
         endif
         e_cpu_time = MPI_WTIME()
-        !$acc end data
-        !$acc end data
         !$acc end data
 
         call screen_elapse_time
