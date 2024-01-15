@@ -1,0 +1,108 @@
+&input_list
+
+! Domain dimensions
+xmin = -9.42477796077
+xmax = +9.42477796077
+ymin = -1.0
+ymax =  1.0
+zmin = -3.14159265359
+zmax = +3.14159265359
+
+! Grid settings
+nx = 512
+ny = 128
+nz = 256
+
+gridpoint_x = 'uniform'
+gridpoint_y = 'DATA/CHANNEL_DNS/GRID/Ygrid.txt'
+gridpoint_z = 'uniform'
+! streching parameter
+stretching_par = 3.75
+
+! MPI settings
+cart_dims(1) = 1
+cart_dims(2) = 1
+cart_dims(3) = 4
+mpi_opt_level =2
+cuda_aware = .false.
+
+! solver settings
+dims = 3
+logical_CFL = .true.
+scheme = 'hybrid_wenoEP'
+sensor      = 'ducros'
+ducrosToll  = 0.1
+weno_order  = 7
+L1_wave     = 'none'
+fd_order    = 6
+LES         = .false.
+sgs_model   = 'WALE'
+viscous = .true.
+n_step = 3
+CFL  = 0.5
+Dt   = 1.E-03
+ic = 'turbulent_channel'
+Tref = 273.15 
+vis_flag = 1
+
+! boundary conditions
+bc(1) = 'periodic'
+bc(2) = 'periodic'
+bc(3) = 'isothermal_wall'
+bc(4) = 'isothermal_wall'
+bc(5) = 'periodic'
+bc(6) = 'periodic'
+
+inflow_profile = 'none'
+smooth_inflow  = .false.
+turb_inflow    = .false.
+sponge(1) = .false.
+sponge(2) = .false.
+sponge(3) = .false.
+sponge(4) = .false.
+sponge(5) = .false.
+sponge(6) = .false.
+
+! iterations settings
+tmax = 10000000
+itmax = 1
+itout = 1
+StOut = 10000
+StFlg = .true.
+rsOut = 500
+restartStat=.false.
+skip_file = 1
+
+! Non dimensional groups
+Reynolds = 230
+Mach = 1.5
+Prandtl = 0.71
+Trat = 1.0
+
+! output settings
+output_file_name = 'tch'
+data_dir = 'CHANNEL_DNS'
+
+density         = .true.
+pressure        = .true.
+velocity        = .true.
+temperature     = .true.
+mach_           = .true.
+sdensity        = .false.
+vorticity       = .false.
+speed_div       = .false.
+charactheristic = .false.
+hw_sensor       = .false.
+hweno_flag      = .false.
+bulk_quantities = .false.
+qcriterion      = .true.
+Rey_average     = .false.
+Fav_average     = .false.
+vorticity_magnitude = .false.
+
+BINARY      = .true.
+GNUPLOT     = .false.
+VTK         = .true.
+VTK2D       = .true.
+LIFT_DRAG   = .false.
+&end
