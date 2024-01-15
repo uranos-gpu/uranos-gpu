@@ -24,7 +24,7 @@ cart_dims(1) = 1
 cart_dims(2) = 1
 cart_dims(3) = 4
 mpi_opt_level =2
-cuda_aware = .false.
+cuda_aware = .true.
 
 ! solver settings
 dims = 3
@@ -65,8 +65,8 @@ sponge(6) = .false.
 
 ! iterations settings
 tmax = 10000000
-itmax = 1
-itout = 1
+itmax = 1000000
+itout = 10000
 StOut = 10000
 StFlg = .true.
 rsOut = 500
