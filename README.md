@@ -1,25 +1,28 @@
-![](images/logo5.svg){width=100%}
+<img src="images/logo6.svg" alt="image" width="100%" height="auto">
 
 # Reference
 
-Please, while using URANOS for you computations cite the following paper:
+Please, while using URANOS for your computations cite the following papers:
 
-De Vanna, F., Avanzi, F., Cogo, M., Sandrin, S., Bettencourt, M., Picano, F., & Benini, E. (2023). URANOS: A GPU accelerated Navier-Stokes solver for compressible wall-bounded flows. Computer Physics Communications, 108717, doi: https://doi.org/10.1016/j.cpc.2023.108717
+- Francesco De Vanna, Giacomo Baldan (2024). URANOS-2.0: Improved performance, enhanced portability, and model extension towards exascale computing of high-speed engineering flows. Under review in Computer Physics Communications.
+
+- De Vanna, F., Avanzi, F., Cogo, M., Sandrin, S., Bettencourt, M., Picano, F., & Benini, E. (2023). URANOS: A GPU accelerated Navier-Stokes solver for compressible wall-bounded flows. Computer Physics Communications, 108717, doi: https://doi.org/10.1016/j.cpc.2023.108717
 
 # Scientific papers obtained with URANOS
 
-- Francesco De Vanna, Francesco Picano, Ernesto Benini, A sharp-interface immersed boundary method for moving objects in compressible viscous flows, Computers & Fluids, 2020, https://doi.org/10.1016/j.compfluid.2019.104415
+- Francesco De Vanna, Giacomo Baldan, Francesco Picano, Ernesto Benini, On the coupling between wall-modeled LES and immersed boundary method towards applicative compressible flow simulations, Computer & Fluids, 2023, https://doi.org/10.1016/j.compfluid.2023.106058
 
-- Francesco De Vanna, Alberto Benato, Francesco Picano, Ernesto Benini, High order conservative formulation of viscous terms for variable viscosity flows, Acta Mechanica, 2021, https://doi.org/10.1007/s00707-021-02937-2
-
-- Francesco De Vanna, Michele Cogo, Matteo Bernardini, Francesco Picano, Ernesto Benini, Unified wall-resolved and wall-modelled method for large-eddy simulations of com- pressible wall-bounded flows, Physical Review Fluids, 2021, https://doi.org/10.1103/PhysRevFluids.6.034614
-
-- Francesco De Vanna, Francesco Picano, Ernesto Benini, Mark Kenneth Quinn, Large- Eddy-Simulations of the unsteady behaviour of a hypersonic intake at Mach 5, AIAA Journal, 2021, https://doi.org/10.2514/1.J060160
+- Francesco De Vanna, Giacomo Baldan, Francesco Picano, Ernesto Benini, Effect of convective schemes in wall-resolved and wall-modeled LES of compressible wall turbulence, Computer & Fluids, 2022, https://doi.org/10.1016/j.compfluid.2022.105710
 
 - Francesco De Vanna, Matteo Bernardini, Francesco Picano, Ernesto Benini, Wall-modeled LES of shock-wave/boundary layer interaction, International Journal of Heat and Fluid Flow, 2022, https://doi.org/10.1016/j.ijheatfluidflow.2022.109071
 
-- Francesco De Vanna, Giacomo Baldan, Francesco Picano, and Ernesto Benini, Effect of convective schemes in wall-resolved and wall-modeled LES of compressible wall turbulence, Computer & Fluids, 2022, https://doi.org/10.1016/j.compfluid.2022.105710
+- Francesco De Vanna, Francesco Picano, Ernesto Benini, Mark Kenneth Quinn, Large- Eddy-Simulations of the unsteady behaviour of a hypersonic intake at Mach 5, AIAA Journal, 2021, https://doi.org/10.2514/1.J060160
 
+- Francesco De Vanna, Michele Cogo, Matteo Bernardini, Francesco Picano, Ernesto Benini, Unified wall-resolved and wall-modelled method for large-eddy simulations of compressible wall-bounded flows, Physical Review Fluids, 2021, https://doi.org/10.1103/PhysRevFluids.6.034614
+
+- Francesco De Vanna, Alberto Benato, Francesco Picano, Ernesto Benini, High order conservative formulation of viscous terms for variable viscosity flows, Acta Mechanica, 2021, https://doi.org/10.1007/s00707-021-02937-2
+
+- Francesco De Vanna, Francesco Picano, Ernesto Benini, A sharp-interface immersed boundary method for moving objects in compressible viscous flows, Computers & Fluids, 2020, https://doi.org/10.1016/j.compfluid.2019.104415
 
 
 # Compiling
@@ -34,22 +37,21 @@ make -j comp="option1" mode="option2"
 
 `comp` currently supports these choices:
 - `gnu`: GNU compiler
-- `gnuch`: GNU compiler in CH version
-- `intel`: INTEL compiler
-- `pgi`: NVIDIA-PGI compiler
+- `nvhpc`: NVHPC compiler (NVIDIA GPUs)
+- `cray`: Cray compiler (AMD GPUs)
 
 `"option2"` specifies the compiler options. Each compiler has dedicated options
 
 Example:
 
 ```
-make -j comp=gnu mode=debug
+make -j comp=gnu mode=cpu_debug
 ```
 
 compiles the code with the gnu compiler using the debugging flags.
 
 ```
-make -j comp=pgi mode=gpu
+make -j comp=nvhpc mode=gpu
 ```
 
 !CAUTION! Each cluster requires specific module to be loaded before the compiling process. 
@@ -73,21 +75,21 @@ mpirun -np "number_of_procs" ./Uranos.exe path/to/file.dat path/to/restart.bin
 ```
 
 For GPU runs you must distribute MPI processes according to the number of GPUs
-available for each node. E.g., for CINECA Marconi-100 cluster -- 4 GPUS per node --  a possible submission script using
+available for each node. E.g., for CINECA Leonardo cluster -- 4 GPUS per node --  a possible submission script using
 8 GPUs is:
 
 ```
 #!/bin/bash
+#SBATCH -p boost_usr_prod
+#SBATCH --time 24:00:00
 #SBATCH -N 2
-#SBATCH --tasks-per-node 4
-#SBATCH --mem=64G
-#SBATCH --partition=debug
-#SBATCH --time=00:30:00
+#SBATCH --ntasks-per-node=4
 #SBATCH --gres=gpu:4
-#SBATCH --partition=debug
-module load profile/global pgi
 
-srun ./Uranos path/to/file.dat path/to/restart.bin
+module load openmpi/4.1.4--nvhpc--23.1-cuda-11.8
+module load nvhpc/23.1
+
+mpirun -n $SLURM_NTASKS ./Uranos.exe path/to/file.dat path/to/restart.bin
 ```
 
 # Interpreting the file.dat file
