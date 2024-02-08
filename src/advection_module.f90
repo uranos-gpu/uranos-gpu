@@ -140,7 +140,6 @@ subroutine hybrid_wenoEPx(weno_num,lbx,ubx,istr,iend,shock_recon)
         real(rp), dimension(5)      :: fhatp, fhatm
         real(rp), dimension(5,5)    :: right, left
         real(rp), dimension(-3:3)   :: central_1_p
-        real(rp), dimension(-2:3)   :: central_1_one_half_p
 
         real(rp) :: phi1, phi2, phi3, phi4, phi5, inner_sum
         real(rp) :: sqrt_rho0, sqrt_rho1, ff, pp, hFn
@@ -148,7 +147,7 @@ subroutine hybrid_wenoEPx(weno_num,lbx,ubx,istr,iend,shock_recon)
 
         real(rp), parameter :: one8 = 1.0_rp/8.0_rp
         real(rp) :: ir, u_, v_, w_, ek, p_, idx
-        real(rp) :: weight, delta_p, lambda_max
+        real(rp) :: weight, lambda_max
         real(rp) :: vnc, hgU, hgV, hgW, hgE, cc, un_c2
         integer  :: i,j,k,l,m,il, n, ii, s
         integer  :: str_x, end_x, igbl, istr_x, iend_x
@@ -156,20 +155,15 @@ subroutine hybrid_wenoEPx(weno_num,lbx,ubx,istr,iend,shock_recon)
 
         call StartProfRange("hybrid_wenoEPx")
 
-        !$omp parallel do collapse(2) default(private), &
-        !$omp shared(weno,RHS,xstep_i,sy,ey,sz,ez,istr,iend,mask),&
-        !$omp shared(central_1_one_half,central_1,Ltot,lbx,ubx,fd_L,fd_R,phi,sx,ex)
-
         !$acc parallel vector_length(vec_size) default(present) &
         !$acc private(tilde_op,pri_1D,phi_arr) &
         !$acc private(flx_arr,flx,weno_flag_chunk) &
-        !$acc create(central_1_p,central_1_one_half_p)
-        !$acc cache(central_1_p,central_1_one_half_p,tilde_op,pri_1D,phi_arr,flx_arr,flx,weno_flag_chunk)
+        !$acc create(central_1_p)
+        !$acc cache(central_1_p,tilde_op,pri_1D,phi_arr,flx_arr,flx,weno_flag_chunk)
         !$acc loop gang collapse(2)
         do k   = sz,ez
           do j = sy,ey
              central_1_p = 2*central_1
-             central_1_one_half_p = central_1_one_half
 
              do str_x = lbx,ubx,chunkSize
                 end_x = min(str_x+ChunkSize, ubx-2*GN+1) - str_x
@@ -228,7 +222,7 @@ subroutine hybrid_wenoEPx(weno_num,lbx,ubx,istr,iend,shock_recon)
                                  * (pri_1D(i,2) + pri_1D(il,2))
 
                    tilde_op(l,i,1) = 2*weight
-                   tilde_op(l,i,2) = weight*(pri_1D(i,2) + pri_1D(il,2))
+                   tilde_op(l,i,2) = weight*(pri_1D(i,2) + pri_1D(il,2)) + 0.5_rp*(pri_1D(i,1) + pri_1D(il,1))
                    tilde_op(l,i,3) = weight*(pri_1D(i,3) + pri_1D(il,3))
                    tilde_op(l,i,4) = weight*(pri_1D(i,4) + pri_1D(il,4))
                    tilde_op(l,i,5) = weight*(pri_1D(i,5) + pri_1D(il,5))
@@ -248,10 +242,6 @@ subroutine hybrid_wenoEPx(weno_num,lbx,ubx,istr,iend,shock_recon)
              !$acc loop vector
              do i = 0,end_x ! sx-1,ex
              if (weno_flag_chunk(i) == weno_smooth) then
-                delta_p = 0.0_rp
-                do l = -2,3
-                   delta_p = delta_p + central_1_one_half_p(l)*pri_1D(i+l,1)
-                enddo
 
                 do n = 1,5
                    hFn = 0.0_rp
@@ -265,7 +255,6 @@ subroutine hybrid_wenoEPx(weno_num,lbx,ubx,istr,iend,shock_recon)
                    enddo
                    flx(i,n) = hFn
                 enddo
-                flx(i,2) = flx(i,2) + delta_p
              endif
              enddo
 
@@ -451,7 +440,6 @@ subroutine hybrid_wenoEPy(weno_num,lby,uby,jstr,jend,shock_recon)
         real(rp), dimension(5)      :: fhatp, fhatm
         real(rp), dimension(5,5)    :: right, left
         real(rp), dimension(-3:3)   :: central_1_p
-        real(rp), dimension(-2:3)   :: central_1_one_half_p
 
         real(rp) :: phi1, phi2, phi3, phi4, phi5, inner_sum
         real(rp) :: sqrt_rho0, sqrt_rho1, ff, pp, hGn
@@ -459,7 +447,7 @@ subroutine hybrid_wenoEPy(weno_num,lby,uby,jstr,jend,shock_recon)
 
         real(rp), parameter :: one8 = 1.0_rp/8.0_rp
         real(rp) :: ir, u_, v_, w_, ek, p_, idy
-        real(rp) :: weight, delta_p, lambda_max
+        real(rp) :: weight, lambda_max
         real(rp) :: vnc, hgU, hgV, hgW, hgE, cc, un_c2
         integer  :: i,ii,j,k,l,m,jl, n, jj, s,iimax
         integer  :: str_y, end_y, jgbl, jstr_y, jend_y
@@ -469,20 +457,15 @@ subroutine hybrid_wenoEPy(weno_num,lby,uby,jstr,jend,shock_recon)
 
         call StartProfRange("hybrid_wenoEPy")
         
-        !$omp parallel do collapse(2) default(private), &
-        !$omp shared(weno,RHS,ystep_i,sx,ex,sz,ez,jstr,jend,mask),&
-        !$omp shared(central_1_one_half,central_1,Ltot,lby,uby,fd_L,fd_R,phi,sy,ey)
-
         !$acc parallel vector_length(vec_size) default(present) &
         !$acc private(tilde_op,pri_1D,phi_arr) &
         !$acc private(flx_arr,flx,weno_flag_chunk) &
-        !$acc create(central_1_p,central_1_one_half_p)
-        !$acc cache(central_1_p,central_1_one_half_p,tilde_op,pri_1D,phi_arr,flx_arr,flx,weno_flag_chunk)
+        !$acc create(central_1_p)
+        !$acc cache(central_1_p,tilde_op,pri_1D,phi_arr,flx_arr,flx,weno_flag_chunk)
         !$acc loop gang collapse(2)
         do k   = sz,ez
           do i = sx,ex,4
              central_1_p = 2*central_1
-             central_1_one_half_p = central_1_one_half
 
              iimax = min(3,ex-i)
 
@@ -550,7 +533,7 @@ subroutine hybrid_wenoEPy(weno_num,lby,uby,jstr,jend,shock_recon)
 
                          tilde_op(l,j,1) = 2*weight
                          tilde_op(l,j,2) = weight*(pri_1D(j,2) + pri_1D(jl,2))
-                         tilde_op(l,j,3) = weight*(pri_1D(j,3) + pri_1D(jl,3))
+                         tilde_op(l,j,3) = weight*(pri_1D(j,3) + pri_1D(jl,3)) + 0.5_rp*(pri_1D(j,1) + pri_1D(jl,1))
                          tilde_op(l,j,4) = weight*(pri_1D(j,4) + pri_1D(jl,4))
                          tilde_op(l,j,5) = weight*(pri_1D(j,5) + pri_1D(jl,5))
 
@@ -569,10 +552,6 @@ subroutine hybrid_wenoEPy(weno_num,lby,uby,jstr,jend,shock_recon)
                    !$acc loop vector
                    do j = 0,end_y ! sy-1,ey
                       if(weno_flag_chunk(j) == two_weno_smooth) then
-                        delta_p = 0.0_rp
-                        do l = -2, 3
-                           delta_p = delta_p + central_1_one_half_p(l)*pri_1D(j+l,1)
-                        enddo
 
                         do n = 1,5
                            hGn = 0.0_rp
@@ -586,7 +565,6 @@ subroutine hybrid_wenoEPy(weno_num,lby,uby,jstr,jend,shock_recon)
                            enddo
                            flx(j,n) = hGn
                         enddo
-                        flx(j,3) = flx(j,3) + delta_p
                       endif
                    enddo
 
@@ -784,7 +762,6 @@ subroutine hybrid_wenoEPz(weno_num,lbz,ubz,kstr,kend,shock_recon)
         real(rp), dimension(5)      :: fhatp, fhatm
         real(rp), dimension(5,5)    :: right, left
         real(rp), dimension(-3:3)   :: central_1_p
-        real(rp), dimension(-2:3)   :: central_1_one_half_p
 
         real(rp) :: phi1, phi2, phi3, phi4, phi5, inner_sum
         real(rp) :: sqrt_rho0, sqrt_rho1, ff, pp, hHn
@@ -792,7 +769,7 @@ subroutine hybrid_wenoEPz(weno_num,lbz,ubz,kstr,kend,shock_recon)
 
         real(rp), parameter :: one8 = 1.0_rp/8.0_rp
         real(rp) :: ir, u_, v_, w_, ek, p_, idz
-        real(rp) :: weight, delta_p, lambda_max
+        real(rp) :: weight, lambda_max
         real(rp) :: vnc, hgU, hgV, hgW, hgE, cc, un_c2
         integer  :: i,ii,j,k,l,m,kl, n, kk, s, iimax
         integer  :: str_z, end_z, kgbl, kstr_z, kend_z
@@ -802,20 +779,15 @@ subroutine hybrid_wenoEPz(weno_num,lbz,ubz,kstr,kend,shock_recon)
 
         call StartProfRange("hybrid_wenoEPz")
 
-        !$omp parallel do collapse(2) default(private), &
-        !$omp shared(weno,RHS,zstep_i,sx,ex,sy,ey,kstr,kend,mask), &
-        !$omp shared(central_1_one_half,central_1,Ltot,lbz,ubz,fd_L,fd_R,phi,sz,ez)
-
         !$acc parallel vector_length(vec_size) default(present) &
         !$acc private(tilde_op,pri_1D,phi_arr) &
         !$acc private(flx_arr,flx,weno_flag_chunk) &
-        !$acc create(central_1_p,central_1_one_half_p)
-        !$acc cache(central_1_p,central_1_one_half_p,tilde_op,pri_1D,phi_arr,flx_arr,flx,weno_flag_chunk)
+        !$acc create(central_1_p)
+        !$acc cache(central_1_p,tilde_op,pri_1D,phi_arr,flx_arr,flx,weno_flag_chunk)
         !$acc loop gang collapse(2)
         do j    = sy,ey
            do i = sx,ex,4
               central_1_p = 2*central_1
-              central_1_one_half_p = central_1_one_half
 
               iimax = min(3,ex-i)
 
@@ -884,7 +856,7 @@ subroutine hybrid_wenoEPz(weno_num,lbz,ubz,kstr,kend,shock_recon)
                           tilde_op(l,k,1) = 2*weight
                           tilde_op(l,k,2) = weight*(pri_1D(k,2) + pri_1D(kl,2))
                           tilde_op(l,k,3) = weight*(pri_1D(k,3) + pri_1D(kl,3))
-                          tilde_op(l,k,4) = weight*(pri_1D(k,4) + pri_1D(kl,4))
+                          tilde_op(l,k,4) = weight*(pri_1D(k,4) + pri_1D(kl,4)) + 0.5_rp*(pri_1D(k,1) + pri_1D(kl,1))
                           tilde_op(l,k,5) = weight*(pri_1D(k,5) + pri_1D(kl,5))
 
                        enddo
@@ -901,10 +873,6 @@ subroutine hybrid_wenoEPz(weno_num,lbz,ubz,kstr,kend,shock_recon)
                     !$acc loop vector
                     do k = 0,end_z !sz-1,ez
                        if(weno_flag_chunk(k) == four_weno_smooth) then
-                          delta_p = 0.0_rp
-                          do l = -2, 3
-                          delta_p = delta_p + central_1_one_half_p(l)*pri_1D(k+l,1)
-                          enddo
 
                           do n = 1,5
                              hHn = 0.0_rp
@@ -918,7 +886,6 @@ subroutine hybrid_wenoEPz(weno_num,lbz,ubz,kstr,kend,shock_recon)
                              enddo
                              flx(k,n) = hHn
                           enddo
-                          flx(k,4) = flx(k,4) + delta_p
                        endif
                     enddo
 
@@ -2666,7 +2633,6 @@ subroutine energy_preservingX(lbx,ubx,ltot,istr,iend,tilde_op_x,pri_1D_x,RHS)
         integer, intent(in) :: ltot
         integer, intent(in) :: istr,iend
 
-        real(rp)                            :: delta_p
         integer                             :: i,j,k,l, il,m, n
 
         real(rp) :: ir, u_, v_, w_, ek, p_, weight, inner_sum, hFn
@@ -2676,11 +2642,6 @@ subroutine energy_preservingX(lbx,ubx,ltot,istr,iend,tilde_op_x,pri_1D_x,RHS)
         real(rp), parameter :: one8= 1.0_rp/8.0_rp
 
         call StartProfRange("energy_preservingX")
-
-        !$omp parallel do collapse(2) default(private), &
-        !$omp shared(sx,ex,sy,ey,sz,ez,phi,RHS,xstep_i,istr,iend),&
-        !$omp shared(central_1,Ltot,lbx,ubx,fd_L,fd_R,central_1_one_half)
-
 
         !$acc parallel default(present)
         !$acc loop gang collapse(2) private(pri_1D_x,tilde_op_x,flx_x)
@@ -2722,7 +2683,7 @@ subroutine energy_preservingX(lbx,ubx,ltot,istr,iend,tilde_op_x,pri_1D_x,RHS)
                                   * (pri_1D_x(i,2) + pri_1D_x(il,2))
 
                     tilde_op_x(i,l,1) = 2*weight
-                    tilde_op_x(i,l,2) = weight*(pri_1D_x(i,2) + pri_1D_x(il,2))
+                    tilde_op_x(i,l,2) = weight*(pri_1D_x(i,2) + pri_1D_x(il,2)) + 0.5_rp*(pri_1D_x(i,1) + pri_1D_x(il,1))
                     tilde_op_x(i,l,3) = weight*(pri_1D_x(i,3) + pri_1D_x(il,3))
                     tilde_op_x(i,l,4) = weight*(pri_1D_x(i,4) + pri_1D_x(il,4))
                     tilde_op_x(i,l,5) = weight*(pri_1D_x(i,5) + pri_1D_x(il,5))
@@ -2732,11 +2693,6 @@ subroutine energy_preservingX(lbx,ubx,ltot,istr,iend,tilde_op_x,pri_1D_x,RHS)
 
               !$acc loop vector
               do i = sx-1,ex
-
-                 delta_p = 0.0_rp
-                 do l = fd_L,fd_R
-                    delta_p = delta_p + central_1_one_half(l)*pri_1D_x(i+l,1)
-                 enddo
 
                  do n = 1,5
                     hFn = 0.0_rp
@@ -2750,7 +2706,6 @@ subroutine energy_preservingX(lbx,ubx,ltot,istr,iend,tilde_op_x,pri_1D_x,RHS)
                     enddo
                     flx_x(i,n) = hFn
                  enddo
-                 flx_x(i,2) = flx_x(i,2) + delta_p
 
                enddo
 
@@ -2786,7 +2741,6 @@ subroutine energy_preservingY(lby,uby,ltot,jstr,jend,tilde_op_y,pri_1D_y,RHS)
         integer, intent(in) :: ltot
         integer, intent(in) :: jstr,jend
 
-        real(rp)                            :: delta_p
         integer                             :: i,j,k,l, m,jl, n
 
         real(rp) :: ir, u_, v_, w_, ek, p_, weight, inner_sum, hGn
@@ -2796,10 +2750,6 @@ subroutine energy_preservingY(lby,uby,ltot,jstr,jend,tilde_op_y,pri_1D_y,RHS)
         real(rp), parameter :: one8= 1.0_rp/8.0_rp
 
         call StartProfRange("energy_preservingY")
-
-        !$omp parallel do collapse(2) default(private), &
-        !$omp shared(sx,ex,sy,ey,sz,ez,phi,RHS,ystep_i,jstr,jend),&
-        !$omp shared(central_1,Ltot,lby,uby,fd_L,fd_R,central_1_one_half)
 
         !$acc parallel default(present)
         !$acc loop gang collapse(2) private(pri_1D_y,tilde_op_y,flx_y)
@@ -2842,7 +2792,7 @@ subroutine energy_preservingY(lby,uby,ltot,jstr,jend,tilde_op_y,pri_1D_y,RHS)
 
                     tilde_op_y(j,l,1) = 2*weight
                     tilde_op_y(j,l,2) = weight*(pri_1D_y(j,2) + pri_1D_y(jl,2))
-                    tilde_op_y(j,l,3) = weight*(pri_1D_y(j,3) + pri_1D_y(jl,3))
+                    tilde_op_y(j,l,3) = weight*(pri_1D_y(j,3) + pri_1D_y(jl,3)) + 0.5_rp*(pri_1D_y(j,1) + pri_1D_y(jl,1))
                     tilde_op_y(j,l,4) = weight*(pri_1D_y(j,4) + pri_1D_y(jl,4))
                     tilde_op_y(j,l,5) = weight*(pri_1D_y(j,5) + pri_1D_y(jl,5))
 
@@ -2851,11 +2801,6 @@ subroutine energy_preservingY(lby,uby,ltot,jstr,jend,tilde_op_y,pri_1D_y,RHS)
 
               !$acc loop vector
               do j = sy-1,ey
-
-                 delta_p = 0.0_rp
-                 do l = fd_L,fd_R
-                    delta_p = delta_p + central_1_one_half(l)*pri_1D_y(j+l,1)
-                 enddo
 
                  do n = 1,5
                     hGn = 0.0_rp
@@ -2869,7 +2814,6 @@ subroutine energy_preservingY(lby,uby,ltot,jstr,jend,tilde_op_y,pri_1D_y,RHS)
                     enddo
                     flx_y(j,n) = hGn
                  enddo
-                 flx_y(j,3) = flx_y(j,3) + delta_p
 
               enddo
 
@@ -2904,7 +2848,6 @@ subroutine energy_preservingZ(lbz,ubz,ltot,kstr,kend,tilde_op_z,pri_1D_z,RHS)
         integer, intent(in) :: ltot
         integer, intent(in) :: kstr,kend
 
-        real(rp)                            :: delta_p
         integer                             :: i,j,k, l, m, kl, n
 
         real(rp) :: ir, u_, v_, w_, ek, p_, weight, inner_sum, hHn
@@ -2914,10 +2857,6 @@ subroutine energy_preservingZ(lbz,ubz,ltot,kstr,kend,tilde_op_z,pri_1D_z,RHS)
         real(rp), parameter :: one8= 1.0_rp/8.0_rp
 
         call StartProfRange("energy_preservingZ")
-
-        !$omp parallel do collapse(2) default(private), &
-        !$omp shared(sx,ex,sy,ey,sz,ez,phi,RHS,zstep_i,kstr,kend),&
-        !$omp shared(central_1,Ltot,lbz,ubz,fd_L,fd_R,central_1_one_half)
 
         !$acc parallel default(present)
         !$acc loop gang collapse(2) private(pri_1D_z,tilde_op_z,flx_z)
@@ -2961,7 +2900,7 @@ subroutine energy_preservingZ(lbz,ubz,ltot,kstr,kend,tilde_op_z,pri_1D_z,RHS)
                     tilde_op_z(k,l,1) = 2*weight
                     tilde_op_z(k,l,2) = weight*(pri_1D_z(k,2) + pri_1D_z(kl,2))
                     tilde_op_z(k,l,3) = weight*(pri_1D_z(k,3) + pri_1D_z(kl,3))
-                    tilde_op_z(k,l,4) = weight*(pri_1D_z(k,4) + pri_1D_z(kl,4))
+                    tilde_op_z(k,l,4) = weight*(pri_1D_z(k,4) + pri_1D_z(kl,4)) + 0.5_rp*(pri_1D_z(k,1) + pri_1D_z(kl,1))
                     tilde_op_z(k,l,5) = weight*(pri_1D_z(k,5) + pri_1D_z(kl,5))
 
                  enddo
@@ -2969,11 +2908,6 @@ subroutine energy_preservingZ(lbz,ubz,ltot,kstr,kend,tilde_op_z,pri_1D_z,RHS)
 
               !$acc loop vector
               do k = sz-1,ez
-
-                 delta_p = 0.0_rp
-                 do l = fd_L, fd_R
-                    delta_p = delta_p + central_1_one_half(l)*pri_1D_z(k+l,1)
-                 enddo
 
                  do n = 1,5
                     hHn = 0.0_rp
@@ -2987,8 +2921,6 @@ subroutine energy_preservingZ(lbz,ubz,ltot,kstr,kend,tilde_op_z,pri_1D_z,RHS)
                     enddo
                     flx_z(k,n) = hHn
                  enddo
-                 flx_z(k,4) = flx_z(k,4) + delta_p
-
               enddo
 
               !$acc loop vector
