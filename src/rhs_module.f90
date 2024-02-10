@@ -241,6 +241,7 @@ subroutine forcing_terms
 
             call ComputeTCHPressureGradient(phi,RHS,force_turbulent_channel)
 
+
           case('hTurb')
 
             call hTurb_ForcingTerm(phi,RHS)
@@ -334,8 +335,6 @@ subroutine ComputeTCHPressureGradient(phi,RHS,prs_grad)
 end subroutine ComputeTCHPressureGradient
 
 
-
-
 subroutine dump_residuals
 
         use FileModule
@@ -345,8 +344,13 @@ subroutine dump_residuals
         integer  :: i,j,k
         real(rp) :: iNp
         real(rp) :: rhs_1, rhs_2, rhs_3, rhs_4, rhs_5
+        real(rp) :: r_, ru, rv, rw, re
         real(rp) :: lcl_res_1, lcl_res_2, lcl_res_3, lcl_res_4, lcl_res_5
         real(rp) :: gbl_res_1, gbl_res_2, gbl_res_3, gbl_res_4, gbl_res_5
+        real(rp) :: lcl_max_r_, lcl_max_ru, lcl_max_rv, lcl_max_rw, lcl_max_re
+        real(rp) :: gbl_max_r_, gbl_max_ru, gbl_max_rv, gbl_max_rw, gbl_max_re
+        real(rp) :: lcl_min_r_, lcl_min_ru, lcl_min_rv, lcl_min_rw, lcl_min_re
+        real(rp) :: gbl_min_r_, gbl_min_ru, gbl_min_rv, gbl_min_rw, gbl_min_re
         type(FileType) :: residualFile
         
         lcl_res_1 = 0.0_rp
@@ -355,9 +359,26 @@ subroutine dump_residuals
         lcl_res_4 = 0.0_rp
         lcl_res_5 = 0.0_rp
 
-        !$acc parallel default(present) copy(lcl_res_1,lcl_res_2,lcl_res_3,lcl_res_4,lcl_res_5)
+        lcl_max_r_ = 0.0_rp
+        lcl_max_ru = 0.0_rp
+        lcl_max_rv = 0.0_rp
+        lcl_max_rw = 0.0_rp
+        lcl_max_re = 0.0_rp
+
+        lcl_min_r_ = huge(0.0_rp)
+        lcl_min_ru = huge(0.0_rp)
+        lcl_min_rv = huge(0.0_rp)
+        lcl_min_rw = huge(0.0_rp)
+        lcl_min_re = huge(0.0_rp)
+
+        !$acc parallel default(present) &
+        !$acc copy(lcl_res_1,lcl_res_2,lcl_res_3,lcl_res_4,lcl_res_5) &
+        !$acc copy(lcl_max_r_,lcl_max_ru,lcl_max_rv,lcl_max_rw,lcl_max_re) &
+        !$acc copy(lcl_min_r_,lcl_min_ru,lcl_min_rv,lcl_min_rw,lcl_min_re)
         !$acc loop gang, vector collapse(3) &
-        !$acc reduction(+:lcl_res_1,lcl_res_2,lcl_res_3,lcl_res_4,lcl_res_5)
+        !$acc reduction(+:lcl_res_1,lcl_res_2,lcl_res_3,lcl_res_4,lcl_res_5) &
+        !$acc reduction(max:lcl_max_r_,lcl_max_ru,lcl_max_rv,lcl_max_rw,lcl_max_re) &
+        !$acc reduction(min:lcl_min_r_,lcl_min_ru,lcl_min_rv,lcl_min_rw,lcl_min_re)
         do       k = sz,ez
            do    j = sy,ey
               do i = sx,ex
@@ -374,6 +395,25 @@ subroutine dump_residuals
                  lcl_res_3 = lcl_res_3 + rhs_3*rhs_3
                  lcl_res_4 = lcl_res_4 + rhs_4*rhs_4
                  lcl_res_5 = lcl_res_5 + rhs_5*rhs_5
+
+                 ! getting max and min values of conservative variables
+                 r_ = abs(phi(i,j,k,1))
+                 ru = abs(phi(i,j,k,2))
+                 rv = abs(phi(i,j,k,3))
+                 rw = abs(phi(i,j,k,4))
+                 re = abs(phi(i,j,k,5))
+
+                 lcl_min_r_ = min(r_,lcl_min_r_)
+                 lcl_min_ru = min(ru,lcl_min_ru)
+                 lcl_min_rv = min(rv,lcl_min_rv)
+                 lcl_min_rw = min(rw,lcl_min_rw)
+                 lcl_min_re = min(re,lcl_min_re)
+
+                 lcl_max_r_ = max(r_,lcl_max_r_)
+                 lcl_max_ru = max(ru,lcl_max_ru)
+                 lcl_max_rv = max(rv,lcl_max_rv)
+                 lcl_max_rw = max(rw,lcl_max_rw)
+                 lcl_max_re = max(re,lcl_max_re)
 
               enddo
            enddo
@@ -402,6 +442,26 @@ subroutine dump_residuals
         if(ieee_is_nan(gbl_res_4)) stop 'divergency has been detected'
         if(ieee_is_nan(gbl_res_5)) stop 'divergency has been detected'
 
+        ! get global max
+        call MPI_allreduce(lcl_max_r_, gbl_max_r_, 1, MPI_RP, MPI_MAX, mpi_comm_cart, err)
+        call MPI_allreduce(lcl_max_ru, gbl_max_ru, 1, MPI_RP, MPI_MAX, mpi_comm_cart, err)
+        call MPI_allreduce(lcl_max_rv, gbl_max_rv, 1, MPI_RP, MPI_MAX, mpi_comm_cart, err)
+        call MPI_allreduce(lcl_max_rw, gbl_max_rw, 1, MPI_RP, MPI_MAX, mpi_comm_cart, err)
+        call MPI_allreduce(lcl_max_re, gbl_max_re, 1, MPI_RP, MPI_MAX, mpi_comm_cart, err)
+
+        if(ieee_is_nan(gbl_max_r_)) stop 'divergency has been detected'
+        if(ieee_is_nan(gbl_max_ru)) stop 'divergency has been detected'
+        if(ieee_is_nan(gbl_max_rv)) stop 'divergency has been detected'
+        if(ieee_is_nan(gbl_max_rw)) stop 'divergency has been detected'
+        if(ieee_is_nan(gbl_max_re)) stop 'divergency has been detected'
+
+        ! get global min
+        call MPI_allreduce(lcl_min_r_, gbl_min_r_, 1, MPI_RP, MPI_MIN, mpi_comm_cart, err)
+        call MPI_allreduce(lcl_min_ru, gbl_min_ru, 1, MPI_RP, MPI_MIN, mpi_comm_cart, err)
+        call MPI_allreduce(lcl_min_rv, gbl_min_rv, 1, MPI_RP, MPI_MIN, mpi_comm_cart, err)
+        call MPI_allreduce(lcl_min_rw, gbl_min_rw, 1, MPI_RP, MPI_MIN, mpi_comm_cart, err)
+        call MPI_allreduce(lcl_min_re, gbl_min_re, 1, MPI_RP, MPI_MIN, mpi_comm_cart, err)
+
         if(rank == root) then
           residualFile%name = 'RESIDUALS_MONITOR'
           residualFile%dir  = trim(data_dir)
@@ -412,12 +472,22 @@ subroutine dump_residuals
                gbl_res_2,     &
                gbl_res_3,     &
                gbl_res_4,     &
-               gbl_res_5
+               gbl_res_5,     &
+               gbl_max_r_,    & 
+               gbl_min_r_,    &
+               gbl_max_ru,    &
+               gbl_min_ru,    &
+               gbl_max_rv,    &
+               gbl_min_rv,    &
+               gbl_max_rw,    &
+               gbl_min_rw,    &
+               gbl_max_re,    &
+               gbl_min_re
 
           call CloseFile(residualFile)
         endif
 
-        10 format(I7,5e18.9)
+        10 format(I7,15e18.9)
 
         return
 end subroutine dump_residuals
