@@ -1238,7 +1238,7 @@ subroutine init_turbulent_channel(status)
                 
                    uy = 0.5_rp * dp_dx * yj**2 + c_1 * yj + c_2
 
-                   exp_ = 0.01_rp*exp(-4*(4*xi**2 + zk**2))
+                   exp_ = 0.01*exp(-4*(4*xi**2 + zk**2))
                 
                    psi_y = -2*yj*zk * exp_
                    psi_z = (yj**2*(8*zk**2-1.0_rp) - 8*zk**2 + 1.0_rp) * exp_
@@ -1256,56 +1256,6 @@ subroutine init_turbulent_channel(status)
         status = 0
         return
 end subroutine init_turbulent_channel
-
-
-
-subroutine init_turbulent_pipe(status)
-        implicit none
-        integer, intent(out) :: status
-
-        ! local declarations
-        real(rp) :: wz,psi_y, psi_z, exp_, xi, yj, zk
-        
-        if(rank == root) write(*,'(A,A,A)', advance = 'no') &
-        ' Initializing turbulent channal: '
-
-        do k       = lbz,ubz
-           do j    = lby,uby
-              do i = lbx,ubx
-
-                 xi = x(i)
-                 yj = y(j)
-                 zk = z(k)
-
-                 phi(i,j,k,1) = 1.0_rp
-                 U  (i,j,k)   = 0.0_rp
-                 V  (i,j,k)   = 0.0_rp
-                 W  (i,j,k)   = 0.0_rp
-                 P  (i,j,k)   = 1.0_rp
-
-                 if(xi**2 + yj**2 < 1.0_rp) then
-                
-                   wz = 2*u_inf * (1.0_rp - xi**2 - yj**2)
-
-                   exp_ = 0.3_rp*u_inf*exp(-4*(4*xi**2 + zk**2))
-                
-                   psi_y = -2*yj*xi * exp_
-                   psi_z = (yj**2*(8*xi**2-1.0_rp) - 8*xi**2 + 1.0_rp) * exp_
-        
-                   U(i,j,k) = - psi_y
-                   V(i,j,k) =   psi_z
-                   W(i,j,k) =   wz
-
-                 endif
-              enddo
-           enddo
-        enddo
-
-        if(rank == root) write(*, '(A)') 'done!'
-        status = 0
-        return
-end subroutine init_turbulent_pipe
-
 
 
 
@@ -1444,68 +1394,6 @@ subroutine init_shock_bubble_2D(status)
         status = 0
         return
 end subroutine init_shock_bubble_2D
-
-subroutine init_masked_ambient(status)
-        
-        implicit none
-        integer, intent(out) :: status
-        real(rp)             :: u_init, alpha, beta
-        integer              :: n
-
-        if(rank == root) write(*,'(A,A,A)', advance = 'no') ' Initializing masked ambient: '
-        
-        ! set the uniform speed
-        if(Mach > 0.6_rp) then
-          u_init = 0.6_rp*sqrt(gamma0)
-        else
-          u_init = u_inf
-        endif
-
-        beta = 1.0_rp
-        alpha = (beta**2)*(gamma0-1._rp)/(8._rp*gamma0*pi**2)
-
-        do k       = lbz,ubz
-           do j    = lby,uby
-              do i = lbx,ubx
-                
-                 !epsv =  0.5_rp*u_init*tanh(100*y(j))*exp(-0.25_rp*y(j)**2)*exp(-0.25_rp*(x(i)+1.0_rp)**2)
-                 !x_ = x(i) - x0
-                 !y_ = y(j) - y0
-
-                 !r2 = x_**2 + y_**2
-                 !exp_ = exp(1._rp-r2)
-                 !
-                 !phi(i,j,k,1) = (1._rp - alpha * exp_)**(1._rp    /(gamma0-1._rp))
-                 !P  (i,j,k)   = (1._rp - alpha * exp_)**(gamma0/(gamma0-1._rp))
-
-                 !U(i,j,k) = u_init - beta/(2._rp*pi) * (y_ * exp_**0.5_rp)
-                 !V(i,j,k) =          beta/(2._rp*pi) * (x_ * exp_**0.5_rp)
-                 !W(i,j,k) = 0._rp
-        
-                 phi(i,j,k,1) = 1.0_rp
-                 U  (i,j,k)   = u_inf
-                 V  (i,j,k)   = 0.0_rp
-                 W  (i,j,k)   = 0.0_rp
-                 P  (i,j,k)   = 1.0_rp
-
-                 do n = 1, nbody
-                    if(mask_field(i,j,k,n) < mask_fluid) then
-                    phi(i,j,k,1) = 1.0_rp
-                      U(i,j,k)   = 0.0_rp
-                      V(i,j,k)   = 0.0_rp
-                      W(i,j,k)   = 0.0_rp
-                      P(i,j,k)   = 1.0_rp
-                    endif
-                 enddo
-
-              enddo
-           enddo
-        enddo
-
-        if(rank == root) write(*, '(A)') 'done!'
-        status = 0
-        return
-end subroutine init_masked_ambient
 
 
 subroutine init_ambient_supersonic(status)
@@ -2442,125 +2330,6 @@ subroutine init_TBLNoise(status)
 
         return
 end subroutine init_TBLNoise
-
-
-
-subroutine init_tbl_ibm(status)
-
-        implicit none
-        integer, intent(out) :: status
-        
-        real(rp), parameter                 :: pi_wake = 0.434_rp
-        real(rp), parameter                 :: toll    = 1.0E-14_rp
-        real(rp), dimension(:), allocatable :: y_tmp, uPlus
-        real(rp), dimension(1-GN:ny+GN)     :: VelY_inc, VelY_cmp, RhoY, TmpY
-        real(rp), dimension(1-GN:ny+GN)     :: VelY_cmp_old
-
-        real(rp) :: yj, eta,yp,up, ue, iReTau, Tr, Tw, Rw, alf, err
-        real(rp) :: uu, fuu, du, uci
-        integer  :: j, jw, itr, itmx = 100
-
-        allocate(y_tmp(1-GN:ny+GN))
-        allocate(UPlus(1-GN:ny+GN))
-        call compute_grid_point(y_tmp,ny,lbound(y_tmp,1),ubound(y_tmp,1),&
-                                ymin,ymax,stretching_par,gridpoint_y)
-
-        !
-        ! === find wall location
-        !
-        jw = 1-GN
-        do j = 1-GN, ny+GN
-           if(y_tmp(j) > 0.0_rp) then
-             jw = j-1
-             exit
-           endif
-        enddo
-        !
-        ! === get musker profile as a function of ReTau
-        !
-        iReTau = 1.0_rp/ReTau
-        uPlus  = 0.0_rp
-        do j = jw, ny+GN
-        
-             yj  = y_tmp(j) - y_tmp(jw)
-             yp  = yj * ReTau
-
-             eta = yp*iReTau
-             eta = min(1.0_rp,eta)
-             yp  = eta*retau
-
-             up = 5.424_rp*atan((2*yp-8.15_rp)/16.7_rp)&
-                     +log10((yp+10.6_rp)**9.6_rp/(yp**2-8.15_rp*yp+86)**2)-3.51132976630723_rp+&
-                      2.44_rp*(pi_wake*(6*eta**2-4*eta**3)+(eta**2*(1-eta)))
-
-             UPlus(j) = up
-
-        enddo
-        !
-        ! === rescale Musker profile to get physical speed
-        !
-        ue = maxval(UPlus)
-        do j = 1-GN,ny+GN
-           VelY_inc(j) = uPlus(j)/ue*u_inf
-        enddo
-        !
-        ! === get temperature and density profiles via SRA
-        !
-        Tr  = 1.0_rp + 0.5_rp*(Prandtl)**(1.0_rp/3.0_rp)*(gamma0-1.0_rp)*Mach**2
-        Tw  = TRat*Tr
-        Rw  = 1.0_rp/Tw
-        alf = 1.1_rp*Prandtl
-
-        itr = 0
-        err = 2.0_rp*toll
-        VelY_cmp = VelY_inc
-        TmpY     = 1.0_rp
-        RhoY     = 1.0_rp
-        do while(err > toll .and. itr < itmx)
-           
-           VelY_cmp_old = VelY_cmp
-           ! compute Temperature and Density profiles
-           do j = jw,ny+GN
-                uu      = VelY_cmp(j)/VelY_cmp(ny)
-                fuu     = alf*uu+(1.0_rp-alf)*uu**2
-                TmpY(j) = tw+(tr-tw)*fuu+(1.0_rp-tr)*uu**2           !< Zhang
-                RhoY(j) = 1.0_rp/TmpY(j)
-           enddo
-
-           do j = jw+1,ny+GN
-              du       = VelY_inc(j)-VelY_inc(j-1)
-              uci      = 0.5_rp*(sqrt(Rw/RhoY(j))+sqrt(Rw/RhoY(j-1))) 
-              VelY_cmp(j) = VelY_cmp(j-1)+uci*du
-           enddo
-        
-           err = sum(abs(VelY_cmp - VelY_cmp_old))
-           itr = itr + 1
-        enddo
-        !
-        ! === assign to inflow
-        !
-        do k       = lbz,ubz
-           do j    = lby,uby
-              do i = lbx,ubx
-
-              phi(i,j,k,1) = RhoY(j)
-                U(i,j,k)   = VelY_inc(j)
-                V(i,j,k)   = 0.0_rp
-                W(i,j,k)   = 0.0_rp
-                P(i,j,k)   = RhoY(j)*TmpY(j)
-        
-              enddo
-           enddo
-        enddo
-
-        deallocate(y_tmp,uPlus)
-
-        status = 0
-        return
-end subroutine init_tbl_ibm
-
-
-
 
 
 
