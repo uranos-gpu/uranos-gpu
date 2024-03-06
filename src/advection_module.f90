@@ -4,6 +4,7 @@ use mpi_module
 use storage_module
 use flux_module
 use profiling_module
+use nscbc_boundary_conditions
 !$ use omp_lib
 implicit none
 private
@@ -19,11 +20,23 @@ subroutine advection_fluxes(scheme)
 
         ! local declarations
         integer            :: istr,iend,jstr,jend,kstr,kend, ltot
-        integer, parameter :: W = 1, E = 2, N = 4
+        integer, parameter :: W = 1, E = 2, S = 3, N = 4
         integer, parameter :: NoOne = MPI_PROC_NULL
-        integer            :: shock_recon
+        integer            :: shock_recon, f
+
+        integer, dimension(6)      :: bound_nodes
+        integer, dimension(6)      :: bound_norms
+        character(1), dimension(6) :: bound_faces
+        integer                    :: bnode, bnorm
+        character(1)               :: bface
+        real(rp)                   :: Twall
 
         call StartProfRange("advection_fluxes")
+
+        ! set the bound nodes, norms and faces
+        bound_nodes = (/ sx , ex , sy , ey , sz ,  ez/)
+        bound_norms = (/ -1 ,  1 , -1 ,  1 , -1 ,  1 /)
+        bound_faces = (/ 'W', 'E', 'S', 'N', 'B', 'F'/)
 
         selectcase(trim(scheme))
         case('hybrid_wenoEP')
@@ -44,10 +57,15 @@ subroutine advection_fluxes(scheme)
         kend = ez
 
         ltot = fd_order/2
-
+        
+        ! nscbc outflow
         if(my_neighbour(E) == NoOne .and. bc(E) == 'nscbc_outflow') iend = ex-1
         if(my_neighbour(N) == NoOne .and. bc(N) == 'nscbc_outflow') jend = ey-1
         if(my_neighbour(W) == NoOne .and. bc(W) == 'nscbc_inflow') istr = sx+1
+
+        ! nscbc wall
+        if(my_neighbour(S) == NoOne .and. bc(S) == 'nscbc_isothermal_wall') jstr = sy+1
+        if(my_neighbour(N) == NoOne .and. bc(N) == 'nscbc_isothermal_wall') jend = ey-1
 
         selectcase(trim(scheme))
 
@@ -74,9 +92,28 @@ subroutine advection_fluxes(scheme)
 
         endselect
 
+        ! nscbc outflow
         if(my_neighbour(E) == NoOne .and. bc(E) == 'nscbc_outflow') call BCRelax_X(RHS)
         if(my_neighbour(N) == NoOne .and. bc(N) == 'nscbc_outflow') call BCRelax_Y(RHS)
         if(my_neighbour(W) == NoOne .and. bc(W) == 'nscbc_inflow') call BCRelax_inflowX(RHS)
+        
+        do f = 1,6
+           if(my_neighbour(f) == MPI_PROC_NULL) then
+
+             bnode = bound_nodes(f)
+             bnorm = bound_norms(f)
+             bface = bound_faces(f)
+
+             select case(bc(f))
+
+               case('nscbc_isothermal_wall') 
+                 Twall = 1.0_rp
+                 call refl_wall(phi,bnode,bnorm,bface,Twall)      
+
+             end select
+
+           endif
+        enddo
 
         call EndProfRange
 

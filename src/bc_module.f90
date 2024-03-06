@@ -66,11 +66,7 @@ subroutine set_bc_conditions
 
              case('nscbc_isothermal_wall')
                Twall = 1.0_rp
-               if(restart_flag) then
-                 call isothermal_wall(phi,bound,Twall) !yes acc
-               else
-                 call nscbc_wall(phi,bound,Twall) !yes acc
-               endif
+               call isothermal_wall(phi,bound,Twall) !yes acc
 
              case('isothermal_wall'             , &
                   'dws_isothermal'              , &
@@ -150,6 +146,9 @@ subroutine set_bc_conditions
 
              case('neumann_wall')
                 call Neumann_wall(phi,bound)
+
+             case('channel_wall_ibm')
+                call channel_wall_ibm(phi,bound) !yes acc
 
              case('pressure_inflow')
                 if(restart_flag) then
@@ -2593,6 +2592,81 @@ subroutine Neumann_wall(phi,b)
 
         return
 end subroutine Neumann_wall
+
+
+subroutine channel_wall_ibm(phi,b)
+
+        implicit none
+        real(rp), dimension(:,:,:,:), allocatable, intent(inout) :: phi
+        type(face_type)                          , intent(in)    :: b
+
+        integer :: i,j,k,ig,jg
+        integer :: node, norm
+
+        node = b%node
+        norm = b%norm
+        
+        selectcase(b%face)
+          case('N','S')
+        
+          !$acc parallel default(present)
+          !$acc loop gang, vector collapse(3)
+          do k       = lbz,ubz
+             do j    = -3,GN    !< force points inside the IBM
+                do i = lbx,ubx
+
+                   jg = node + norm*j      !< ghost node
+
+                   phi(i,jg,k,1) = 1.0_rp
+                   phi(i,jg,k,2) = 0.0_rp
+                   phi(i,jg,k,3) = 0.0_rp
+                   phi(i,jg,k,4) = 0.0_rp
+                   phi(i,jg,k,5) = 1.0_rp/(gamma0-1.0_rp)
+
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+
+          case('E','W') 
+          !$acc parallel default(present)
+          !$acc loop gang, vector collapse(3)
+          do k       = lbz,ubz
+             do j    = lby,uby 
+                do i = -3,GN
+
+                   ig = node + norm*i      !< ghost node
+
+                   phi(ig,j,k,1) = 1.0_rp
+                   phi(ig,j,k,2) = 0.0_rp
+                   phi(ig,j,k,3) = 0.0_rp
+                   phi(ig,j,k,4) = 0.0_rp
+                   phi(ig,j,k,5) = 1.0_rp/(gamma0-1.0_rp)
+
+                enddo
+             enddo
+          enddo
+          !$acc end parallel
+
+
+
+
+
+
+
+
+        case default
+          print*, ' channel_wall_ibm is not implemented for face ', trim(b%face)
+          stop
+
+        endselect
+
+        return
+end subroutine channel_wall_ibm
+
+
+
+
 
 
 
