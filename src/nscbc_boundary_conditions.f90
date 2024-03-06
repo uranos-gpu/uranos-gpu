@@ -40,7 +40,8 @@ subroutine refl_wall(phi,bnode,bnorm,bface,Twall)
         yW = 0.5_rp*(y(j1) + y(j0))
         y1 = abs(y(j1)-yW)
         y2 = abs(y(j2)-yW)
-        idy = 1._rp/(abs(y(j1) - y(j0)))
+        !idy = 1._rp/(abs(y(j1) - y(j0)))
+        idy = 1._rp/(1.5_rp*0._rp+2._rp*y1-0.5_rp*y2)
 
         selectcase(bface)
         case('S','N')
@@ -55,11 +56,17 @@ subroutine refl_wall(phi,bnode,bnorm,bface,Twall)
                rEW = rrW*ttW/(gamma0-1._rp)
         
                ! wall derivative of conservative variables
-               dw_dn(1) = phi(i,j1,k,1)-phi(i,j0,k,1) 
-               dw_dn(2) = phi(i,j1,k,2)-phi(i,j0,k,2) 
-               dw_dn(3) = phi(i,j1,k,3)-phi(i,j0,k,3) 
-               dw_dn(4) = phi(i,j1,k,4)-phi(i,j0,k,4) 
-               dw_dn(5) = phi(i,j1,k,5)-phi(i,j0,k,5) 
+               !dw_dn(1) = phi(i,j1,k,1)-phi(i,j0,k,1) 
+               !dw_dn(2) = phi(i,j1,k,2)-phi(i,j0,k,2) 
+               !dw_dn(3) = phi(i,j1,k,3)-phi(i,j0,k,3) 
+               !dw_dn(4) = phi(i,j1,k,4)-phi(i,j0,k,4) 
+               !dw_dn(5) = phi(i,j1,k,5)-phi(i,j0,k,5) 
+
+               dw_dn(1) = -1.5_rp*rrW+2._rp*phi(i,j1,k,1)-0.5_rp*phi(i,j2,k,1)
+               dw_dn(2) = -1.5_rp*uuW+2._rp*phi(i,j1,k,2)-0.5_rp*phi(i,j2,k,2)
+               dw_dn(3) = -1.5_rp*vvW+2._rp*phi(i,j1,k,3)-0.5_rp*phi(i,j2,k,3)
+               dw_dn(4) = -1.5_rp*wwW+2._rp*phi(i,j1,k,4)-0.5_rp*phi(i,j2,k,4)
+               dw_dn(5) = -1.5_rp*rEW+2._rp*phi(i,j1,k,5)-0.5_rp*phi(i,j2,k,5)
 
                !Compute eigenvectors
                rho = rrW
@@ -169,7 +176,7 @@ subroutine refl_wall(phi,bnode,bnorm,bface,Twall)
                 do mm=1,5
                  df = df + er(mm,m) * dwc_dn(mm)
                 enddo
-                RHS(i,j1,k,m) = RHS(i,j1,k,m) - df*idy !- RHS(i,j0,k,1) 
+                RHS(i,j1,k,m) = RHS(i,j1,k,m) - bnorm * df*idy !- RHS(i,j0,k,1) 
                enddo
 
            enddo
