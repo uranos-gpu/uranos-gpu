@@ -128,7 +128,8 @@ subroutine init_boundary_conditions
                         call init_shock_vortex(err)
 
                 elseif(ic == 'turbulent_channel') then
-                        call init_turbulent_channel(err)
+                        !call init_turbulent_channel(err)
+                        call init_turbulent_chennel_random(err)
 
                 elseif(ic == 'ambient_supersonic') then
                         call init_ambient_supersonic(err)
