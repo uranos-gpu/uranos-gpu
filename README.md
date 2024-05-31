@@ -92,6 +92,42 @@ module load nvhpc/23.1
 mpirun -n $SLURM_NTASKS ./Uranos.exe path/to/file.dat path/to/restart.bin
 ```
 
+# Basics tests
+
+SHOCK TUBE
+
+To become familiar with URANOS it is recommended to first launch a one-dimensional test consisting of a shock tube. The commands are as follows:
+```
+mpirun -np 4 ./Uranos.exe tests/shock_tube_x.dat
+```
+The run produces the temporal evolution of a shock tube which can be post-processed downstream using PostUranos.exe. The command is as follows:
+```
+./PostUranos.exe tests/shock_tube_x.dat
+```
+
+The process produces as autoput a `DATA/SHOCK_TUBE_1D` directory within which the results of the simulation and the post-treatments. In particular results can be visualized retrospectively in terms of line graphs (GNUPLOT) or two-dimensional fields (VTK).
+
+CHANNEL DNS
+
+As the use of the solver becomes more complex, the user is encouraged to try the `CHANNEL_DNS` test. The text consists of a turbulent channel flow with a bulk Mach number of 1.5. The following is the operating command using 4 computing units:
+
+```
+mpirun -np 4 ./Uranos.exe tests/channel_dns.dat
+```
+
+Statistics are produced while the solver is running and collected in `DATA/CHANNEL_DNS/VEL_STATS` and `DATA/CHANNEL_DNS/BUD_STATS` for the wall normal and the mmomentum budget statistics, respectively. Using PostUranos.exe allows to derive contours plots. 
+
+BOUNDARY LAYER
+
+Similarly to the channel flow test case, the third test case comprises of a hypersonic turbulent boundary layer with the lower-wall modeled according to a Wall-Modeled LES framework. The test can be run according to the following command:
+
+```
+mpirun -np 4 ./Uranos.exe tests/hypersonic_boundary_layer.dat
+```
+
+Again, wall normal statistics are collected while the code is running and saved in specific directories over some discrete stations of the boundary layer.
+
+
 # Interpreting the file.dat file
 
 `xmin` defines the x-left boundary of the domain
@@ -219,6 +255,12 @@ Data in the `DATA/data_dir/BINARY` can be post-processed with `PostUranos.exe` v
 ```
 
 PostUranos is a serial code which provide the contours plots and some video related to a simulation. You can find the visual results in `DATA/data_dir/VTK` (for 3D fields) and `DATA/data_dir/VTK2D` (for 2D fields)
+
+# Contributing
+We appreciate any contributions and feedback that can improve URANOS. If you wish to contribute to the tool, please get in touch with the maintainers or open an Issue in the repository / a thread in Discussions. Pull Requests are welcome, but please propose/discuss the changes in an linked Issue first.
+
+# Licencing
+Please refer to the licence file. 
 
 
 
