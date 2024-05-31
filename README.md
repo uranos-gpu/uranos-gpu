@@ -92,6 +92,8 @@ module load nvhpc/23.1
 mpirun -n $SLURM_NTASKS ./Uranos.exe path/to/file.dat path/to/restart.bin
 ```
 
+For people not disposing of a HPC architecture, the solver can be compiled and run within the nvhpc framework by installing the suite from `https://developer.nvidia.com/hpc-sdk-downloads`.
+
 # Basics tests
 
 SHOCK TUBE
