@@ -1238,7 +1238,7 @@ subroutine init_turbulent_channel(status)
                 
                    uy = 0.5_rp * dp_dx * yj**2 + c_1 * yj + c_2
 
-                   exp_ = 0.3_rp*u_inf*exp(-4*(4*xi**2 + zk**2))
+                   exp_ = 0.01*exp(-4*(4*xi**2 + zk**2))
                 
                    psi_y = -2*yj*zk * exp_
                    psi_z = (yj**2*(8*zk**2-1.0_rp) - 8*zk**2 + 1.0_rp) * exp_
@@ -1259,6 +1259,78 @@ end subroutine init_turbulent_channel
 
 
 
+
+
+subroutine init_turbulent_channel_random(status)
+! ---------------------------------------------------------
+!
+!       Turbulent channel initialization
+!       REFERENCE: DANS.HENNINGSON, 
+!                 "On turbulent spots in plane Poiseuille flow"
+!                 pag 186
+!
+! ---------------------------------------------------------
+        use random_module, only: random_normal
+
+        implicit none
+        integer, intent(out) :: status
+
+        ! local declarations
+        real(rp) :: dp_dx, c_1, c_2, uy
+        real(rp) :: r1, r2, r3, u_, v_, w_, xi, yj, zk
+        
+        if(rank == root) write(*,'(A,A,A)', advance = 'no') &
+        ' Initializing turbulent channel with random numbers: '
+
+        dp_dx = -1.5_rp*2._rp*u_inf
+        c_1   =   0.0_rp
+        c_2   = - 0.5_rp*dp_dx
+        
+        do k       = lbz,ubz
+           do j    = lby,uby
+              do i = lbx,ubx
+
+                 xi = x(i)
+                 yj = y(j)
+                 zk = z(k)
+
+                 phi(i,j,k,1) = 1.0_rp
+                 U  (i,j,k)   = 0.0_rp
+                 V  (i,j,k)   = 0.0_rp
+                 W  (i,j,k)   = 0.0_rp
+                 P  (i,j,k)   = 1.0_rp
+
+                 if(abs(yj) < 1.0_rp) then
+
+                   uy = 0.5_rp * dp_dx * yj**2 + c_1 * yj + c_2
+                   U(i,j,k) = uy
+
+                 endif
+                 if(abs(yj) < 0.9_rp) then
+
+                   uy = 0.5_rp * dp_dx * yj**2 + c_1 * yj + c_2
+
+                   call random_normal(r1)
+                   call random_normal(r2)
+                   call random_normal(r3)
+
+                   u_ = 0.1*r1
+                   v_ = 0.2*r2
+                   w_ = 0.2*r3
+        
+                   U(i,j,k) = uy + u_
+                   V(i,j,k) = v_
+                   W(i,j,k) = w_
+
+                 endif
+              enddo
+           enddo
+        enddo
+
+        if(rank == root) write(*, '(A)') 'done!'
+        status = 0
+        return
+end subroutine init_turbulent_channel_random
 
 
 

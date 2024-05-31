@@ -196,6 +196,7 @@ OBJECTS = $(addprefix $(OBJDIR), mpi_module.o \
 	  flux_module.o \
 	  mpi_comm_module.o \
 	  inflow_module.o \
+	  nscbc_boundary_conditions.o \
 	  sgs_module.o \
 	  df_module.o \
 	  GetRetau_module.o \
@@ -323,7 +324,7 @@ $(OBJDIR)ic_module.o				: $(SRCDIR)ic_module.f90 $(addprefix $(OBJDIR), paramete
 $(OBJDIR)init_bc_module.o		 	: $(SRCDIR)init_bc_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o ic_module.o bc_module.o rhs_module.o)
 $(OBJDIR)bc_module.o			 	: $(SRCDIR)bc_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o fluid_functions_module.o inflow_module.o real_to_integer_module.o mpi_comm_module.o)
 $(OBJDIR)rhs_module.o			 	: $(SRCDIR)rhs_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o advection_module.o viscous_module.o integration_module.o sgs_module.o)
-$(OBJDIR)advection_module.o			: $(SRCDIR)advection_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o flux_module.o inflow_module.o nvtx.o roctx.o)
+$(OBJDIR)advection_module.o			: $(SRCDIR)advection_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o flux_module.o inflow_module.o nvtx.o roctx.o nscbc_boundary_conditions.o)
 $(OBJDIR)shock_detection_module.o		: $(SRCDIR)shock_detection_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o fluid_functions_module.o mpi_comm_module.o)
 $(OBJDIR)viscous_module.o			: $(SRCDIR)viscous_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o nvtx.o roctx.o)
 $(OBJDIR)flux_module.o				: $(SRCDIR)flux_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o)
@@ -333,6 +334,8 @@ $(OBJDIR)df_module.o				: $(SRCDIR)df_module.f90 $(addprefix $(OBJDIR), paramete
 $(OBJDIR)GetRetau_module.o			: $(SRCDIR)GetRetau_module.f90 $(addprefix $(OBJDIR), parameters_module.o mpi_module.o fluid_functions_module.o mesh_module.o)
 $(OBJDIR)wmles_module.o				: $(SRCDIR)wmles_module.f90 $(addprefix $(OBJDIR), parameters_module.o fluid_functions_module.o)
 $(OBJDIR)profiling_module.o			: $(SRCDIR)profiling_module.f90 $(addprefix $(OBJDIR), nvtx.o roctx.o)
+$(OBJDIR)nscbc_boundary_conditions.o		: $(SRCDIR)nscbc_boundary_conditions.f90 $(addprefix $(OBJDIR), parameters_module.o mpi_module.o storage_module.o mesh_module.o)
+$(OBJDIR)nvtx.o					: $(SRCDIR)nvtx.f90
 $(OBJDIR)nvtx.o					: $(SRCDIR)nvtx.f90
 $(OBJDIR)roctx.o					: $(SRCDIR)roctx.f90
 

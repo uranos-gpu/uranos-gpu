@@ -369,9 +369,10 @@ end subroutine compute_dynamical_smagorinsky
 
 
 
+
 subroutine compute_wale(VIS,LMD)
 
-        use parameters_module, only: cp, central_1, central_fd_order, mu_inf, bc
+        use parameters_module, only: cp, central_1, mu_inf, bc
         use mpi_module       , only: sx,ex, sy,ey, sz,ez
         use storage_module   , only: phi, U, V, W
         use mesh_module      , only: xstep, ystep, zstep, xstep_i, ystep_i, zstep_i
@@ -384,13 +385,13 @@ subroutine compute_wale(VIS,LMD)
         real(rp), parameter :: one3 = 1.0_rp/3.0_rp, two3 = 2.0_rp/3.0_rp
         real(rp)            :: Cw2
         real(rp)            :: delta2
-        real(rp)            :: sqrtS_S_, sqrtSdSd, sumSS, sumSdSd
+        real(rp)            :: sqrtS_S_, sqrtSdSd, sumSS, sumSdSd, SdTrace
         real(rp)            :: S_S__52
         real(rp)            :: SdSd_32
         real(rp)            :: SdSd_54
         real(rp)            :: mu_turb, lb_turb, i_mu_inf
 
-        real(rp)            :: i_st_x, i_st_y, i_st_z
+        real(rp)            :: i_st_x, i_st_y, i_st_z, cl
         real(rp)            :: cl1_x, cl1_y, cl1_z
         real(rp)            :: du_x, du_y, du_z
         real(rp)            :: dv_x, dv_y, dv_z
@@ -404,14 +405,9 @@ subroutine compute_wale(VIS,LMD)
         real(rp)            :: DV_ij_2_xx, DV_ij_2_xy, DV_ij_2_xz
         real(rp)            :: DV_ij_2_yx, DV_ij_2_yy, DV_ij_2_yz
         real(rp)            :: DV_ij_2_zx, DV_ij_2_zy, DV_ij_2_zz
-        real(rp)            :: DV_ji_2_xx, DV_ji_2_xy, DV_ji_2_xz
-        real(rp)            :: DV_ji_2_yx, DV_ji_2_yy, DV_ji_2_yz
-        real(rp)            :: DV_ji_2_zx, DV_ji_2_zy, DV_ji_2_zz
 
-        integer             :: fR
         integer             :: i,j,k,l
         
-        fR       = central_fd_order/2
         i_mu_inf = 1.0_rp/mu_inf
 
         Cw2 = 0.325_rp**2
@@ -445,11 +441,12 @@ subroutine compute_wale(VIS,LMD)
                  dw_y = 0.0_rp
                  dw_z = 0.0_rp
                  !$acc loop seq
-                 do l = 1,fR
-
-                    cl1_x = i_st_x * central_1(l)
-                    cl1_y = i_st_y * central_1(l)
-                    cl1_z = i_st_z * central_1(l)
+                 do l = 1,3
+        
+                    cl = central_1(l)
+                    cl1_x = i_st_x * cl
+                    cl1_y = i_st_y * cl
+                    cl1_z = i_st_z * cl
 
                     du_x = du_x + cl1_x * (U(i+l,j,k) - U(i-l,j,k))
                     du_y = du_y + cl1_y * (U(i,j+l,k) - U(i,j-l,k))
@@ -495,26 +492,21 @@ subroutine compute_wale(VIS,LMD)
 
                  !DV_ji_2(:,:) = matmul(grad_vT, grad_vT)
                  !remember ... A^T*A^T = (A*A)^T
-                 DV_ji_2_xx = DV_ij_2_xx
-                 DV_ji_2_xy = DV_ij_2_yx
-                 DV_ji_2_xz = DV_ij_2_zx
-                 DV_ji_2_yx = DV_ij_2_xy
-                 DV_ji_2_yy = DV_ij_2_yy
-                 DV_ji_2_yz = DV_ij_2_zy
-                 DV_ji_2_zx = DV_ij_2_xz
-                 DV_ji_2_zy = DV_ij_2_yz
-                 DV_ji_2_zz = DV_ij_2_zz
+
+                 SdTrace = - one3 * (  du_x*du_x +   dv_y*dv_y +   dw_z*dw_z + &
+                                     2*du_y*dv_x + 2*du_z*dw_x + 2*dv_z*dw_y)
 
                  ! Sd tensor
-                 Sd_xx = 0.5_rp*(DV_ij_2_xx + DV_ji_2_xx) - one3 * DV_ij_2_xx
-                 Sd_xy = 0.5_rp*(DV_ij_2_xy + DV_ji_2_xy) 
-                 Sd_xz = 0.5_rp*(DV_ij_2_xz + DV_ji_2_xz) 
-                 Sd_yx = 0.5_rp*(DV_ij_2_yx + DV_ji_2_yx) 
-                 Sd_yy = 0.5_rp*(DV_ij_2_yy + DV_ji_2_yy) - one3 * DV_ij_2_yy
-                 Sd_yz = 0.5_rp*(DV_ij_2_yz + DV_ji_2_yz) 
-                 Sd_zx = 0.5_rp*(DV_ij_2_zx + DV_ji_2_zx) 
-                 Sd_zy = 0.5_rp*(DV_ij_2_zy + DV_ji_2_zy) 
-                 Sd_zz = 0.5_rp*(DV_ij_2_zz + DV_ji_2_zz) - one3 * DV_ij_2_zz
+                 Sd_xx = DV_ij_2_xx + SdTrace
+                 Sd_xy = 0.5_rp*(DV_ij_2_xy + DV_ij_2_yx) 
+                 Sd_xz = 0.5_rp*(DV_ij_2_xz + DV_ij_2_zx) 
+                 Sd_yx = 0.5_rp*(DV_ij_2_yx + DV_ij_2_xy) 
+                 Sd_yy = DV_ij_2_yy + SdTrace
+                 Sd_yz = 0.5_rp*(DV_ij_2_yz + DV_ij_2_zy) 
+                 Sd_zx = 0.5_rp*(DV_ij_2_zx + DV_ij_2_xz) 
+                 Sd_zy = 0.5_rp*(DV_ij_2_zy + DV_ij_2_yz) 
+                 Sd_zz = DV_ij_2_zz + SdTrace
+
 
                  ! compute tensor norms
                  sumSS   = S_xx*S_xx+S_xy*S_xy+S_xz*S_xz + &
@@ -554,8 +546,6 @@ subroutine compute_wale(VIS,LMD)
 
         return
 end subroutine compute_wale
-
-
 
 
 
