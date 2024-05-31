@@ -1,0 +1,132 @@
+&input_list
+
+	! x interval
+	xmin = -5.
+	xmax = 5.
+	
+	! y interval 
+	ymin = -1
+	ymax = 1
+
+	! z interval 
+	zmin = -1
+	zmax = 1
+
+    ! grid type
+    gridpoint_x = 'uniform'
+    gridpoint_y = 'uniform'
+    gridpoint_z = 'uniform'
+    ! streching parameter
+    stretching_par = 0.3
+
+    ! dimensions
+    dims = 3
+	
+	! total simulation time
+	tmax = 2.
+    itmax = 100
+	
+	! number of nodes in each direction
+	nx = 101
+	ny = 5
+	nz = 5
+
+    ! number of procs per direction (0 if automatic)
+    cart_dims(1) = 4
+    cart_dims(2) = 1
+    cart_dims(3) = 1
+	
+	! CFL value and time-step value
+	CFL  = 0.5
+	Dt   = 1.E-02
+
+	! boundary conditions
+	bc(1) = 'neumann'
+	bc(2) = 'neumann'
+	bc(3) = 'periodic'
+	bc(4) = 'periodic'
+	bc(5) = 'periodic'
+	bc(6) = 'periodic'
+
+    sponge(1) = .false.
+    sponge(2) = .false.
+    sponge(3) = .false.
+    sponge(4) = .false.
+    sponge(5) = .false.
+    sponge(6) = .false.
+
+    Trat = 1.0
+	
+	inflow_profile = 'none'
+        smooth_inflow  = .false.
+        turb_inflow    = .false.
+
+	! Reynolds number
+	Reynolds = 1000
+
+	! Mach number
+	Mach = 1.0
+
+	! Prandtl number
+	Prandtl = 0.71
+	
+	! flag to launch with CFL (true) or without CFL (false)
+	logical_CFL = .true.
+        scheme      = 'hybrid_wenoEP'
+        sensor      = 'density_jump'
+        L1_wave     = 'pirozzoli_model'
+        fd_order    = 6
+        weno_order  = 5
+        LES         = .false.
+        sgs_model   = 'WALE'
+
+	! Viscous therms flag
+ 	viscous = .false.
+	
+	! Runge-Kutta sub-steps number
+	n_step = 3
+	
+	! output interation
+	itout = 10
+        StOut = 100
+        StFlg = .false.
+	
+	! initial condition
+	ic = "shock_tube_x"
+	
+	! output file name
+	output_file_name = "shock_tube_x"
+	
+	! data sub-directory name
+	data_dir = "SHOCK_TUBE_1D"
+        mpi_opt_level=2
+	cuda_aware = .true.
+
+        ! skip file
+        skip_file = 1
+	
+	! Flags for output (true to print it out, false for not)
+	density         = .true.
+	pressure        = .true.
+	velocity        = .true.
+	temperature     = .true.
+	mach_           = .true.
+ 	sdensity        = .false.
+ 	vorticity       = .false.
+        speed_div       = .false.
+	charactheristic = .false.
+        hw_sensor       = .false.
+        hweno_flag      = .true.
+        bulk_quantities = .false.
+        qcriterion      = .false.
+        Rey_average     = .false.
+        Fav_average     = .false.
+        vorticity_magnitude = .false.
+	
+	! Flag for output format
+	BINARY      = .true.
+	GNUPLOT     = .true.
+	VTK         = .true.
+	LIFT_DRAG   = .false.
+
+&end
