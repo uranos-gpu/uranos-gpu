@@ -4,9 +4,9 @@
 
 Please, while using URANOS for your computations cite the following papers:
 
-- Francesco De Vanna, Giacomo Baldan (2024). URANOS-2.0: Improved performance, enhanced portability, and model extension towards exascale computing of high-speed engineering flows. Under review in Computer Physics Communications.
+- Francesco De Vanna, Giacomo Baldan (2024). URANOS-2.0: Improved performance, enhanced portability, and model extension towards exascale computing of high-speed engineering flows. Computer Physics Communications, 2024, doi: https://doi.org/10.1016/j.cpc.2024.109285
 
-- De Vanna, F., Avanzi, F., Cogo, M., Sandrin, S., Bettencourt, M., Picano, F., & Benini, E. (2023). URANOS: A GPU accelerated Navier-Stokes solver for compressible wall-bounded flows. Computer Physics Communications, 108717, doi: https://doi.org/10.1016/j.cpc.2023.108717
+- De Vanna, F., Avanzi, F., Cogo, M., Sandrin, S., Bettencourt, M., Picano, F., & Benini, E. (2023). URANOS: A GPU accelerated Navier-Stokes solver for compressible wall-bounded flows. Computer Physics Communications, 2023, doi: https://doi.org/10.1016/j.cpc.2023.108717
 
 # Scientific papers obtained with URANOS
 
