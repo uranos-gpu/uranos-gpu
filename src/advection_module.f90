@@ -173,20 +173,21 @@ subroutine hybrid_wenoEPx(weno_num,lbx,ubx,istr,iend,shock_recon)
         real(rp), parameter    :: gm1 = gamma0-1.0_rp
         real(rp), parameter    :: hgm = gamma0/gm1
 
-        real(rp), dimension(5,-3:4) :: fvp, fvm, fp, fm
+        real(rp), dimension(5,-3:4) :: fp, fm
         real(rp), dimension(5)      :: fhatp, fhatm
         real(rp), dimension(5,5)    :: right, left
         real(rp), dimension(-3:3)   :: central_1_p
 
         real(rp) :: phi1, phi2, phi3, phi4, phi5, inner_sum
-        real(rp) :: sqrt_rho0, sqrt_rho1, ff, pp, hFn
+        real(rp) :: sqrt_rho0, sqrt_rho1, hFn
         real(rp) :: uroe, vroe, wroe, hroe, ekroe, croe, den_roe
+        real(rp) :: f1, f2, f3, f4, f5, w1, w2, w3, w4, w5, wc, gc
 
         real(rp), parameter :: one8 = 1.0_rp/8.0_rp
         real(rp) :: ir, u_, v_, w_, ek, p_, idx
         real(rp) :: weight, lambda_max
         real(rp) :: vnc, hgU, hgV, hgW, hgE, cc, un_c2
-        integer  :: i,j,k,l,m,il, n, ii, s
+        integer  :: i,j,k,l,m,il, n, s
         integer  :: str_x, end_x, igbl, istr_x, iend_x
         integer(1), parameter :: one = 1
 
@@ -295,7 +296,7 @@ subroutine hybrid_wenoEPx(weno_num,lbx,ubx,istr,iend,shock_recon)
              endif
              enddo
 
-             !$acc loop vector private(right,left,fvp,fvm,fp,fm,fhatp,fhatm)
+             !$acc loop vector private(right,left,fp,fm,fhatp,fhatm)
              do i = 0,end_x ! sx-1,ex
              if (weno_flag_chunk(i) == weno_shock) then
 
@@ -387,30 +388,37 @@ subroutine hybrid_wenoEPx(weno_num,lbx,ubx,istr,iend,shock_recon)
                 ! LAX FRIEDRICHS
                 !
                 lambda_max = max(abs(uroe-croe),abs(uroe+croe))
+                
+                do s = -weno_num+1,weno_num
+                 f1 = flx_arr(i+s,1)
+                 f2 = flx_arr(i+s,2)
+                 f3 = flx_arr(i+s,3)
+                 f4 = flx_arr(i+s,4)
+                 f5 = flx_arr(i+s,5)
+                 w1 = phi_arr(i+s,1)
+                 w2 = phi_arr(i+s,2)
+                 w3 = phi_arr(i+s,3)
+                 w4 = phi_arr(i+s,4)
+                 w5 = phi_arr(i+s,5)
+                 do m = 1,5
+                  wc = 0._rp
+                  gc = 0._rp
 
-                do n = 1,5
-                   do ii = -weno_num+1,weno_num
-                      ff = flx_arr(i+ii,n)
-                      pp = phi_arr(i+ii,n) * lambda_max
+                  wc = wc + left(m,1) * w1
+                  wc = wc + left(m,2) * w2
+                  wc = wc + left(m,3) * w3
+                  wc = wc + left(m,4) * w4
+                  wc = wc + left(m,5) * w5
+                  gc = gc + left(m,1) * f1
+                  gc = gc + left(m,2) * f2
+                  gc = gc + left(m,3) * f3
+                  gc = gc + left(m,4) * f4
+                  gc = gc + left(m,5) * f5
 
-                      fvp(n,ii) = 0.5_rp * (ff + pp)
-                      fvm(n,ii) = 0.5_rp * (ff - pp)
-                   enddo
-                enddo
-                !
-                ! WENO - TENO RECONSTRUCTION
-                !
-
-                do s = -weno_num+1, weno_num
-                   do m = 1,5
-                      fp(m,s) = 0.0_rp
-                      fm(m,s) = 0.0_rp
-                      do l = 1,5
-                      fp(m,s) = fp(m,s) + left(m,l)*fvp(l,s)
-                      fm(m,s) = fm(m,s) + left(m,l)*fvm(l,s)
-                      enddo
-                   enddo
-                enddo
+                  fp(m,s) = 0.5_rp * (gc+wc*lambda_max)
+                  fm(m,s) = gc - 0.5_rp * (gc+wc*lambda_max)
+                  enddo
+                 enddo
 
                 call weno_reconstruction(weno_num,shock_recon,fp,fm,fhatp,fhatm)
 
@@ -473,20 +481,21 @@ subroutine hybrid_wenoEPy(weno_num,lby,uby,jstr,jend,shock_recon)
         real(rp), parameter    :: gm1 = gamma0-1.0_rp
         real(rp), parameter    :: hgm = gamma0/gm1
 
-        real(rp), dimension(5,-3:4) :: fvp, fvm, fp, fm
+        real(rp), dimension(5,-3:4) :: fp, fm
         real(rp), dimension(5)      :: fhatp, fhatm
         real(rp), dimension(5,5)    :: right, left
         real(rp), dimension(-3:3)   :: central_1_p
 
         real(rp) :: phi1, phi2, phi3, phi4, phi5, inner_sum
-        real(rp) :: sqrt_rho0, sqrt_rho1, ff, pp, hGn
+        real(rp) :: sqrt_rho0, sqrt_rho1, hGn
         real(rp) :: uroe, vroe, wroe, hroe, ekroe, croe, den_roe
+        real(rp) :: f1, f2, f3, f4, f5, w1, w2, w3, w4, w5, wc, gc
 
         real(rp), parameter :: one8 = 1.0_rp/8.0_rp
         real(rp) :: ir, u_, v_, w_, ek, p_, idy
         real(rp) :: weight, lambda_max
         real(rp) :: vnc, hgU, hgV, hgW, hgE, cc, un_c2
-        integer  :: i,ii,j,k,l,m,jl, n, jj, s,iimax
+        integer  :: i,ii,j,k,l,m,jl, n, s,iimax
         integer  :: str_y, end_y, jgbl, jstr_y, jend_y
         integer(1), parameter :: two = 2
         integer(1), parameter :: two_weno_smooth = 2*weno_smooth
@@ -605,7 +614,7 @@ subroutine hybrid_wenoEPy(weno_num,lby,uby,jstr,jend,shock_recon)
                       endif
                    enddo
 
-                   !$acc loop vector private(right,left,fvp,fvm,fp,fm,fhatp,fhatm)
+                   !$acc loop vector private(right,left,fp,fm,fhatp,fhatm)
                    do j = 0,end_y ! sy-1,ey
                       if(weno_flag_chunk(j) == two_weno_shock) then
 
@@ -699,29 +708,36 @@ subroutine hybrid_wenoEPy(weno_num,lby,uby,jstr,jend,shock_recon)
                       !
                       lambda_max = max(abs(vroe-croe),abs(vroe+croe))
 
-                      do n = 1,5
-                         do jj = -weno_num+1,weno_num
-                            ff = flx_arr(j+jj,n)
-                            pp = phi_arr(ii,j+jj,n) * lambda_max
+                      do s = -weno_num+1,weno_num
+                       f1 = flx_arr(j+s,1)
+                       f2 = flx_arr(j+s,2)
+                       f3 = flx_arr(j+s,3)
+                       f4 = flx_arr(j+s,4)
+                       f5 = flx_arr(j+s,5)
+                       w1 = phi_arr(ii,j+s,1)
+                       w2 = phi_arr(ii,j+s,2)
+                       w3 = phi_arr(ii,j+s,3)
+                       w4 = phi_arr(ii,j+s,4)
+                       w5 = phi_arr(ii,j+s,5)
+                       do m = 1,5
+                        wc = 0._rp
+                        gc = 0._rp
 
-                            fvp(n,jj) = 0.5_rp * (ff + pp)
-                            fvm(n,jj) = 0.5_rp * (ff - pp)
-                         enddo
-                      enddo
-                      !
-                      ! WENO - TENO RECONSTRUCTION
-                      !
+                        wc = wc + left(m,1) * w1
+                        wc = wc + left(m,2) * w2
+                        wc = wc + left(m,3) * w3
+                        wc = wc + left(m,4) * w4
+                        wc = wc + left(m,5) * w5
+                        gc = gc + left(m,1) * f1
+                        gc = gc + left(m,2) * f2
+                        gc = gc + left(m,3) * f3
+                        gc = gc + left(m,4) * f4
+                        gc = gc + left(m,5) * f5
 
-                      do s = -weno_num+1, weno_num
-                         do m = 1,5
-                            fp(m,s) = 0.0_rp
-                            fm(m,s) = 0.0_rp
-                            do l = 1,5
-                            fp(m,s) = fp(m,s) + left(m,l)*fvp(l,s)
-                            fm(m,s) = fm(m,s) + left(m,l)*fvm(l,s)
-                            enddo
-                         enddo
-                      enddo
+                        fp(m,s) = 0.5_rp * (gc+wc*lambda_max)
+                        fm(m,s) = gc - 0.5_rp * (gc+wc*lambda_max)
+                        enddo
+                       enddo
 
                       call weno_reconstruction(weno_num,shock_recon,fp,fm,fhatp,fhatm)
 
@@ -795,20 +811,21 @@ subroutine hybrid_wenoEPz(weno_num,lbz,ubz,kstr,kend,shock_recon)
         real(rp), parameter    :: gm1 = gamma0-1.0_rp
         real(rp), parameter    :: hgm = gamma0/gm1
 
-        real(rp), dimension(5,-3:4) :: fvp, fvm, fp, fm
+        real(rp), dimension(5,-3:4) :: fp, fm
         real(rp), dimension(5)      :: fhatp, fhatm
         real(rp), dimension(5,5)    :: right, left
         real(rp), dimension(-3:3)   :: central_1_p
 
         real(rp) :: phi1, phi2, phi3, phi4, phi5, inner_sum
-        real(rp) :: sqrt_rho0, sqrt_rho1, ff, pp, hHn
+        real(rp) :: sqrt_rho0, sqrt_rho1, hHn
         real(rp) :: uroe, vroe, wroe, hroe, ekroe, croe, den_roe
+        real(rp) :: f1, f2, f3, f4, f5, w1, w2, w3, w4, w5, wc, gc
 
         real(rp), parameter :: one8 = 1.0_rp/8.0_rp
         real(rp) :: ir, u_, v_, w_, ek, p_, idz
         real(rp) :: weight, lambda_max
         real(rp) :: vnc, hgU, hgV, hgW, hgE, cc, un_c2
-        integer  :: i,ii,j,k,l,m,kl, n, kk, s, iimax
+        integer  :: i,ii,j,k,l,m,kl, n, s, iimax
         integer  :: str_z, end_z, kgbl, kstr_z, kend_z
         integer(1), parameter :: four = 4
         integer(1), parameter :: four_weno_smooth = four*weno_smooth
@@ -926,7 +943,7 @@ subroutine hybrid_wenoEPz(weno_num,lbz,ubz,kstr,kend,shock_recon)
                        endif
                     enddo
 
-                    !$acc loop vector private(right,left,fvp,fvm,fp,fm,fhatp,fhatm)
+                    !$acc loop vector private(right,left,fp,fm,fhatp,fhatm)
                     do k = 0,end_z !sz-1,ez
                        if (weno_flag_chunk(k) == four_weno_shock) then
                           !
@@ -1018,30 +1035,37 @@ subroutine hybrid_wenoEPz(weno_num,lbz,ubz,kstr,kend,shock_recon)
                           ! LAX FRIEDRICHS
                           !
                           lambda_max = max(abs(wroe-croe),abs(wroe+croe))
+                        
+                          do s = -weno_num+1,weno_num
+                           f1 = flx_arr(k+s,1)
+                           f2 = flx_arr(k+s,2)
+                           f3 = flx_arr(k+s,3)
+                           f4 = flx_arr(k+s,4)
+                           f5 = flx_arr(k+s,5)
+                           w1 = phi_arr(ii,k+s,1)
+                           w2 = phi_arr(ii,k+s,2)
+                           w3 = phi_arr(ii,k+s,3)
+                           w4 = phi_arr(ii,k+s,4)
+                           w5 = phi_arr(ii,k+s,5)
+                           do m = 1,5
+                            wc = 0._rp
+                            gc = 0._rp
 
-                          do n = 1,5
-                             do kk = -weno_num+1,weno_num
-                                ff = flx_arr(k+kk,n)
-                                pp = phi_arr(ii,k+kk,n) * lambda_max
+                            wc = wc + left(m,1) * w1
+                            wc = wc + left(m,2) * w2
+                            wc = wc + left(m,3) * w3
+                            wc = wc + left(m,4) * w4
+                            wc = wc + left(m,5) * w5
+                            gc = gc + left(m,1) * f1
+                            gc = gc + left(m,2) * f2
+                            gc = gc + left(m,3) * f3
+                            gc = gc + left(m,4) * f4
+                            gc = gc + left(m,5) * f5
 
-                                fvp(n,kk) = 0.5_rp * (ff + pp)
-                                fvm(n,kk) = 0.5_rp * (ff - pp)
-                             enddo
-                          enddo
-                          !
-                          ! WENO - TENO RECONSTRUCTION
-                          !
-
-                          do s = -weno_num+1, weno_num
-                             do m = 1,5
-                                fp(m,s) = 0.0_rp
-                                fm(m,s) = 0.0_rp
-                                do l = 1,5
-                                   fp(m,s) = fp(m,s) + left(m,l)*fvp(l,s)
-                                   fm(m,s) = fm(m,s) + left(m,l)*fvm(l,s)
-                                enddo
-                             enddo
-                          enddo
+                            fp(m,s) = 0.5_rp * (gc+wc*lambda_max)
+                            fm(m,s) = gc - 0.5_rp * (gc+wc*lambda_max)
+                            enddo
+                           enddo
 
                           call weno_reconstruction(weno_num,shock_recon,fp,fm,fhatp,fhatm)
 
