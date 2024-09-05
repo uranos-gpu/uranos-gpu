@@ -1150,7 +1150,7 @@ subroutine iDifferentialWallModelledTrbVis(b,tWall,phi,VIS,LMD)
                 p_1 = (gamma0-1.0_rp) * (phi(i,j1,k,5) - r_1*ek1)
                 T_1 = p_1*ir1
 
-                tauW_WR = mu_inf*mW*(u_1+w_1)*idyh
+                tauW_WR = mu_inf*mW*(sqrt(u_1*u_1+w_1*w_1))*idyh
                 qauW_WR = mu_inf*lW*(T_1-T_w)*idyh
                 !
                 ! get the viscous length
@@ -1342,7 +1342,7 @@ subroutine iStaticDifferentialWallModelledTrbVis(b,tWall,phi,VIS,LMD)
                 p_1 = (gamma0-1.0_rp) * (phi(i,j1,k,5) - r_1*ek1)
                 T_1 = p_1*ir1
 
-                tauW_WR = mu_inf*mW*(u_1+w_1)/dyh
+                tauW_WR = mu_inf*mW*(sqrt(u_1*u_1+w_1*w_1))/dyh
                 qauW_WR = mu_inf*lW*(T_1-T_w)/dyh
                 !
                 ! === get the LES field at the jl location
@@ -1574,7 +1574,7 @@ subroutine StaticDifferentialWallModelledTrbVis(b,tWall,phi,VIS,LMD)
                 p_1 = (gamma0-1.0_rp) * (phi(i,j1,k,5) - r_1*ek1)
                 T_1 = p_1*ir1
 
-                tauW_WR = mu_inf*mW*(u_1+w_1)/dyh
+                tauW_WR = mu_inf*mW*(sqrt(u_1*u_1+w_1*w_1))/dyh
                 qauW_WR = mu_inf*lW*(T_1-T_w)/dyh
                 ! 
                 ! get les quantities at the jInt node
