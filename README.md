@@ -51,7 +51,7 @@ Different compiling modes can be selected by specifying `make` options.
 
 ```bash
 make -j <nproc> comp="<compiler>" mode="<build_mode>"
-
+```
 
 # Running
 
@@ -67,19 +67,28 @@ loaded before execution, according to the cluster’s documentation.
 ## Examples
 
 ### Basic (no restart)
+```
 mpirun -np <nprocs> ./Uranos.exe path/to/file.dat
+```
 
 ### With restart
+```
 mpirun -np <nprocs> ./Uranos.exe path/to/file.dat path/to/restart.bin
+```
 
 ### Local workstation (single GPU)
+```
 mpirun -np 1 ./Uranos.exe ./tests/flat_plate/input.dat
+```
 
 ### Local workstation (multi-GPU, 2 ranks → 2 GPUs)
+```
 mpirun -np 2 ./Uranos.exe ./tests/flat_plate/input.dat
+```
 
 ## SLURM Scripts
 
+```
 ### CPU cluster (1 node, 32 ranks)
 #!/bin/bash  
 #SBATCH -J uranos_cpu  
@@ -92,7 +101,9 @@ module purge
 module load gcc/12.1.0 openmpi/4.1.5  
 
 mpirun -np ${SLURM_NTASKS} ./Uranos.exe path/to/file.dat
+```
 
+```
 ### GPU cluster (generic, 1 node, 4 GPUs → 4 ranks)
 #!/bin/bash  
 #SBATCH -J uranos_gpu  
@@ -106,7 +117,9 @@ module purge
 module load nvhpc/24.3 openmpi/4.1.5    # adjust to your site  
 
 mpirun -np ${SLURM_NTASKS} ./Uranos.exe path/to/file.dat
+```
 
+```
 ### CINECA Leonardo (4 GPUs/node, use 2 nodes → 8 GPUs)
 #!/bin/bash  
 #SBATCH -J uranos_leonardo  
@@ -121,7 +134,9 @@ module load openmpi/4.1.4--nvhpc--23.1-cuda-11.8
 module load nvhpc/23.1  
 
 mpirun -np ${SLURM_NTASKS} ./Uranos.exe path/to/file.dat
+```
 
+```
 ### Restart on GPU cluster
 #!/bin/bash  
 #SBATCH -J uranos_restart  
@@ -135,7 +150,7 @@ module purge
 module load nvhpc/24.3 openmpi/4.1.5  
 
 mpirun -np ${SLURM_NTASKS} ./Uranos.exe ./cases/mycase.dat ./results/restart.bin
-
+```
 
 
 
