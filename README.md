@@ -45,9 +45,6 @@ The compilation process requires the following dependencies:
 A `Makefile` with predefined settings is provided to facilitate the compilation process.  
 Different compiling modes can be selected by specifying `make` options.
 
----
-
-## Syntax
 
 ```bash
 make -j <nproc> comp="<compiler>" mode="<build_mode>"
