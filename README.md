@@ -1,36 +1,36 @@
 <img src="images/logo6.svg" alt="image" width="100%" height="auto">
 
-# Reference
+# References
 
-Please, while using URANOS for your computations cite the following papers:
+When using **URANOS** for your computations, please cite the following papers:
 
-- Francesco De Vanna, Giacomo Baldan (2024). URANOS-2.0: Improved performance, enhanced portability, and model extension towards exascale computing of high-speed engineering flows. Computer Physics Communications, 2024, doi: https://doi.org/10.1016/j.cpc.2024.109285
+- Francesco De Vanna, Giacomo Baldan (2024). *URANOS-2.0: Improved performance, enhanced portability, and model extension towards exascale computing of high-speed engineering flows*. Computer Physics Communications, 2024. https://doi.org/10.1016/j.cpc.2024.109285
 
-- De Vanna, F., Avanzi, F., Cogo, M., Sandrin, S., Bettencourt, M., Picano, F., & Benini, E. (2023). URANOS: A GPU accelerated Navier-Stokes solver for compressible wall-bounded flows. Computer Physics Communications, 2023, doi: https://doi.org/10.1016/j.cpc.2023.108717
+- Francesco De Vanna, Filippo Avanzi, Michele Cogo, Simone Sandrin, Matt Bettencourt, Francesco Picano, Ernesto Benini (2023). *URANOS: A GPU accelerated Navier–Stokes solver for compressible wall-bounded flows*. Computer Physics Communications, 2023. https://doi.org/10.1016/j.cpc.2023.108717
 
-# Scientific papers obtained with URANOS
+# Scientific Papers Obtained with URANOS
 
-- Francesco De Vanna, Ernesto Benini Wall-Modeled LES of a Transonic Gas Turbine Vane - Part II: Mach Number Eﬀect and Losses Prediction, Journal of Turbomachinery, 2025
+- Francesco De Vanna, Ernesto Benini (2025). *Wall-Modeled LES of a Transonic Gas Turbine Vane – Part II: Mach Number Effect and Losses Prediction*. Journal of Turbomachinery, 2025.
 
-- Francesco De Vanna, Ernesto Benini Wall-Modeled LES of a Transonic Gas Turbine Vane - Part I: Model Setup and Assessment of Turbulent Length Scales, Journal of Turbomachinery, 2025, https://doi.org/10.1115/1.4069131
+- Francesco De Vanna, Ernesto Benini (2025). *Wall-Modeled LES of a Transonic Gas Turbine Vane – Part I: Model Setup and Assessment of Turbulent Length Scales*. Journal of Turbomachinery, 2025. https://doi.org/10.1115/1.4069131
 
-- Francesco De Vanna, Entropy losses in transonic shock–boundary-layer interaction, Physics of Fluids, 2025, https://doi.org/10.1063/5.0278759
+- Francesco De Vanna (2025). *Entropy losses in transonic shock–boundary-layer interaction*. Physics of Fluids, 2025. https://doi.org/10.1063/5.0278759
 
-- Francesco De Vanna, Ernesto Benini Impact of Wall Cooling on Transonic Gas Turbine Stators Aerothermodynamics: Insights from Wall-Modeled LES, Applied ThermalEngineering, 2025, https://doi.org/10.1016/j.applthermaleng.2025.126396
+- Francesco De Vanna, Ernesto Benini (2025). *Impact of Wall Cooling on Transonic Gas Turbine Stators Aerothermodynamics: Insights from Wall-Modeled LES*. Applied Thermal Engineering, 2025. https://doi.org/10.1016/j.applthermaleng.2025.126396
 
-- Francesco De Vanna, Giacomo Baldan, Francesco Picano, Ernesto Benini, On the coupling between wall-modeled LES and immersed boundary method towards applicative compressible flow simulations, Computer & Fluids, 2023, https://doi.org/10.1016/j.compfluid.2023.106058
+- Francesco De Vanna, Giacomo Baldan, Francesco Picano, Ernesto Benini (2023). *On the coupling between wall-modeled LES and immersed boundary method towards applicative compressible flow simulations*. Computers & Fluids, 2023. https://doi.org/10.1016/j.compfluid.2023.106058
 
-- Francesco De Vanna, Giacomo Baldan, Francesco Picano, Ernesto Benini, Effect of convective schemes in wall-resolved and wall-modeled LES of compressible wall turbulence, Computer & Fluids, 2022, https://doi.org/10.1016/j.compfluid.2022.105710
+- Francesco De Vanna, Giacomo Baldan, Francesco Picano, Ernesto Benini (2022). *Effect of convective schemes in wall-resolved and wall-modeled LES of compressible wall turbulence*. Computers & Fluids, 2022. https://doi.org/10.1016/j.compfluid.2022.105710
 
-- Francesco De Vanna, Matteo Bernardini, Francesco Picano, Ernesto Benini, Wall-modeled LES of shock-wave/boundary layer interaction, International Journal of Heat and Fluid Flow, 2022, https://doi.org/10.1016/j.ijheatfluidflow.2022.109071
+- Francesco De Vanna, Matteo Bernardini, Francesco Picano, Ernesto Benini (2022). *Wall-modeled LES of shock-wave/boundary layer interaction*. International Journal of Heat and Fluid Flow, 2022. https://doi.org/10.1016/j.ijheatfluidflow.2022.109071
 
-- Francesco De Vanna, Francesco Picano, Ernesto Benini, Mark Kenneth Quinn, Large- Eddy-Simulations of the unsteady behaviour of a hypersonic intake at Mach 5, AIAA Journal, 2021, https://doi.org/10.2514/1.J060160
+- Francesco De Vanna, Francesco Picano, Ernesto Benini, Mark Kenneth Quinn (2021). *Large-Eddy Simulations of the unsteady behaviour of a hypersonic intake at Mach 5*. AIAA Journal, 2021. https://doi.org/10.2514/1.J060160
 
-- Francesco De Vanna, Michele Cogo, Matteo Bernardini, Francesco Picano, Ernesto Benini, Unified wall-resolved and wall-modelled method for large-eddy simulations of compressible wall-bounded flows, Physical Review Fluids, 2021, https://doi.org/10.1103/PhysRevFluids.6.034614
+- Francesco De Vanna, Michele Cogo, Matteo Bernardini, Francesco Picano, Ernesto Benini (2021). *Unified wall-resolved and wall-modeled method for large-eddy simulations of compressible wall-bounded flows*. Physical Review Fluids, 2021. https://doi.org/10.1103/PhysRevFluids.6.034614
 
-- Francesco De Vanna, Alberto Benato, Francesco Picano, Ernesto Benini, High order conservative formulation of viscous terms for variable viscosity flows, Acta Mechanica, 2021, https://doi.org/10.1007/s00707-021-02937-2
+- Francesco De Vanna, Alberto Benato, Francesco Picano, Ernesto Benini (2021). *High-order conservative formulation of viscous terms for variable viscosity flows*. Acta Mechanica, 2021. https://doi.org/10.1007/s00707-021-02937-2
 
-- Francesco De Vanna, Francesco Picano, Ernesto Benini, A sharp-interface immersed boundary method for moving objects in compressible viscous flows, Computers & Fluids, 2020, https://doi.org/10.1016/j.compfluid.2019.104415
+- Francesco De Vanna, Francesco Picano, Ernesto Benini (2020). *A sharp-interface immersed boundary method for moving objects in compressible viscous flows*. Computers & Fluids, 2020. https://doi.org/10.1016/j.compfluid.2019.104415
 
 
 # Compiling
