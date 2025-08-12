@@ -157,40 +157,52 @@ mpirun -np ${SLURM_NTASKS} ./Uranos.exe ./cases/mycase.dat ./results/restart.bin
 
 
 
-# Basics tests
+# Basic Tests
 
-SHOCK TUBE
+To become familiar with **URANOS**, it is recommended to start with the built-in test cases located in the `tests` directory. 
+These examples range from simple one-dimensional problems to more advanced three-dimensional turbulent flows. 
+All examples can be post-processed using `PostUranos.exe`, which generates GNUPLOT-compatible line data and VTK files for visualization.
 
-To become familiar with URANOS it is recommended to first launch a one-dimensional test consisting of a shock tube. The commands are as follows:
-```
-mpirun -np 4 ./Uranos.exe tests/shock_tube_x.dat
-```
-The run produces the temporal evolution of a shock tube which can be post-processed downstream using PostUranos.exe. The command is as follows:
-```
-./PostUranos.exe tests/shock_tube_x.dat
-```
-
-The process produces as autoput a `DATA/SHOCK_TUBE_1D` directory within which the results of the simulation and the post-treatments. In particular results can be visualized retrospectively in terms of line graphs (GNUPLOT) or two-dimensional fields (VTK).
-
-CHANNEL DNS
-
-As the use of the solver becomes more complex, the user is encouraged to try the `CHANNEL_DNS` test. The text consists of a turbulent channel flow with a bulk Mach number of 1.5. The following is the operating command using 4 computing units:
+## 1. Shock Tube (1D)
+This is the simplest test case and a good starting point to verify your installation. It simulates the temporal evolution of a one-dimensional shock tube.  
+Run the simulation with:  
 
 ```
-mpirun -np 4 ./Uranos.exe tests/channel_dns.dat
+mpirun -np 4 ./Uranos.exe tests/shock_tube_x.dat  
 ```
 
-Statistics are produced while the solver is running and collected in `DATA/CHANNEL_DNS/VEL_STATS` and `DATA/CHANNEL_DNS/BUD_STATS` for the wall normal and the mmomentum budget statistics, respectively. Using PostUranos.exe allows to derive contours plots. 
-
-BOUNDARY LAYER
-
-Similarly to the channel flow test case, the third test case comprises of a hypersonic turbulent boundary layer with the lower-wall modeled according to a Wall-Modeled LES framework. The test can be run according to the following command:
+Post-process the results with:  
 
 ```
-mpirun -np 4 ./Uranos.exe tests/hypersonic_boundary_layer.dat
+./PostUranos.exe tests/shock_tube_x.dat  
 ```
 
-Again, wall normal statistics are collected while the code is running and saved in specific directories over some discrete stations of the boundary layer.
+Results are stored in `DATA/SHOCK_TUBE_1D/`, containing both raw simulation outputs and processed data. 
+Line graphs (GNUPLOT) show variable profiles over time, while VTK files enable visualization of flow fields in Paraview.
+
+## 2. Channel DNS (3D)
+This case simulates a turbulent channel flow at bulk Mach number 1.5 using Direct Numerical Simulation (DNS). It demonstrates URANOS's ability to resolve turbulent structures without modeling assumptions.  
+Run the simulation with:  
+
+```
+mpirun -np 4 ./Uranos.exe tests/channel_dns.dat  
+```
+
+During the run, wall-normal statistics are stored in:  
+- `DATA/CHANNEL_DNS/VEL_STATS` → velocity statistics  
+- `DATA/CHANNEL_DNS/BUD_STATS` → momentum budget terms  
+Post-processing with `PostUranos.exe` allows you to generate contour plots.
+
+## 3. Hypersonic Boundary Layer (WMLES)
+This case models a hypersonic turbulent boundary layer over an adiabatic wall using a Wall-Modeled LES framework. 
+It is a good introduction to wall modeling capabilities in URANOS.  
+Run the simulation with:  
+
+```
+mpirun -np 4 ./Uranos.exe tests/hypersonic_boundary_layer.dat  
+```
+Statistics are collected during runtime and saved in directories corresponding to selected downstream stations in the boundary layer. 
+These can be used for both line-plot and contour visualization in the post-processing stage.
 
 
 # Interpreting the file.dat file
