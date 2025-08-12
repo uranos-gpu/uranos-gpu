@@ -10,6 +10,14 @@ Please, while using URANOS for your computations cite the following papers:
 
 # Scientific papers obtained with URANOS
 
+- Francesco De Vanna, Ernesto Benini Wall-Modeled LES of a Transonic Gas Turbine Vane - Part II: Mach Number Eﬀect and Losses Prediction, Journal of Turbomachinery, 2025
+
+- Francesco De Vanna, Ernesto Benini Wall-Modeled LES of a Transonic Gas Turbine Vane - Part I: Model Setup and Assessment of Turbulent Length Scales, Journal of Turbomachinery, 2025, https://doi.org/10.1115/1.4069131
+
+- Francesco De Vanna, Entropy losses in transonic shock–boundary-layer interaction, Physics of Fluids, 2025, https://doi.org/10.1063/5.0278759
+
+- Francesco De Vanna, Ernesto Benini Impact of Wall Cooling on Transonic Gas Turbine Stators Aerothermodynamics: Insights from Wall-Modeled LES, Applied ThermalEngineering, 2025, https://doi.org/10.1016/j.applthermaleng.2025.126396
+
 - Francesco De Vanna, Giacomo Baldan, Francesco Picano, Ernesto Benini, On the coupling between wall-modeled LES and immersed boundary method towards applicative compressible flow simulations, Computer & Fluids, 2023, https://doi.org/10.1016/j.compfluid.2023.106058
 
 - Francesco De Vanna, Giacomo Baldan, Francesco Picano, Ernesto Benini, Effect of convective schemes in wall-resolved and wall-modeled LES of compressible wall turbulence, Computer & Fluids, 2022, https://doi.org/10.1016/j.compfluid.2022.105710
