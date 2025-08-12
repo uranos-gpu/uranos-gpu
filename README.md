@@ -35,72 +35,104 @@ When using **URANOS** for your computations, please cite the following papers:
 
 # Compiling
 
-URANOS requires (1) a Fortran compiler and (2) an MPI library. For the GPU version, the NVIDIA compiler. A Makefile with
-predefined settings is available to facilitate compiling.
-Different compiling modes can be selected by changing "make" options. The following is the syntax
+URANOS can be compiled for both CPU and GPU architectures.  
+The compilation process requires the following dependencies:
 
-```
-make -j comp="option1" mode="option2"
-```
+1. **Fortran compiler** – such as `gfortran`, `nvfortran`, or the Cray Fortran compiler.
+2. **MPI library** – such as OpenMPI, MPICH, or Cray MPI.
+3. **(Optional, for GPU)** NVIDIA HPC SDK (`nvfortran`) or other supported GPU compilers.
 
-`comp` currently supports these choices:
-- `gnu`: GNU compiler
-- `nvhpc`: NVHPC compiler (NVIDIA GPUs)
-- `cray`: Cray compiler (AMD GPUs)
+A `Makefile` with predefined settings is provided to facilitate the compilation process.  
+Different compiling modes can be selected by specifying `make` options.
 
-`"option2"` specifies the compiler options. Each compiler has dedicated options
+---
 
-Example:
+## Syntax
 
-```
-make -j comp=gnu mode=cpu_debug
-```
+```bash
+make -j <nproc> comp="<compiler>" mode="<build_mode>"
 
-compiles the code with the gnu compiler using the debugging flags.
-
-```
-make -j comp=nvhpc mode=gpu
-```
-
-!CAUTION! Each cluster requires specific module to be loaded before the compiling process. 
-You are address to cluster-speficic documentation concerning such issue. 
 
 # Running
 
-URANOS can be executed with a standard MPI launcher, e.g. `mpirun`.
-In addition two files have to specified:
-* `file.dat`: file defining the physical and numerical setup of the simulation, to be customized
-according to the desired needs. Examples of input.dat files are available in the `tests` folder.
-* `restart.bin`: only required for restart a simulation from previous results (optional)
+URANOS runs with a standard MPI launcher (`mpirun`) and requires an input file (`file.dat`) defining the physical and numerical setup, plus an optional restart file (`restart.bin`) if resuming from previous results; examples of `file.dat` are available in the `tests` folder. On GPU systems, MPI ranks should match the number of GPUs per node, and the appropriate compiler/MPI/CUDA modules must be loaded according to the cluster’s documentation.
 
-Thus, to run a simulation without restart, type, e.g.:
-```
-mpirun -np "number_of_procs" ./Uranos.exe path/to/file.dat
-```
-if you want to restart a the simulation from previous data just type:
-```
-mpirun -np "number_of_procs" ./Uranos.exe path/to/file.dat path/to/restart.bin
-```
+## Examples
 
-For GPU runs you must distribute MPI processes according to the number of GPUs
-available for each node. E.g., for CINECA Leonardo cluster -- 4 GPUS per node --  a possible submission script using
-8 GPUs is:
+### Basic (no restart)
+mpirun -np <nprocs> ./Uranos.exe path/to/file.dat
 
-```
+### With restart
+mpirun -np <nprocs> ./Uranos.exe path/to/file.dat path/to/restart.bin
+
+### Local workstation (single GPU)
+mpirun -np 1 ./Uranos.exe ./tests/flat_plate/input.dat
+
+### Local workstation (multi-GPU, 2 ranks → 2 GPUs)
+mpirun -np 2 ./Uranos.exe ./tests/flat_plate/input.dat
+
+## SLURM Scripts
+
+### CPU cluster (1 node, 32 ranks)
 #!/bin/bash
+#SBATCH -J uranos_cpu
+#SBATCH -p cpu_partition
+#SBATCH --time=04:00:00
+#SBATCH -N 1
+#SBATCH --ntasks-per-node=32
+
+module purge
+module load gcc/12.1.0 openmpi/4.1.5
+
+mpirun -np ${SLURM_NTASKS} ./Uranos.exe path/to/file.dat
+
+### GPU cluster (generic, 1 node, 4 GPUs → 4 ranks)
+#!/bin/bash
+#SBATCH -J uranos_gpu
+#SBATCH -p gpu_partition
+#SBATCH --time=12:00:00
+#SBATCH -N 1
+#SBATCH --ntasks-per-node=4
+#SBATCH --gres=gpu:4
+
+module purge
+module load nvhpc/24.3 openmpi/4.1.5    # adjust to your site
+
+mpirun -np ${SLURM_NTASKS} ./Uranos.exe path/to/file.dat
+
+### CINECA Leonardo (4 GPUs/node, use 2 nodes → 8 GPUs)
+#!/bin/bash
+#SBATCH -J uranos_leonardo
 #SBATCH -p boost_usr_prod
-#SBATCH --time 24:00:00
+#SBATCH --time=24:00:00
 #SBATCH -N 2
 #SBATCH --ntasks-per-node=4
 #SBATCH --gres=gpu:4
 
+module purge
 module load openmpi/4.1.4--nvhpc--23.1-cuda-11.8
 module load nvhpc/23.1
 
-mpirun -n $SLURM_NTASKS ./Uranos.exe path/to/file.dat path/to/restart.bin
-```
+mpirun -np ${SLURM_NTASKS} ./Uranos.exe path/to/file.dat
 
-For people not disposing of a HPC architecture, the solver can be compiled and run within the nvhpc framework by installing the suite from `https://developer.nvidia.com/hpc-sdk-downloads`.
+### Restart on GPU cluster
+#!/bin/bash
+#SBATCH -J uranos_restart
+#SBATCH -p gpu_partition
+#SBATCH --time=06:00:00
+#SBATCH -N 1
+#SBATCH --ntasks-per-node=4
+#SBATCH --gres=gpu:4
+
+module purge
+module load nvhpc/24.3 openmpi/4.1.5
+
+mpirun -np ${SLURM_NTASKS} ./Uranos.exe ./cases/mycase.dat ./results/restart.bin
+
+
+
+
+
 
 # Basics tests
 
