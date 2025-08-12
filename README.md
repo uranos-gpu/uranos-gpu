@@ -55,7 +55,14 @@ make -j <nproc> comp="<compiler>" mode="<build_mode>"
 
 # Running
 
-URANOS runs with a standard MPI launcher (`mpirun`) and requires an input file (`file.dat`) defining the physical and numerical setup, plus an optional restart file (`restart.bin`) if resuming from previous results; examples of `file.dat` are available in the `tests` folder. On GPU systems, MPI ranks should match the number of GPUs per node, and the appropriate compiler/MPI/CUDA modules must be loaded according to the cluster’s documentation.
+URANOS runs with a standard MPI launcher (`mpirun`) and requires an input file
+(`file.dat`) defining the physical and numerical setup. An optional restart file
+(`restart.bin`) can be provided to resume a simulation from previous results.
+Examples of `file.dat` are available in the `tests` folder.
+
+On GPU systems, the number of MPI ranks should match the number of GPUs
+available per node. The appropriate compiler, MPI, and CUDA modules must be
+loaded before execution, according to the cluster’s documentation.
 
 ## Examples
 
@@ -74,60 +81,61 @@ mpirun -np 2 ./Uranos.exe ./tests/flat_plate/input.dat
 ## SLURM Scripts
 
 ### CPU cluster (1 node, 32 ranks)
-#!/bin/bash
-#SBATCH -J uranos_cpu
-#SBATCH -p cpu_partition
-#SBATCH --time=04:00:00
-#SBATCH -N 1
-#SBATCH --ntasks-per-node=32
+#!/bin/bash  
+#SBATCH -J uranos_cpu  
+#SBATCH -p cpu_partition  
+#SBATCH --time=04:00:00  
+#SBATCH -N 1  
+#SBATCH --ntasks-per-node=32  
 
-module purge
-module load gcc/12.1.0 openmpi/4.1.5
+module purge  
+module load gcc/12.1.0 openmpi/4.1.5  
 
 mpirun -np ${SLURM_NTASKS} ./Uranos.exe path/to/file.dat
 
 ### GPU cluster (generic, 1 node, 4 GPUs → 4 ranks)
-#!/bin/bash
-#SBATCH -J uranos_gpu
-#SBATCH -p gpu_partition
-#SBATCH --time=12:00:00
-#SBATCH -N 1
-#SBATCH --ntasks-per-node=4
-#SBATCH --gres=gpu:4
+#!/bin/bash  
+#SBATCH -J uranos_gpu  
+#SBATCH -p gpu_partition  
+#SBATCH --time=12:00:00  
+#SBATCH -N 1  
+#SBATCH --ntasks-per-node=4  
+#SBATCH --gres=gpu:4  
 
-module purge
-module load nvhpc/24.3 openmpi/4.1.5    # adjust to your site
+module purge  
+module load nvhpc/24.3 openmpi/4.1.5    # adjust to your site  
 
 mpirun -np ${SLURM_NTASKS} ./Uranos.exe path/to/file.dat
 
 ### CINECA Leonardo (4 GPUs/node, use 2 nodes → 8 GPUs)
-#!/bin/bash
-#SBATCH -J uranos_leonardo
-#SBATCH -p boost_usr_prod
-#SBATCH --time=24:00:00
-#SBATCH -N 2
-#SBATCH --ntasks-per-node=4
-#SBATCH --gres=gpu:4
+#!/bin/bash  
+#SBATCH -J uranos_leonardo  
+#SBATCH -p boost_usr_prod  
+#SBATCH --time=24:00:00  
+#SBATCH -N 2  
+#SBATCH --ntasks-per-node=4  
+#SBATCH --gres=gpu:4  
 
-module purge
-module load openmpi/4.1.4--nvhpc--23.1-cuda-11.8
-module load nvhpc/23.1
+module purge  
+module load openmpi/4.1.4--nvhpc--23.1-cuda-11.8  
+module load nvhpc/23.1  
 
 mpirun -np ${SLURM_NTASKS} ./Uranos.exe path/to/file.dat
 
 ### Restart on GPU cluster
-#!/bin/bash
-#SBATCH -J uranos_restart
-#SBATCH -p gpu_partition
-#SBATCH --time=06:00:00
-#SBATCH -N 1
-#SBATCH --ntasks-per-node=4
-#SBATCH --gres=gpu:4
+#!/bin/bash  
+#SBATCH -J uranos_restart  
+#SBATCH -p gpu_partition  
+#SBATCH --time=06:00:00  
+#SBATCH -N 1  
+#SBATCH --ntasks-per-node=4  
+#SBATCH --gres=gpu:4  
 
-module purge
-module load nvhpc/24.3 openmpi/4.1.5
+module purge  
+module load nvhpc/24.3 openmpi/4.1.5  
 
 mpirun -np ${SLURM_NTASKS} ./Uranos.exe ./cases/mycase.dat ./results/restart.bin
+
 
 
 
