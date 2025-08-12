@@ -50,6 +50,33 @@ Different compiling modes can be selected by specifying `make` options.
 make -j <nproc> comp="<compiler>" mode="<build_mode>"
 ```
 
+## Typical examples
+### GNU, optimized CPU
+```
+make -j comp=gnu mode=cpu
+```
+
+### GNU, debug CPU with bounds and runtime checks
+```
+make -j comp=gnu mode=cpu_debug
+```
+
+### NVIDIA GPU (V100/A100/H100), optimized
+```
+make -j comp=nvhpc mode=gpu
+```
+
+### NVIDIA GPU, profiling with NVTX
+```
+make -j comp=nvhpc mode=gpu_profiling
+```
+
+### Cray/AMD GPU, optimized
+```
+make -j comp=cray mode=gpu
+```
+
+
 # Running
 
 URANOS runs with a standard MPI launcher (`mpirun`) and requires an input file
