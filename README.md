@@ -10,7 +10,7 @@ When using **URANOS** for your computations, please cite the following papers:
 
 # Scientific Papers Obtained with URANOS
 
-- Francesco De Vanna, Ernesto Benini (2025). *Wall-Modeled LES of a Transonic Gas Turbine Vane – Part II: Mach Number Effect and Losses Prediction*. Journal of Turbomachinery, 2025.
+- Francesco De Vanna, Ernesto Benini (2025). *Wall-Modeled LES of a Transonic Gas Turbine Vane – Part II: Mach Number Effect and Losses Prediction*. Journal of Turbomachinery, 2025. https://doi.org/10.1115/1.4069384
 
 - Francesco De Vanna, Ernesto Benini (2025). *Wall-Modeled LES of a Transonic Gas Turbine Vane – Part I: Model Setup and Assessment of Turbulent Length Scales*. Journal of Turbomachinery, 2025. https://doi.org/10.1115/1.4069131
 
