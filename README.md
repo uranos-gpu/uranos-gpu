@@ -212,7 +212,7 @@ module load cray-mpich
 srun -n ${SLURM_NTASKS} ./Uranos.exe path/to/file.dat
 ```
 
-> **Note:** LUMI/Leonardo specifics may evolve; check your center docs for current module versions. ([kth.diva-portal.org][1])
+> **Note:** LUMI/Leonardo specifics may evolve; check your center docs for current module versions.
 
 ---
 
@@ -316,13 +316,13 @@ Generated products:
 * `DATA/<data_dir>/VTK2D/` → 2D fields/planes (VTK)
 * GNUPLOT-ready line data for quick profiling
 
-> If you don’t see VTK outputs after running `PostUranos.exe`, verify the `data_dir` in your `file.dat` matches the simulation output path and that `BINARY/*.bin` exists for the requested times. (Common issue: mismatched `output_file_name`/`data_dir` between run and post.) ([GitHub][2])
+> If you don’t see VTK outputs after running `PostUranos.exe`, verify the `data_dir` in your `file.dat` matches the simulation output path and that `BINARY/*.bin` exists for the requested times. (Common issue: mismatched `output_file_name`/`data_dir` between run and post.)
 
 ---
 
 ## Performance & Portability
 
-URANOS emphasizes portability across NVIDIA and AMD GPU architectures via OpenACC (tested on EuroHPC Leonardo and LUMI in recent releases). See the CPC articles for detailed performance analyses and design choices. ([ScienceDirect][3])
+URANOS emphasizes portability across NVIDIA and AMD GPU architectures via OpenACC (tested on EuroHPC Leonardo and LUMI in recent releases). See the CPC articles for detailed performance analyses and design choices.
 
 ---
 
@@ -330,8 +330,8 @@ URANOS emphasizes portability across NVIDIA and AMD GPU architectures via OpenAC
 
 If you use URANOS in academic work, please cite:
 
-* **URANOS-2.0** — *Computer Physics Communications*, 2024. ([ScienceDirect][3])
-* **URANOS (original)** — *Computer Physics Communications*, 2023. ([ScienceDirect][4])
+* **URANOS-2.0** — *Computer Physics Communications*, 2024. [https://doi.org/10.1016/j.cpc.2024.109285](https://doi.org/10.1016/j.cpc.2024.109285)
+* **URANOS (original)** — *Computer Physics Communications*, 2023. [https://doi.org/10.1016/j.cpc.2023.108717](https://doi.org/10.1016/j.cpc.2023.108717)
 
 BibTeX snippets are available at the DOI pages.
 
@@ -351,8 +351,6 @@ A selection (recent first):
 * De Vanna, Picano, Benini, Quinn (2021). *LES of hypersonic intake (M5).* **AIAA J.** [https://doi.org/10.2514/1.J060160](https://doi.org/10.2514/1.J060160)
 * De Vanna, Benato, Picano, Benini (2021). *High-order viscous terms (variable viscosity).* **Acta Mechanica.** [https://doi.org/10.1007/s00707-021-02937-2](https://doi.org/10.1007/s00707-021-02937-2)
 
-(For a broader list, see the CPC articles and repository references.) ([GitHub][2])
-
 ---
 
 ## Contributing
@@ -363,13 +361,13 @@ We welcome issues and PRs! Please open an Issue or Discussion to propose changes
 
 ## License
 
-This project is released under a BSD-style license. See [`LICENSE`](./LICENSE) for details. ([ScienceDirect][3])
+This project is released under a BSD-style license. See [`LICENSE`](./LICENSE) for details.
 
 ---
 
 ## Acknowledgments
 
-Developed at the **Department of Industrial Engineering, University of Padova**, with runs on EuroHPC systems (Leonardo, LUMI). We thank collaborators and HPC centers for support. ([ScienceDirect][4], [kth.diva-portal.org][1])
+Developed at the **Department of Industrial Engineering, University of Padova**, with runs on EuroHPC systems (Leonardo, LUMI). We thank collaborators and HPC centers for support.
 
 ---
 
