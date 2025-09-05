@@ -1,367 +1,393 @@
-<img src="images/logo6.svg" alt="image" width="100%" height="auto">
+````markdown
+# URANOS — A GPU-Accelerated Navier–Stokes Solver for Compressible Wall-Bounded Flows
 
-# References
+[![License: BSD](https://img.shields.io/badge/License-BSD-blue.svg)](#license)
+[![Fortran](https://img.shields.io/badge/language-Fortran90-informational.svg)]()
+[![GPU](https://img.shields.io/badge/GPU-OpenACC-success.svg)]()
+[![MPI](https://img.shields.io/badge/Parallel-MPI-informational.svg)]()
 
-When using **URANOS** for your computations, please cite the following papers:
+URANOS is a massively parallel solver for DNS/LES/WMLES of **compressible** wall-bounded flows, designed for modern pre-exascale systems and workstations. It supports both **CPU** and **GPU** execution with **OpenACC** + MPI, and ships with post-processing utilities to produce VTK and line data for analysis and visualization. :contentReference[oaicite:0]{index=0}
 
-- Francesco De Vanna, Giacomo Baldan (2024). *URANOS-2.0: Improved performance, enhanced portability, and model extension towards exascale computing of high-speed engineering flows*. Computer Physics Communications, 2024. https://doi.org/10.1016/j.cpc.2024.109285
+---
 
-- Francesco De Vanna, Filippo Avanzi, Michele Cogo, Simone Sandrin, Matt Bettencourt, Francesco Picano, Ernesto Benini (2023). *URANOS: A GPU accelerated Navier–Stokes solver for compressible wall-bounded flows*. Computer Physics Communications, 2023. https://doi.org/10.1016/j.cpc.2023.108717
+## Table of Contents
 
-# Scientific Papers Obtained with URANOS
+- [Features](#features)
+- [Getting Started](#getting-started)
+- [Build](#build)
+  - [Dependencies](#dependencies)
+  - [Build Modes](#build-modes)
+  - [Examples](#examples)
+- [Run](#run)
+  - [Local (CPU/GPU)](#local-cpugpu)
+  - [SLURM Examples](#slurm-examples)
+- [Test Cases](#test-cases)
+- [Input File (`file.dat`) Cheat-Sheet](#input-file-filedat-cheat-sheet)
+- [Outputs & Post-Processing](#outputs--post-processing)
+- [Performance & Portability](#performance--portability)
+- [Citing URANOS](#citing-uranos)
+- [Publications Using URANOS](#publications-using-uranos)
+- [Contributing](#contributing)
+- [License](#license)
+- [Acknowledgments](#acknowledgments)
+- [FAQ / Troubleshooting](#faq--troubleshooting)
 
-- Francesco De Vanna, Ernesto Benini (2025). *Wall-Modeled LES of a Transonic Gas Turbine Vane – Part II: Mach Number Effect and Losses Prediction*. Journal of Turbomachinery, 2025. https://doi.org/10.1115/1.4069384
+---
 
-- Francesco De Vanna, Ernesto Benini (2025). *Wall-Modeled LES of a Transonic Gas Turbine Vane – Part I: Model Setup and Assessment of Turbulent Length Scales*. Journal of Turbomachinery, 2025. https://doi.org/10.1115/1.4069131
+## Features
 
-- Francesco De Vanna (2025). *Entropy losses in transonic shock–boundary-layer interaction*. Physics of Fluids, 2025. https://doi.org/10.1063/5.0278759
+- **High-fidelity compressible flow**: DNS, LES, and WMLES with energy-preserving central schemes and hybrid WENO/TENO families.
+- **Wall models & SGS**: WALE, Smagorinsky, Sigma; wall-temperature control via `Trat` (adiabatic/cold/hot walls).
+- **Shock capturing**: density, density-jump, and Ducros shock sensors.
+- **GPU portability** via OpenACC (NVIDIA & AMD through vendor toolchains), and MPI domain decomposition. :contentReference[oaicite:1]{index=1}
+- **Post-processing** tool (`PostUranos.exe`) to export **VTK** (3D fields) and **VTK2D** (planes/lines) and GNUPLOT-ready data.
 
-- Francesco De Vanna, Ernesto Benini (2025). *Impact of Wall Cooling on Transonic Gas Turbine Stators Aerothermodynamics: Insights from Wall-Modeled LES*. Applied Thermal Engineering, 2025. https://doi.org/10.1016/j.applthermaleng.2025.126396
+---
 
-- Francesco De Vanna, Giacomo Baldan, Francesco Picano, Ernesto Benini (2023). *On the coupling between wall-modeled LES and immersed boundary method towards applicative compressible flow simulations*. Computers & Fluids, 2023. https://doi.org/10.1016/j.compfluid.2023.106058
+## Getting Started
 
-- Francesco De Vanna, Giacomo Baldan, Francesco Picano, Ernesto Benini (2022). *Effect of convective schemes in wall-resolved and wall-modeled LES of compressible wall turbulence*. Computers & Fluids, 2022. https://doi.org/10.1016/j.compfluid.2022.105710
-
-- Francesco De Vanna, Matteo Bernardini, Francesco Picano, Ernesto Benini (2022). *Wall-modeled LES of shock-wave/boundary layer interaction*. International Journal of Heat and Fluid Flow, 2022. https://doi.org/10.1016/j.ijheatfluidflow.2022.109071
-
-- Francesco De Vanna, Francesco Picano, Ernesto Benini, Mark Kenneth Quinn (2021). *Large-Eddy Simulations of the unsteady behaviour of a hypersonic intake at Mach 5*. AIAA Journal, 2021. https://doi.org/10.2514/1.J060160
-
-- Francesco De Vanna, Michele Cogo, Matteo Bernardini, Francesco Picano, Ernesto Benini (2021). *Unified wall-resolved and wall-modeled method for large-eddy simulations of compressible wall-bounded flows*. Physical Review Fluids, 2021. https://doi.org/10.1103/PhysRevFluids.6.034614
-
-- Francesco De Vanna, Alberto Benato, Francesco Picano, Ernesto Benini (2021). *High-order conservative formulation of viscous terms for variable viscosity flows*. Acta Mechanica, 2021. https://doi.org/10.1007/s00707-021-02937-2
-
-- Francesco De Vanna, Francesco Picano, Ernesto Benini (2020). *A sharp-interface immersed boundary method for moving objects in compressible viscous flows*. Computers & Fluids, 2020. https://doi.org/10.1016/j.compfluid.2019.104415
-
-
-# Compiling
-
-URANOS can be compiled for both CPU and GPU architectures.  
-The compilation process requires the following dependencies:
-
-1. **Fortran compiler** – such as `gfortran`, `nvfortran`, or the Cray Fortran compiler.
-2. **MPI library** – such as OpenMPI, MPICH, or Cray MPI.
-3. **(Optional, for GPU)** NVIDIA HPC SDK (`nvfortran`) or other supported GPU compilers.
-
-A `Makefile` with predefined settings is provided to facilitate the compilation process.  
-Different compiling modes can be selected by specifying `make` options.
-
+Clone:
 
 ```bash
+git clone https://github.com/uranos-gpu/uranos-gpu.git
+cd uranos-gpu
+````
+
+Recommended first run: the **Shock Tube (1D)** or **Channel DNS** tests (see [Test Cases](#test-cases)).
+
+---
+
+## Build
+
+### Dependencies
+
+* **Fortran compiler**: `gfortran`, `nvfortran` (NVIDIA HPC SDK), or Cray Fortran
+* **MPI library**: OpenMPI, MPICH, or Cray MPI
+* **(GPU optional)**: vendor toolchain (e.g., NVIDIA HPC SDK or Cray environment)
+
+### Build Modes
+
+Use the provided `Makefile`:
+
+```
 make -j <nproc> comp="<compiler>" mode="<build_mode>"
 ```
 
-## Typical examples
-### GNU, optimized CPU
-```
+* `comp`: `gnu` | `nvhpc` | `cray`
+* `mode`: `cpu` | `cpu_debug` | `gpu` | `gpu_profiling`
+
+### Examples
+
+**GNU, optimized CPU**
+
+```bash
 make -j comp=gnu mode=cpu
 ```
 
-### GNU, debug CPU with bounds and runtime checks
-```
+**GNU, debug CPU (bounds & runtime checks)**
+
+```bash
 make -j comp=gnu mode=cpu_debug
 ```
 
-### NVIDIA GPU (V100/A100/H100), optimized
-```
+**NVIDIA GPU (V100/A100/H100), optimized**
+
+```bash
 make -j comp=nvhpc mode=gpu
 ```
 
-### NVIDIA GPU, profiling with NVTX
-```
+**NVIDIA GPU, profiling with NVTX**
+
+```bash
 make -j comp=nvhpc mode=gpu_profiling
 ```
 
-### Cray/AMD GPU, optimized
-```
+**Cray/AMD GPU (e.g., LUMI), optimized**
+
+```bash
 make -j comp=cray mode=gpu
 ```
 
+---
 
-# Running
+## Run
 
-URANOS runs with a standard MPI launcher (`mpirun`) and requires an input file
-(`file.dat`) defining the physical and numerical setup. An optional restart file
-(`restart.bin`) can be provided to resume a simulation from previous results.
-Examples of `file.dat` are available in the `tests` folder.
+URANOS uses an input file `file.dat` and a standard MPI launcher.
 
-On GPU systems, the number of MPI ranks should match the number of GPUs
-available per node. The appropriate compiler, MPI, and CUDA modules must be
-loaded before execution, according to the cluster’s documentation.
+### Local (CPU/GPU)
 
-## Examples
+**Basic (no restart)**
 
-### Basic (no restart)
-```
+```bash
 mpirun -np <nprocs> ./Uranos.exe path/to/file.dat
 ```
 
-### With restart
-```
+**With restart**
+
+```bash
 mpirun -np <nprocs> ./Uranos.exe path/to/file.dat path/to/restart.bin
 ```
 
-### Local workstation (single GPU)
-```
+**Single-GPU workstation**
+
+```bash
 mpirun -np 1 ./Uranos.exe ./tests/flat_plate/input.dat
 ```
 
-### Local workstation (multi-GPU, 2 ranks → 2 GPUs)
-```
+**Multi-GPU workstation (2 ranks → 2 GPUs)**
+
+```bash
 mpirun -np 2 ./Uranos.exe ./tests/flat_plate/input.dat
 ```
 
-## SLURM Scripts
+> **Tip:** On GPU nodes, set ranks = GPUs per node and load your site’s `nvhpc`/MPI modules.
 
-```
-### CPU cluster (1 node, 32 ranks)
-#!/bin/bash  
-#SBATCH -J uranos_cpu  
-#SBATCH -p cpu_partition  
-#SBATCH --time=04:00:00  
-#SBATCH -N 1  
-#SBATCH --ntasks-per-node=32  
+### SLURM Examples
 
-module purge  
-module load gcc/12.1.0 openmpi/4.1.5  
+**Generic CPU (1 node, 32 ranks)**
 
-mpirun -np ${SLURM_NTASKS} ./Uranos.exe path/to/file.dat
-```
+```bash
+#!/bin/bash
+#SBATCH -J uranos_cpu
+#SBATCH -p cpu_partition
+#SBATCH --time=04:00:00
+#SBATCH -N 1
+#SBATCH --ntasks-per-node=32
 
-```
-### GPU cluster (generic, 1 node, 4 GPUs → 4 ranks)
-#!/bin/bash  
-#SBATCH -J uranos_gpu  
-#SBATCH -p gpu_partition  
-#SBATCH --time=12:00:00  
-#SBATCH -N 1  
-#SBATCH --ntasks-per-node=4  
-#SBATCH --gres=gpu:4  
-
-module purge  
-module load nvhpc/24.3 openmpi/4.1.5    # adjust to your site  
+module purge
+module load gcc/12.1.0 openmpi/4.1.5
 
 mpirun -np ${SLURM_NTASKS} ./Uranos.exe path/to/file.dat
 ```
 
-```
-### CINECA Leonardo (4 GPUs/node, use 2 nodes → 8 GPUs)
-#!/bin/bash  
-#SBATCH -J uranos_leonardo  
-#SBATCH -p boost_usr_prod  
-#SBATCH --time=24:00:00  
-#SBATCH -N 2  
-#SBATCH --ntasks-per-node=4  
-#SBATCH --gres=gpu:4  
+**Generic GPU (1 node, 4 GPUs → 4 ranks)**
 
-module purge  
-module load openmpi/4.1.4--nvhpc--23.1-cuda-11.8  
-module load nvhpc/23.1  
+```bash
+#!/bin/bash
+#SBATCH -J uranos_gpu
+#SBATCH -p gpu_partition
+#SBATCH --time=12:00:00
+#SBATCH -N 1
+#SBATCH --ntasks-per-node=4
+#SBATCH --gres=gpu:4
+
+module purge
+module load nvhpc/24.3 openmpi/4.1.5   # adjust to your site
 
 mpirun -np ${SLURM_NTASKS} ./Uranos.exe path/to/file.dat
 ```
 
-```
-### Restart on GPU cluster
-#!/bin/bash  
-#SBATCH -J uranos_restart  
-#SBATCH -p gpu_partition  
-#SBATCH --time=06:00:00  
-#SBATCH -N 1  
-#SBATCH --ntasks-per-node=4  
-#SBATCH --gres=gpu:4  
+**CINECA Leonardo (NVIDIA, 4 GPUs/node; 2 nodes → 8 GPUs)**
 
-module purge  
-module load nvhpc/24.3 openmpi/4.1.5  
+```bash
+#!/bin/bash
+#SBATCH -J uranos_leonardo
+#SBATCH -p boost_usr_prod
+#SBATCH --time=24:00:00
+#SBATCH -N 2
+#SBATCH --ntasks-per-node=4
+#SBATCH --gres=gpu:4
 
-mpirun -np ${SLURM_NTASKS} ./Uranos.exe ./cases/mycase.dat ./results/restart.bin
-```
+module purge
+module load openmpi/4.1.4--nvhpc--23.1-cuda-11.8
+module load nvhpc/23.1
 
-
-
-
-
-
-# Basic Tests
-
-To become familiar with **URANOS**, it is recommended to start with the built-in test cases located in the `tests` directory. 
-These examples range from simple one-dimensional problems to more advanced three-dimensional turbulent flows. 
-All examples can be post-processed using `PostUranos.exe`, which generates GNUPLOT-compatible line data and VTK files for visualization.
-
-## 1. Shock Tube (1D)
-This is the simplest test case and a good starting point to verify your installation. It simulates the temporal evolution of a one-dimensional shock tube.  
-Run the simulation with:  
-
-```
-mpirun -np 4 ./Uranos.exe tests/shock_tube_x.dat  
+mpirun -np ${SLURM_NTASKS} ./Uranos.exe path/to/file.dat
 ```
 
-Post-process the results with:  
-
-```
-./PostUranos.exe tests/shock_tube_x.dat  
-```
-
-Results are stored in `DATA/SHOCK_TUBE_1D/`, containing both raw simulation outputs and processed data. 
-Line graphs (GNUPLOT) show variable profiles over time, while VTK files enable visualization of flow fields in Paraview.
-
-## 2. Channel DNS (3D)
-This case simulates a turbulent channel flow at bulk Mach number 1.5 using Direct Numerical Simulation (DNS). It demonstrates URANOS's ability to resolve turbulent structures without modeling assumptions.  
-Run the simulation with:  
-
-```
-mpirun -np 4 ./Uranos.exe tests/channel_dns.dat  
-```
-
-During the run, wall-normal statistics are stored in:  
-- `DATA/CHANNEL_DNS/VEL_STATS` → velocity statistics  
-- `DATA/CHANNEL_DNS/BUD_STATS` → momentum budget terms  
-Post-processing with `PostUranos.exe` allows you to generate contour plots.
-
-## 3. Hypersonic Boundary Layer (WMLES)
-This case models a hypersonic turbulent boundary layer over an adiabatic wall using a Wall-Modeled LES framework. 
-It is a good introduction to wall modeling capabilities in URANOS.  
-Run the simulation with:  
-
-```
-mpirun -np 4 ./Uranos.exe tests/hypersonic_boundary_layer.dat  
-```
-Statistics are collected during runtime and saved in directories corresponding to selected downstream stations in the boundary layer. 
-These can be used for both line-plot and contour visualization in the post-processing stage.
-
-
-# Interpreting the file.dat file
-
-`xmin` defines the x-left boundary of the domain
-
-`xmax` defines the x-right boundary of the domain
-
-`ymin` defines the y-left boundary of the domain
-
-`ymax` defines the y-right boundary of the domain
-
-`zmin` defines the z-left boundary of the domain
-
-`zmax` defines the z-right boundary of the domain
-
-
-`gridpoint_x` specifies the path/to/the/gridX/file
-
-`gridpoint_y` specifies the path/to/the/gridY/file
-
-`gridpoint_z` specifies the path/to/the/gridZ/file
-
-`uniform` grid is readely available without requiring an external grid file
-
-`dims` specifies the problem dimensions and could 2 or 3
-
-`tmax` is the total simulation time (in code units). 
-
-`itmax` is the maximum number of iterations
-
-`nx`, `ny`, `nz` are the number of point along the X, Y, Z coordinates. 
-Those must be consistent with input grids.
-
-`cart_dims(1)`, `cart_dims(2)`, `cart_dims(3)` specify the number of procs along the
-X, Y, and Z directions. Some problems (channel flow and boundary layer) split the domain only along X and Z, but not along Y. 
-
-`CFL` is the Courant-Friedrichs-Lewy parameter. The implemented Runge-Kutta method is stable up to CFL = 1. For safaty margin keep less than 0.8. 
-
-`Dt` is a fixed time step is you dont want adaptive time-stepping (logical\_CFL must be .false.)
-
-`bc(1)` = boundary condition at the x-left side
-
-`bc(2)` = boundary condition at the x-right side
-
-`bc(3)` = boundary condition at the y-left side
-
-`bc(4)` = boundary condition at the y-right side
-
-`bc(5)` = boundary condition at the z-left side
-
-`bc(6)` = boundary condition at the z-right side
-
-bc\_module.f90 provide a list of several boundary conditions
-
-`sponge(1)` activate a sponge zone for the x-left side
-
-`sponge(2)` activate a sponge zone for the x-right side
-
-`sponge(3)` activate a sponge zone for the y-left side
-
-`sponge(4)` activate a sponge zone for the x-right side
-
-`sponge(5)` activate a sponge zone for the z-left side
-
-`sponge(6)` activate a sponge zone for the x-right side
-
-`Trat` fix the wall-to-adiabatic temperature ratio (i.e., `Trat = 1` the wall is adibatic, `Trat < 1` the wall is cold, `Trat > 1` the wall is hot)
-
-`inflow_profile` select the inflow profile (look at `inflow_module.f90`)
-
-`smooth_inflow` provides a time gradually increasing inflow condition
-
-`turb_inflow` adds turbulence at the inflow
-
-`Reynolds` is the Reynolds number of the flow
-
-`Mach` is the Mach number of the flow
-
-`Prandtl` is the Mach number of the flow
-
-`logical_CFL` is `.true.` for adaptive time-stepping, `.false.` for static time-step
-
-`scheme` select the convective scheme among: 
-- `energy_preserving`, central energy-stable scheme, not to be used with shocked flows
-- `hybrid_wenoEP` WENO scheme hybridized with energy preserving
-- `hybrid_tenoEP` TENO scheme hybridized with energy preserving
-- `hybrid_tenoaEP` TENO-A scheme hybrided with energy preserving
-
-`sensor` defines the shock-sensor among:
-- `density` shock sensor based on density gradient
-- `density_jump` shock sensor based on density jump in cell
-- `ducros` shock sensor based on a modified version of Ducros sensor
-
-`fd_order` defines the order of accurary of central schemes (2,4,6). Default 6
-`weno_order` defines the order of accurary of weno schemes (3,5,7). Default 5
-
-`LES` activates the SGS model
-`sgs_model` select the  SGS model among: 
-- `WALE`
-- `Smagorinsky`
-- `sigma_model`
-
-`viscous` activates viscous flux computation
-
-`itout` defines the output iteration of restart.bin files
-
-`StOut` defines the output iteration of statistics.bin files
-
-`StFlg` activates the output of statistics
-
-`ic` defines the initial condition (see `src/ic_module.f90`)
-
-`output_file_name` defines the prefix  of all output files
-
-`data_dir` specifies the output directory
-
-
-
-
-# Interpreting the outputs
-As default, URANOS outputs a `DATA/data_dir/BINARY` directory where `.bin` files are stored. Each file represents a possible restart of a simulation.
-Data in the `DATA/data_dir/BINARY` can be post-processed with `PostUranos.exe` via the following command
-
-```
-./PostUranos.exe path/to/file.dat (path/to/restart.bin optional)
+**LUMI (AMD MI250/MI300 via Cray stack)**
+
+```bash
+#!/bin/bash
+#SBATCH -J uranos_lumi
+#SBATCH -A <project>
+#SBATCH -p <partition>
+#SBATCH -N 2
+#SBATCH --time=12:00:00
+#SBATCH --ntasks-per-node=8
+
+module purge
+module load PrgEnv-cray
+module load cray-mpich
+
+srun -n ${SLURM_NTASKS} ./Uranos.exe path/to/file.dat
 ```
 
-PostUranos is a serial code which provide the contours plots and some video related to a simulation. You can find the visual results in `DATA/data_dir/VTK` (for 3D fields) and `DATA/data_dir/VTK2D` (for 2D fields)
+> **Note:** LUMI/Leonardo specifics may evolve; check your center docs for current module versions. ([kth.diva-portal.org][1])
 
-# Contributing
-We appreciate any contributions and feedback that can improve URANOS. If you wish to contribute to the tool, please get in touch with the maintainers or open an Issue in the repository / a thread in Discussions. Pull Requests are welcome, but please propose/discuss the changes in an linked Issue first.
+---
 
-# Licencing
-Please refer to the licence file. 
+## Test Cases
 
+All examples live in `tests/` and can be post-processed with `PostUranos.exe`.
 
+### 1) Shock Tube (1D)
+
+```bash
+mpirun -np 4 ./Uranos.exe tests/shock_tube_x.dat
+./PostUranos.exe tests/shock_tube_x.dat
+```
+
+Output directory: `DATA/SHOCK_TUBE_1D/`
+
+### 2) Channel DNS (3D, M\_b≈1.5)
+
+```bash
+mpirun -np 4 ./Uranos.exe tests/channel_dns.dat
+./PostUranos.exe tests/channel_dns.dat
+```
+
+Wall-normal stats during runtime:
+
+* `DATA/CHANNEL_DNS/VEL_STATS`
+* `DATA/CHANNEL_DNS/BUD_STATS`
+
+### 3) Hypersonic Boundary Layer (WMLES)
+
+```bash
+mpirun -np 4 ./Uranos.exe tests/hypersonic_boundary_layer.dat
+./PostUranos.exe tests/hypersonic_boundary_layer.dat
+```
+
+Stations/lines are saved per downstream location for both line plots and contours.
+
+---
+
+## Input File (`file.dat`) Cheat-Sheet
+
+> **Grid & Domain**
+
+* `xmin,xmax,ymin,ymax,zmin,zmax` — domain extents
+* `uniform` — use built-in uniform grid (no external files)
+* `gridpoint_x/y/z` — paths to grid files (if not uniform)
+* `dims` — problem dimensionality (`2` or `3`)
+* `nx,ny,nz` — grid points (must match grid files)
+
+> **Time Integration**
+
+* `CFL` — Courant number (RK stable up to 1; keep ≤ 0.8 for safety)
+* `logical_CFL` — `.true.` for adaptive Δt; `.false.` for fixed `Dt`
+* `itmax`, `tmax` — iteration/time limits
+
+> **Physics & Models**
+
+* `Reynolds`, `Mach`, `Prandtl`
+* `Trat` — wall-to-adiabatic temperature ratio (`=1` adiabatic; `<1` cold; `>1` hot)
+* `LES` — enable SGS; `sgs_model = WALE | Smagorinsky | sigma_model`
+* `viscous` — enable viscous fluxes
+
+> **Schemes & Sensors**
+
+* `scheme` — `energy_preserving | hybrid_wenoEP | hybrid_tenoEP | hybrid_tenoaEP`
+* `sensor` — `density | density_jump | ducros`
+* `fd_order` — central order (2,4,6); `weno_order` — WENO/TENO (3,5,7)
+
+> **I/O & Decomposition**
+
+* `cart_dims(1:3)` — MPI cartesian split (X,Y,Z)
+* `output_file_name`, `data_dir`
+* `itout` — restart cadence; `StOut` — statistics cadence; `StFlg` — enable stats
+
+> **BCs & Extras**
+
+* `bc(1..6)` — BC per face (see `src/bc_module.f90`)
+* `sponge(1..6)` — activate sponge zones per face
+* `ic` — initial condition (see `src/ic_module.f90`)
+* `inflow_profile`, `smooth_inflow`, `turb_inflow`
+
+---
+
+## Outputs & Post-Processing
+
+URANOS writes binary data under:
+
+```
+DATA/<data_dir>/BINARY/*.bin
+```
+
+Post-process with:
+
+```bash
+./PostUranos.exe path/to/file.dat [path/to/restart.bin]
+```
+
+Generated products:
+
+* `DATA/<data_dir>/VTK/`   → 3D fields (VTK)
+* `DATA/<data_dir>/VTK2D/` → 2D fields/planes (VTK)
+* GNUPLOT-ready line data for quick profiling
+
+> If you don’t see VTK outputs after running `PostUranos.exe`, verify the `data_dir` in your `file.dat` matches the simulation output path and that `BINARY/*.bin` exists for the requested times. (Common issue: mismatched `output_file_name`/`data_dir` between run and post.) ([GitHub][2])
+
+---
+
+## Performance & Portability
+
+URANOS emphasizes portability across NVIDIA and AMD GPU architectures via OpenACC (tested on EuroHPC Leonardo and LUMI in recent releases). See the CPC articles for detailed performance analyses and design choices. ([ScienceDirect][3])
+
+---
+
+## Citing URANOS
+
+If you use URANOS in academic work, please cite:
+
+* **URANOS-2.0** — *Computer Physics Communications*, 2024. ([ScienceDirect][3])
+* **URANOS (original)** — *Computer Physics Communications*, 2023. ([ScienceDirect][4])
+
+BibTeX snippets are available at the DOI pages.
+
+---
+
+## Publications Using URANOS
+
+A selection (recent first):
+
+* De Vanna & Benini (2025). *WMLES of a Transonic Gas Turbine Vane – Part I.* **J. Turbomach.** [https://doi.org/10.1115/1.4069131](https://doi.org/10.1115/1.4069131)
+* De Vanna (2025). *Entropy losses in transonic shock–boundary-layer interaction.* **Phys. Fluids.** [https://doi.org/10.1063/5.0278759](https://doi.org/10.1063/5.0278759)
+* De Vanna & Benini (2025). *Impact of Wall Cooling on Transonic Gas Turbine Stators Aerothermodynamics.* **Appl. Therm. Eng.** [https://doi.org/10.1016/j.applthermaleng.2025.126396](https://doi.org/10.1016/j.applthermaleng.2025.126396)
+* De Vanna, Baldan, Picano, Benini (2023). *WMLES + IBM for compressible flows.* **Computers & Fluids.** [https://doi.org/10.1016/j.compfluid.2023.106058](https://doi.org/10.1016/j.compfluid.2023.106058)
+* De Vanna et al. (2022). *Effect of convective schemes in WR/WMLES.* **Computers & Fluids.** [https://doi.org/10.1016/j.compfluid.2022.105710](https://doi.org/10.1016/j.compfluid.2022.105710)
+* De Vanna, Bernardini, Picano, Benini (2022). *WMLES of SWBLI.* **Int. J. Heat Fluid Flow.** [https://doi.org/10.1016/j.ijheatfluidflow.2022.109071](https://doi.org/10.1016/j.ijheatfluidflow.2022.109071)
+* De Vanna et al. (2021). *Unified WR/WMLES method.* **Phys. Rev. Fluids.** [https://doi.org/10.1103/PhysRevFluids.6.034614](https://doi.org/10.1103/PhysRevFluids.6.034614)
+* De Vanna, Picano, Benini, Quinn (2021). *LES of hypersonic intake (M5).* **AIAA J.** [https://doi.org/10.2514/1.J060160](https://doi.org/10.2514/1.J060160)
+* De Vanna, Benato, Picano, Benini (2021). *High-order viscous terms (variable viscosity).* **Acta Mechanica.** [https://doi.org/10.1007/s00707-021-02937-2](https://doi.org/10.1007/s00707-021-02937-2)
+
+(For a broader list, see the CPC articles and repository references.) ([GitHub][2])
+
+---
+
+## Contributing
+
+We welcome issues and PRs! Please open an Issue or Discussion to propose changes before submitting a PR. See `CONTRIBUTING.md` (if absent, include testing notes in your PR).
+
+---
+
+## License
+
+This project is released under a BSD-style license. See [`LICENSE`](./LICENSE) for details. ([ScienceDirect][3])
+
+---
+
+## Acknowledgments
+
+Developed at the **Department of Industrial Engineering, University of Padova**, with runs on EuroHPC systems (Leonardo, LUMI). We thank collaborators and HPC centers for support. ([ScienceDirect][4], [kth.diva-portal.org][1])
+
+---
+
+## FAQ / Troubleshooting
+
+**Q1. `PostUranos.exe` runs but VTK folders are empty.**
+A: Ensure `DATA/<data_dir>/BINARY/*.bin` exists and matches the `file.dat` you pass to `PostUranos.exe`. If multiple runs share a `data_dir`, point to the intended `restart.bin` explicitly when post-processing.
+
+**Q2. How many MPI ranks should I use on GPUs?**
+A: Typically 1 rank per GPU on a node. For multi-node runs, set `--ntasks-per-node` to the number of GPUs per node and use the site-provided CUDA/ROCm/MPI modules.
+
+**Q3. Which scheme should I use for shocked flows?**
+A: Prefer hybrid WENO/TENO variants with an appropriate shock sensor; avoid purely energy-preserving central schemes for strong shocks.
+
+**Q4. Typical CFL values?**
+A: The RK scheme is stable up to CFL ≈ 1; for safety, use ≤ 0.8. Start conservative and increase once stable.
+
+**Q5. Where do statistics go in channel/BL cases?**
+A: See the test-case sections—velocity and budget stats are written during runtime in dedicated subfolders.
 
