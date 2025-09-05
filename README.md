@@ -38,7 +38,7 @@ URANOS is a massively parallel solver for DNS/LES/WMLES of **compressible** wall
 - **High-fidelity compressible flow**: DNS, LES, and WMLES with energy-preserving central schemes and hybrid WENO/TENO families.
 - **Wall models & SGS**: WALE, Smagorinsky, Sigma; wall-temperature control via `Trat` (adiabatic/cold/hot walls).
 - **Shock capturing**: density, density-jump, and Ducros shock sensors.
-- **GPU portability** via OpenACC (NVIDIA & AMD through vendor toolchains), and MPI domain decomposition. :contentReference[oaicite:1]{index=1}
+- **GPU portability** via OpenACC (NVIDIA & AMD through vendor toolchains), and MPI domain decomposition.
 - **Post-processing** tool (`PostUranos.exe`) to export **VTK** (3D fields) and **VTK2D** (planes/lines) and GNUPLOT-ready data.
 
 ---
