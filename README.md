@@ -5,7 +5,7 @@
 [![GPU](https://img.shields.io/badge/GPU-OpenACC-success.svg)]()
 [![MPI](https://img.shields.io/badge/Parallel-MPI-informational.svg)]()
 
-URANOS is a massively parallel solver for DNS/LES/WMLES of **compressible** wall-bounded flows, designed for modern pre-exascale systems and workstations. It supports both **CPU** and **GPU** execution with **OpenACC** + MPI, and ships with post-processing utilities to produce VTK and line data for analysis and visualization. :contentReference[oaicite:0]{index=0}
+URANOS is a massively parallel solver for DNS/LES/WMLES of **compressible** wall-bounded flows, designed for modern exascale systems and workstations. It supports both **CPU** and **GPU** execution with **OpenACC** + MPI, and ships with post-processing utilities to produce VTK and line data for analysis and visualization.
 
 ---
 
