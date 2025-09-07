@@ -3,7 +3,7 @@ title: "URANOS — A GPU-Accelerated Navier–Stokes Solver for Compressible Wal
 message: "If you use URANOS, please cite the following works."
 authors:
   - family-names: "De Vanna"
-    given-names: "Francesco et al."
+    given-names: "Francesco"
 # add coauthors as appropriate
 identifiers:
   - type: doi
