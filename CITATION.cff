@@ -4,8 +4,7 @@ message: "If you use URANOS, please cite the following works."
 authors:
   - family-names: "De Vanna"
     given-names: "Francesco"
-  - family-names: "Benini"
-    given-names: "Ernesto"
+  - given-names: et al.
 # add coauthors as appropriate
 identifiers:
   - type: doi
