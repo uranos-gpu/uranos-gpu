@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+title: "URANOS — A GPU-Accelerated Navier–Stokes Solver for Compressible Wall-Bounded Flows"
+message: "If you use URANOS, please cite the following works."
+authors:
+  - family-names: "De Vanna"
+    given-names: "Francesco"
+  - family-names: "Benini"
+    given-names: "Ernesto"
+# add coauthors as appropriate
+identifiers:
+  - type: doi
+    value: 10.1016/j.cpc.2024.109285
+  - type: doi
+    value: 10.1016/j.cpc.2023.108717
+license: BSD-3-Clause
+repository-code: "https://github.com/uranos-gpu/uranos-gpu"
+
