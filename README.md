@@ -1,3 +1,7 @@
+![logo](images/logo_2025.png)
+
+
+
 # URANOS — A GPU-Accelerated Navier–Stokes Solver for Compressible Wall-Bounded Flows
 
 [![License: BSD](https://img.shields.io/badge/License-BSD-blue.svg)](#license)
