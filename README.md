@@ -2,16 +2,20 @@
 
 
 
-# URANOS — A GPU-Accelerated Navier–Stokes Solver for Compressible Wall-Bounded Flows
+# URANOS — Computing the Future of Aerospace
 
 [![License: BSD](https://img.shields.io/badge/License-BSD-blue.svg)](#license)
 [![Fortran](https://img.shields.io/badge/language-Fortran90-informational.svg)]()
 [![GPU](https://img.shields.io/badge/GPU-OpenACC-success.svg)]()
 [![MPI](https://img.shields.io/badge/Parallel-MPI-informational.svg)]()
 
-URANOS is a massively parallel solver for DNS/LES/WMLES of **compressible** wall-bounded flows, designed for modern exascale systems and workstations. It supports both **CPU** and **GPU** execution with **OpenACC** + MPI, and ships with post-processing utilities to produce VTK and line data for analysis and visualization.
+
+**URANOS** is a **GPU-accelerated Navier–Stokes solver** for **compressible flows** with direct relevance to **aerospace propulsion systems** and **aerothermodynamics**
+
+Embedding GPU-Acceleration **URANOS** scales over massively parallel architectures solver from modern exascale systems down to workstations. **URANOS** supports both **CPU** and **GPU** execution with **OpenACC** + MPI, and ships with post-processing utilities to produce fancy fluid visualizations.
 
 ---
+
 
 ## Table of Contents
 
