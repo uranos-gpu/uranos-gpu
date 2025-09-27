@@ -10,7 +10,7 @@
 [![MPI](https://img.shields.io/badge/Parallel-MPI-informational.svg)]()
 
 
-**URANOS** is a **GPU-accelerated Navier–Stokes solver** for **compressible flows** with direct relevance to **aerospace propulsion systems** and **aerothermodynamics**
+**URANOS** is a **GPU-accelerated Navier–Stokes solver** for **compressible flows** with direct relevance to **aerospace propulsion systems** and **aerothermodynamics**.
 
 Embedding GPU-Acceleration **URANOS** scales over massively parallel architectures from modern exascale systems down to workstations. **URANOS** supports both **CPU** and **GPU** execution with **OpenACC** + MPI, and ships with post-processing utilities to produce fancy fluid visualizations.
 
