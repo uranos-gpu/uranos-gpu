@@ -2,7 +2,7 @@
 
 
 
-# URANOS — Computing the Future of Aerospace
+# URANOS — Computing the Exascale Future of Aerospace
 
 [![License: BSD](https://img.shields.io/badge/License-BSD-blue.svg)](#license)
 [![Fortran](https://img.shields.io/badge/language-Fortran90-informational.svg)]()
@@ -12,7 +12,7 @@
 
 **URANOS** is a **GPU-accelerated Navier–Stokes solver** for **compressible flows** with direct relevance to **aerospace propulsion systems** and **aerothermodynamics**
 
-Embedding GPU-Acceleration **URANOS** scales over massively parallel architectures solver from modern exascale systems down to workstations. **URANOS** supports both **CPU** and **GPU** execution with **OpenACC** + MPI, and ships with post-processing utilities to produce fancy fluid visualizations.
+Embedding GPU-Acceleration **URANOS** scales over massively parallel architectures from modern exascale systems down to workstations. **URANOS** supports both **CPU** and **GPU** execution with **OpenACC** + MPI, and ships with post-processing utilities to produce fancy fluid visualizations.
 
 ---
 
