@@ -2,7 +2,7 @@
 
 
 
-# URANOS — Computing the Exascale Future of Aerospace
+# URANOS — Exascaling the Future of Aerospace
 
 [![License: BSD](https://img.shields.io/badge/License-BSD-blue.svg)](#license)
 [![Fortran](https://img.shields.io/badge/language-Fortran90-informational.svg)]()
