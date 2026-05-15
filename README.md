@@ -1,4 +1,4 @@
-![logo](images/logo_2026.png)
+![logo](images/logo_2026_bis.png)
 
 
 
