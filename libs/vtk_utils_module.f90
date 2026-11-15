@@ -42,38 +42,29 @@ subroutine WriteVTKHeader2D(file,x,y,lo,up)
         write(unit = funit, iostat = err) 'BINARY' // newline
         write(unit = funit, iostat = err) newline
 
-        ! === grid header
         write(s_buffer, fmt = '(A)'     , iostat = err) 'DATASET RECTILINEAR_GRID'
         write(unit = funit, iostat = err) trim(s_buffer) // newline
         write(s_buffer, FMT = '(A,3I12)', iostat = err) 'DIMENSIONS', nx, ny, 1
         write(unit = funit, iostat = err) trim(s_buffer) // newline
-        
-        ! === x coordinate
+
         write(buf2,'(i8)') nx
         GRID_header="X_COORDINATES "//trim(adjustl(buf2))//" double"//newline
         write(unit = funit) trim(GRID_header),real(x(lo(1):up(1)),rp),newline
 
-        ! === y coordinate
         write(buf2,'(i8)') ny
         GRID_header="Y_COORDINATES "//trim(adjustl(buf2))//" double"//newline
         write(unit = funit) trim(GRID_header),real(y(lo(2):up(2)),rp),newline
 
-        ! ==== z coordinate
         write(buf2,'(i8)') 1
         GRID_header="Z_COORDINATES "//trim(adjustl(buf2))//" double"//newline
         write(unit = funit) trim(GRID_header),0.0_rp,newline
 
-        ! ==== writing the data
         write(unit = funit, iostat = err) newline
         write(s_buffer, FMT = '(A,I12)', iostat = err) 'POINT_DATA', nx*ny
         write(unit = funit, iostat = err) trim(s_buffer) // newline
 
-
         return
 end subroutine WriteVTKHeader2D
-
-
-
 
 subroutine WriteVTKHeader3D(file,x,y,z,id,lo,up)
         implicit none
@@ -95,23 +86,19 @@ subroutine WriteVTKHeader3D(file,x,y,z,id,lo,up)
         write(unit = funit, iostat = err) 'BINARY' // newline
         write(unit = funit, iostat = err) newline
 
-        ! === grid header
         write(s_buffer, fmt = '(A)'     , iostat = err) 'DATASET RECTILINEAR_GRID'
         write(unit = funit, iostat = err) trim(s_buffer) // newline
         write(s_buffer, FMT = '(A,3I12)', iostat = err) 'DIMENSIONS', id(1), id(2), id(3)
         write(unit = funit, iostat = err) trim(s_buffer) // newline
-        
-        ! === x coordinate
+
         write(buf2,'(i8)') id(1)
         GRID_header="X_COORDINATES "//trim(adjustl(buf2))//" double"//newline
         write(unit = funit) trim(GRID_header),real(x(lo(1):up(1)),rp),newline
 
-        ! === y coordinate
         write(buf2,'(i8)') id(2)
         GRID_header="Y_COORDINATES "//trim(adjustl(buf2))//" double"//newline
         write(unit = funit) trim(GRID_header),real(y(lo(2):up(2)),rp),newline
 
-        ! ==== z coordinate
         write(buf2,'(i8)') id(3)
         GRID_header="Z_COORDINATES "//trim(adjustl(buf2))//" double"//newline
         if(id(3)==1) then
@@ -120,16 +107,12 @@ subroutine WriteVTKHeader3D(file,x,y,z,id,lo,up)
           write(unit = funit) trim(GRID_header),real(z(lo(3):up(3)),rp),newline
         endif
 
-        ! ==== writing the data
         write(unit = funit, iostat = err) newline
         write(s_buffer, FMT = '(A,I12)', iostat = err) 'POINT_DATA', id(1)*id(2)*id(3)
         write(unit = funit, iostat = err) trim(s_buffer) // newline
 
-
         return
 end subroutine WriteVTKHeader3D
-
-
 
 subroutine scalarVTK_BINARY2D(file, lo, up, var_name, var)
         implicit none
@@ -137,22 +120,20 @@ subroutine scalarVTK_BINARY2D(file, lo, up, var_name, var)
         real(rp), allocatable, dimension(:,:), intent(in) :: var
         type(FileType)                       , intent(in) :: file
         character(len=*)                     , intent(in) :: var_name
-        
-        ! local declarations
+
         integer , parameter           :: sp  = selected_real_kind(6,37)
         character(len=1) , parameter  :: newline = char(10)
         character(len=100)            :: s_buffer
         integer                       :: iostatus
-        
+
         write(s_buffer, FMT = '(A,I12)', iostat = iostatus) 'SCALARS '//trim(var_name)//' float', 1
         write(unit = file%unit, iostat = iostatus) trim(s_buffer) // newline
         write(unit = file%unit, iostat = iostatus) 'LOOKUP_TABLE default' // newline
-        
+
         write(file%unit) real(var(lo(1):up(1),lo(2):up(2)),sp)
 
         return
 end subroutine scalarVTK_BINARY2D
-
 
 subroutine scalarVTK_BINARY2Dcodim(file, lo, up, var_name, var, codim)
         implicit none
@@ -161,22 +142,20 @@ subroutine scalarVTK_BINARY2Dcodim(file, lo, up, var_name, var, codim)
         type(FileType)                         , intent(in) :: file
         character(len=*)                       , intent(in) :: var_name
         integer                                , intent(in) :: codim
-        
-        ! local declarations
+
         integer , parameter           :: sp  = selected_real_kind(6,37)
         character(len=1) , parameter  :: newline = char(10)
         character(len=100)            :: s_buffer
         integer                       :: iostatus
-        
+
         write(s_buffer, FMT = '(A,I12)', iostat = iostatus) 'SCALARS '//trim(var_name)//' float', 1
         write(unit = file%unit, iostat = iostatus) trim(s_buffer) // newline
         write(unit = file%unit, iostat = iostatus) 'LOOKUP_TABLE default' // newline
-        
+
         write(file%unit) real(var(lo(1):up(1),lo(2):up(2),codim),sp)
 
         return
 end subroutine scalarVTK_BINARY2Dcodim
-
 
 subroutine scalarVTK_BINARY3D(file, lo, up, var_name, var)
         implicit none
@@ -184,22 +163,20 @@ subroutine scalarVTK_BINARY3D(file, lo, up, var_name, var)
         real(rp), allocatable, dimension(:,:,:), intent(in) :: var
         type(FileType)                         , intent(in) :: file
         character(len=*)                       , intent(in) :: var_name
-        
-        ! local declarations
+
         integer , parameter           :: sp  = selected_real_kind(6,37)
         character(len=1) , parameter  :: newline = char(10)
         character(len=100)            :: s_buffer
         integer                       :: iostatus
-        
+
         write(s_buffer, FMT = '(A,I12)', iostat = iostatus) 'SCALARS '//trim(var_name)//' float', 1
         write(unit = file%unit, iostat = iostatus) trim(s_buffer) // newline
         write(unit = file%unit, iostat = iostatus) 'LOOKUP_TABLE default' // newline
-        
+
         write(file%unit) real(var(lo(1):up(1),lo(2):up(2),lo(3):up(3)),sp)
 
         return
 end subroutine scalarVTK_BINARY3D
-
 
 subroutine scalarVTK_BINARY3Dcodim(file, lo, up, var_name, var, codim)
         implicit none
@@ -208,22 +185,20 @@ subroutine scalarVTK_BINARY3Dcodim(file, lo, up, var_name, var, codim)
         type(FileType)                           , intent(in) :: file
         character(len=*)                         , intent(in) :: var_name
         integer                                  , intent(in) :: codim
-        
-        ! local declarations
+
         integer , parameter           :: sp  = selected_real_kind(6,37)
         character(len=1) , parameter  :: newline = char(10)
         character(len=100)            :: s_buffer
         integer                       :: iostatus
-        
+
         write(s_buffer, FMT = '(A,I12)', iostat = iostatus) 'SCALARS '//trim(var_name)//' float', 1
         write(unit = file%unit, iostat = iostatus) trim(s_buffer) // newline
         write(unit = file%unit, iostat = iostatus) 'LOOKUP_TABLE default' // newline
-        
+
         write(file%unit) real(var(lo(1):up(1),lo(2):up(2),lo(3):up(3),codim),sp)
 
         return
 end subroutine scalarVTK_BINARY3Dcodim
-
 
 subroutine Int1scalarVTK_BINARY3D(file, lo, up, var_name, var)
         implicit none
@@ -231,22 +206,19 @@ subroutine Int1scalarVTK_BINARY3D(file, lo, up, var_name, var)
         integer(1), allocatable, dimension(:,:,:), intent(in) :: var
         type(FileType)                           , intent(in) :: file
         character(len=*)                         , intent(in) :: var_name
-        
-        ! local declarations
-        integer , parameter           :: sp  = selected_real_kind(6,37)
+
         character(len=1) , parameter  :: newline = char(10)
         character(len=100)            :: s_buffer
         integer                       :: iostatus
-        
+
         write(s_buffer, FMT = '(A,I12)', iostat = iostatus) 'SCALARS '//trim(var_name)//' int', 1
         write(unit = file%unit, iostat = iostatus) trim(s_buffer) // newline
         write(unit = file%unit, iostat = iostatus) 'LOOKUP_TABLE default' // newline
-        
+
         write(file%unit) int(var(lo(1):up(1),lo(2):up(2),lo(3):up(3)),4)
 
         return
 end subroutine Int1scalarVTK_BINARY3D
-
 
 subroutine vectorVTK_BINARY2D(file,lo,up,vec_name,vec_x,vec_y,vec_z)
         implicit none
@@ -255,15 +227,14 @@ subroutine vectorVTK_BINARY2D(file,lo,up,vec_name,vec_x,vec_y,vec_z)
         type(FileType)                       , intent(in) :: file
         character(len=*)                     , intent(in) :: vec_name
 
-        ! local declarations
         integer , parameter           :: sp  = selected_real_kind(6,37)
         character(len=1) , parameter  :: newline = char(10)
         character(len=100)            :: s_buffer
         integer                       :: iostatus, i,j
-        
+
         write(s_buffer, FMT = '(A,I12)', iostat = iostatus) 'VECTORS '//trim(vec_name)//' float'
         write(unit = file%unit, iostat = iostatus) trim(s_buffer) // newline
-       
+
         do j    = lo(2),up(2)
            do i = lo(1),up(1)
 
@@ -275,7 +246,6 @@ subroutine vectorVTK_BINARY2D(file,lo,up,vec_name,vec_x,vec_y,vec_z)
         return
 end subroutine vectorVTK_BINARY2D
 
-
 subroutine vectorVTK_BINARY3D(file, lo,up,vec_name, vec_x, vec_y, vec_z)
         implicit none
         integer, dimension(3)                  , intent(in) :: lo,up
@@ -283,14 +253,13 @@ subroutine vectorVTK_BINARY3D(file, lo,up,vec_name, vec_x, vec_y, vec_z)
         type(FileType)                         , intent(in) :: file
         character(len=*)                       , intent(in) :: vec_name
 
-        ! local declarations
         character(len=1) , parameter  :: newline = char(10)
         character(len=100)            :: s_buffer
         integer                       :: iostatus, i,j,k
-        
+
         write(s_buffer, FMT = '(A,I12)', iostat = iostatus) 'VECTORS '//trim(vec_name)//' double'
         write(unit = file%unit, iostat = iostatus) trim(s_buffer) // newline
-       
+
         do k       = lo(3),up(3)
            do j    = lo(2),up(2)
               do i = lo(1),up(1)
@@ -303,16 +272,5 @@ subroutine vectorVTK_BINARY3D(file, lo,up,vec_name, vec_x, vec_y, vec_z)
 
         return
 end subroutine vectorVTK_BINARY3D
-
-
-
-
-
-
-
-
-
-
-
 
 end module vtk_utils_module

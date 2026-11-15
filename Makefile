@@ -1,30 +1,22 @@
 #Programe Name
 MAINPROG = Uranos.exe
-MAINPOST = PostUranos.exe
-MAINSTAT = PostUranosStat.exe
 
 # Directories
 DIRECTORIES = .objs .mods DATA
 OBJDIR = .objs/
 MODDIR = .mods/
 SRCDIR = src/
-PSTDIR = pst_src/
-STADIR = pst_src_stat/
+SCHDIR = src/advection_schemes/
+VISDIR = src/viscous_schemes/
+SGSDIR = src/sgs_schemes/
+OUTDIR = src/output/
 LIBDIR = libs/
 
 # Compiler
 FC = mpif90
 
-#LIBS = -L/usr/local/opt/lapack/lib -llapack -lblas
-
 # Libraries
-ifeq ($(HOME), /marconi/home/userexternal/fdevanna)
-	LIBS = #-L/cineca/prod/opt/compilers/intel/pe-xe-2018/binary/lib/intel64/ -L${LAPACK_LIB} -L${BLAS_LIB} -lifcoremt -lblas  -llapack
-else
-	LIBS = #-Llibs/lapack/lib -llapack -lblas
-endif
-
-$cudaver=$(nvcc --version | sed -n -e 's/^.*release //p' | awk '{ print substr($1, 1, length($1)-1) }')
+LIBS =
 
 # DEFAULTS!!!
 # -----------------------------
@@ -34,27 +26,35 @@ OPENMP       = #-fopenmp -DOPENMP -lgomp -lpthread
 TIME 	     = 
 MODULES      = #-J$(MODDIR)
 PREPROC      = -cpp
-INCMODULES =
+INCMODULES   =
+
+# Parallel build: detect core count (Linux: nproc, macOS: sysctl)
+NPROC := $(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+MAKEFLAGS += -j$(NPROC) --output-sync=target
+
 # SMART COMPILING OPTIONS
 # -----------------------------
-
 
 ifeq ($(comp),gnu)
      FC = mpif90
      MODULES = -J$(MODDIR)
      ifeq ($(mode),cpu)
-     	OPT   = -O3
+     	OPT   = -O3 -pipe
      else ifeq ($(mode),cpu_debug)
-     	OPT   = -O3
-     	DEBUG = -g -DDEBUG -pedantic -fbounds-check -fcheck=all -Wall -Waliasing -Wextra -fmax-errors=5 -fdump-core 
+     	OPT   = -O3 -pipe
+     	DEBUG = -g -DDEBUG -pedantic -fbounds-check -fcheck=all -Wall -Waliasing -Wextra -fmax-errors=5 -fdump-core
 	#-finit-real=inf -ffpe-trap=invalid,zero,overflow -Wuninitialized
      	TIME    =
+     else ifeq ($(mode),cpu_profiling)
+     	OPT   = -O3 -pipe
+     	DEBUG =
+     	TIME  = -DPROFCPU
      endif
 endif
 ifeq ($(comp),gnuch)
      FC = mpif90.mpich
      MODULES = -J$(MODDIR)
-     OPT     = -O3
+     OPT     = -O3 -pipe
      TIME    =
      OPENMP  =
      ifeq ($(mode),debug)
@@ -65,7 +65,6 @@ ifeq ($(comp),gnuch)
      	OPENMP = -fopenmp -DOPENMP -lgomp -lpthread
      endif
 endif
-
 
 ifeq ($(comp),intel)
 	FC = mpif90
@@ -98,55 +97,30 @@ ifeq ($(comp),intel)
 	endif
 endif
 
-
-
 ifeq ($(comp),nvhpc)
 	FC = mpif90
 	MODULES = -module $(MODDIR)
+	# GPU compute capability: ccnative autodetects the local GPU (workstation).
+	# On machines whose build node has no GPU (e.g. Leonardo login nodes),
+	# override explicitly: make comp=nvhpc mode=gpu gpu_cc=cc80
+	gpu_cc ?= ccnative
 	ifeq ($(mode),gpu)
-		OPT    = -O3 -acc=gpu -gpu=cc70,cc80,deepcopy,safecache -cudalib=curand -Munroll=c:7 -DNVIDIA
-		DEBUG  = 
+		OPT    = -O3 -acc=gpu -gpu=$(gpu_cc),deepcopy,safecache -Minline=maxsize:1000  -DNVIDIA
+		DEBUG  = -cudalib=curand
 		TIME   = 
 		OPENMP =
 	else ifeq ($(mode),gpu_debug)
-                OPT    = -O3 -acc=gpu -gpu=cc70,cc80,deepcopy,lineinfo,safecache,ptxinfo -cudalib=curand -DNVIDIA
+                OPT    = -O3 -acc=gpu -gpu=$(gpu_cc),deepcopy,lineinfo,safecache,ptxinfo -Minline=maxsize:1000 -cudalib=curand -DNVIDIA
                 DEBUG  = -g -Minfo=accel -Minit-real=snan -Minit-msg -Ktrap=inv
                 TIME   = 
                 OPENMP =
 	else ifeq ($(mode),gpu_profiling)
-                OPT    = -O3 -acc=gpu -gpu=cc70,cc80,deepcopy,lineinfo,safecache,ptxinfo -cudalib=curand,nvtx3 -DNVIDIA
-                DEBUG  = -g -Minfo=accel -Munroll=c:7
+                OPT    = -O3 -acc=gpu -gpu=$(gpu_cc),deepcopy,lineinfo,safecache,ptxinfo -Minline=maxsize:1000 -cudalib=curand,nvtx3 -DNVIDIA
+                DEBUG  = 
                 TIME   = -DNVTX
                 OPENMP =
 	endif
 endif
-
-
-ifeq ($(comp),cray)
-	FC = ftn
-	MODULES = -em -J $(MODDIR)
-	PREPROC = 
-	ifeq ($(mode),cpu)
-		OPT    = -O3 -hfp3 -eZ -m4
-		DEBUG  = 
-		TIME   =
-		OPENMP = 
-	else ifeq ($(mode),gpu)
-		OPT        = -O3 -hfp3 -hacc -DAMD -h acc_model=auto_async_none:fast_addr:deep_copy -eZ -m4 -lhipfort-amdgcn -lrocrand $(INCMODULES)
-		DEBUG      = 
-		TIME       =
-		OPENMP     = 
-		INCMODULES = -J /users/$$USER/EasyBuild/SW/LUMI-23.09/G/hipfort/0.4-0-cpeCray-23.09-rocm5.2/include/hipfort/amdgcn
-	else ifeq ($(mode),gpu_profiling)
-		OPT        = -O3 -hfp3 -hacc -DAMD -h acc_model=auto_async_none:fast_addr:deep_copy -eZ -m4 -lhipfort-amdgcn -lrocrand -lroctx64 $(INCMODULES)
-		DEBUG      = -g
-		TIME       = -DROCTX
-		OPENMP     = 
-		INCMODULES = -J /users/$$USER/EasyBuild/SW/LUMI-23.09/G/hipfort/0.4-0-cpeCray-23.09-rocm5.2/include/hipfort/amdgcn
-	endif
-endif
-
-
 
 ifeq ($(fast_pgi),true)
 	FC      = mpif90
@@ -157,236 +131,258 @@ ifeq ($(fast_pgi),true)
 	MODULES = -module $(MODDIR)
 endif
 
-ifeq ($(pgi-cuda),true)
-	FC      = mpif90
-	OPT     = -fast -r8 #-acc
-	TIME    = 
-	OPENMP	= 
-	DEBUG   = -Minfo=accel
-	MODULES = -module $(MODDIR)
-endif
-
 ifeq ($(mpidex),buffer)
 	MPIDEX = -DMPIBFR
 endif
 
-LDFLAGS := $(PREPROC) $(OPENMP) $(TIME) $(MPIDEX) $(DEBUG) $(OPT)
+FFLAGS := $(PREPROC) $(OPENMP) $(TIME) $(MPIDEX) $(DEBUG) $(OPT)
 
-# Fortran Compiler flags
-FFLAGS    = $(LDFLAGS)
+# Flag-tracking stamp: rebuild all objects when FFLAGS changes, not on every Makefile edit
+FLAGFILE := $(OBJDIR).flags
+$(shell mkdir -p $(OBJDIR) $(MODDIR))
+$(shell printf '%s' '$(FFLAGS)' | cmp -s - $(FLAGFILE) 2>/dev/null || printf '%s' '$(FFLAGS)' > $(FLAGFILE))
 
-#Object files
-OBJECTS = $(addprefix $(OBJDIR), mpi_module.o \
+# Per-object extra flags (empty for every object except where overridden below).
+EXTRA_FFLAGS :=
+# WALE occupancy cap: compile ONLY wale_module.o with -gpu=maxregcount:128.
+# On A100 this repacks compute_wale 162->128 registers, 0 spill, ~12->16 warps/SM
+# (~-13.5% kernel, byte-identical).  nvfortran -gpu sub-flag -> only the OpenACC
+# GPU builds; a no-op for CPU builds.
+WALE_REGCAP :=
+ifeq ($(comp),nvhpc)
+    ifneq (,$(filter gpu gpu_debug gpu_profiling,$(mode)))
+        WALE_REGCAP := -gpu=maxregcount:128
+    endif
+endif
+
+# weno_reconstruction occupancy cap: compile ONLY weno_reconstruction.o with
+# -gpu=maxregcount:$(wenorec_cap).  weno_reconstruction lives in its own file, so
+# -Minline (intra-file only on nvfortran) does NOT inline it into the blended
+# convective sweeps: it is a real ABI device call whose register count therefore
+# CAPS the launch occupancy of every hybrid_wenoEP_* kernel.  Uncapped it needs
+# 220 registers (= 4 gangs/SM) while the X and Z entry functions need only 176
+# and 138, so the shared callee -- not the kernel -- is what limits them.
+# Capping it repacks the callee and lets each sweep run at its own limit.
+# Register allocation does not change arithmetic -> byte-identical.
+wenorec_cap ?= 168
+WENOREC_REGCAP :=
+ifeq ($(comp),nvhpc)
+    ifneq (,$(filter gpu gpu_debug gpu_profiling,$(mode)))
+        WENOREC_REGCAP := -gpu=maxregcount:$(wenorec_cap)
+    endif
+endif
+
+# Blended-KEEP occupancy cap: compile ONLY hybrid_wenoEP_KEEP.o with
+# -gpu=maxregcount:$(keep_cap).  Uncapped, ptxas picks 176/248/138 for the csi/eta/zeta
+# sweeps; 168 puts all three at the 6-gang band (65536/(168*64) = 6.09) at the cost of
+# 84/188/32 B of spill confined to the rarely-taken WENO shock branch.  Measured on A100
+# 128^3/10 iter over five decks (Sod x/y/z, TGV Cartesian, TGV wavy): convective
+# -3.7% .. -9.2%, negative on every deck, and better than the weno-only cap everywhere.
+# 176 is NOT a safe value (it lifts zeta 138 -> 176 and loses its gang: +1% .. +6%).
+# Register allocation does not change arithmetic -> byte-identical (cmp, 5 vars, 5 decks).
+# Set keep_cap=0 to disable if a build must carry zero spill in the sweeps themselves.
+keep_cap ?= 168
+KEEP_REGCAP :=
+ifeq ($(comp),nvhpc)
+    ifneq (,$(filter gpu gpu_debug gpu_profiling,$(mode)))
+        ifneq ($(keep_cap),0)
+            KEEP_REGCAP := -gpu=maxregcount:$(keep_cap)
+        endif
+    endif
+endif
+
+# Objects shared by all executables (solver + tools + libs)
+COMMON_OBJS = $(addprefix $(OBJDIR), \
 	  parameters_module.o \
-	  mesh_module.o \
-	  input_module.o \
-	  output_module.o \
-	  output_tch.o \
-	  storage_module.o \
+	  file_module.o \
 	  allocate_module.o \
-	  time_module.o \
-	  ic_module.o \
-	  init_bc_module.o \
-	  bc_module.o \
-	  rhs_module.o \
-	  advection_module.o \
-	  shock_detection_module.o \
-	  fluid_functions_module.o \
-	  viscous_module.o \
-	  flux_module.o \
+	  mpi_module.o \
 	  mpi_comm_module.o \
-	  inflow_module.o \
-	  nscbc_boundary_conditions.o \
-	  sgs_module.o \
-	  df_module.o \
-	  GetRetau_module.o \
-	  statistics_module.o \
-	  post_storage_module.o \
-	  post_input_module.o \
-	  post_shell_tools_module.o \
-	  post_computation_module.o \
-	  post_output_gnu_module.o \
-	  post_output_vtk_module.o \
-	  post_output_module.o \
-	  post_bc_module.o \
-	  post_solutions_module.o \
-	  post_statistic_module.o \
-	  post_statistic_spatial_module.o \
-	  post_statistic_time_module.o \
-	  post_stat_input_module.o \
-	  post_stat_storage_module.o \
-	  post_stat_output_module.o \
-	  post_stat_computation_module.o \
-	  post_stat_output_bl_module.o \
-	  norm_module.o \
-	  integration_module.o \
 	  real_to_integer_module.o \
-	  dirac_delta_module.o \
 	  math_tools_module.o \
 	  matrix_inversion_module.o \
-	  interpolation_module.o \
+	  norm_module.o \
+	  statistics_module.o \
 	  random_module.o \
+	  interpolation_module.o \
 	  reynolds_averaged_module.o \
-	  file_module.o \
-	  wmles_module.o \
-	  onlineStats.o \
-	  vtk_utils_module.o\
 	  nvtx.o \
-	  roctx.o \
-	  profiling_module.o\
-	  npy.o)
+	  profiling_module.o \
+	  npy.o \
+	  vtk_utils_module.o \
+	  thermodynamics_module.o \
+	  input_module.o \
+	  mesh_module.o \
+	  storage_module.o \
+	  fluid_functions_module.o \
+	  onlineStats.o \
+	  df_module.o \
+	  inflow_module.o \
+	  shock_detection_module.o \
+	  euler_matrices_module.o \
+	  nscbc_boundary_conditions.o \
+	  GetRetau_module.o \
+	  energy_preserving_JP.o \
+	  energy_preserving_KEEP.o \
+	  energy_preserving_AEC2CP.o \
+	  energy_preserving_AECTP.o \
+	  energy_preserving_PEPTP.o \
+	  weno_reconstruction.o \
+	  hybrid_wenoEP_JP.o \
+	  hybrid_wenoEP_KEEP.o \
+	  hybrid_wenoEP_AEC2CP.o \
+	  hybrid_wenoEP_AECTP.o \
+	  hybrid_wenoEP_PEPTP.o \
+	  advection_module.o \
+	  viscous_shared.o \
+	  viscous_staggered.o \
+	  viscous_laplacian.o \
+	  viscous_conservative.o \
+	  viscous_module.o \
+	  bc_module.o \
+	  sgs_bc_module.o \
+	  wale_module.o \
+	  sgs_module.o \
+	  output_probes.o \
+	  rhs_module.o \
+	  update_variable_module.o \
+	  output_residuals.o \
+	  ic_module.o \
+	  init_bc_module.o \
+	  time_module.o \
+	  output_restart.o \
+	  output_screen.o \
+	  output_stats_channel.o \
+	  output_stats_tgv.o \
+	  output_module.o)
 
+vpath %.f90 $(SRCDIR) $(SCHDIR) $(VISDIR) $(SGSDIR) $(OUTDIR) $(LIBDIR)
 
-
-# make all 
-all : $(DIRECTORIES) $(MAINPROG) $(MAINPOST) $(MAINSTAT) $(DEBUGGER) $(GRSCALER)
+# make all
+.PHONY: all
+all : $(DIRECTORIES) $(MAINPROG)
 
 # Create the directory $@ if this does not exist
 $(DIRECTORIES) :
 	mkdir -p $@
 	
+.PHONY: solver
+solver: $(DIRECTORIES) $(MAINPROG)
+
 # -------------------------------------------------------
-# Compile Uranos main program 
+# Compile Uranos main program
 # -------------------------------------------------------
-$(MAINPROG): $(OBJECTS) $(SRCDIR)main.f90 Makefile
+$(MAINPROG): $(COMMON_OBJS) $(SRCDIR)main.f90
 	@echo "-------------------------------------------"
 	@echo "Creating the executable: $(MAINPROG)"
 	@echo "-------------------------------------------"
-	$(FC) $(LDFLAGS) $(SRCDIR)main.f90 $(MODULES) $(INCMODULES) $(OBJECTS) -o $(MAINPROG) $(LIBS)
+	$(FC) $(FFLAGS) $(SRCDIR)main.f90 $(MODULES) $(INCMODULES) $(COMMON_OBJS) -o $(MAINPROG) $(LIBS)
 
 # -------------------------------------------------------
-# Compile post_Uranos main program 
+# Compile any .f90 found via vpath into .objs/
 # -------------------------------------------------------
-$(MAINPOST): $(OBJECTS) $(PSTDIR)post_main.f90 Makefile
-	@echo "-------------------------------------------"
-	@echo "Creating the executable: $(MAINPOST)"
-	@echo "-------------------------------------------"
-	$(FC) $(LDFLAGS) $(PSTDIR)post_main.f90 $(MODULES) $(OBJECTS) -o $(MAINPOST) $(LIBS)
+$(OBJDIR)%.o : %.f90 $(FLAGFILE)
+	$(FC) $(FFLAGS) $(EXTRA_FFLAGS) -c $< -o $@ $(MODULES) $(LIBS)
 
-# -------------------------------------------------------
-# Compile post_Uranos_stat main program 
-# -------------------------------------------------------
-$(MAINSTAT): $(OBJECTS) $(STADIR)post_stat_main.f90 Makefile
-	@echo "-------------------------------------------"
-	@echo "Creating the executable: $(MAINSTAT)"
-	@echo "-------------------------------------------"
-	$(FC) $(LDFLAGS) $(STADIR)post_stat_main.f90 $(MODULES) $(OBJECTS) -o $(MAINSTAT) $(LIBS)
+# WALE kernel: occupancy-cap this one object (see WALE_REGCAP above).
+$(OBJDIR)wale_module.o : EXTRA_FFLAGS := $(WALE_REGCAP)
 
-# -------------------------------------------------------
-# Compiling modules in SRC
-# -------------------------------------------------------
-$(OBJDIR)%.o : $(SRCDIR)%.f90 Makefile 
-	$(FC) $(FFLAGS) -c $< -o $@ $(MODULES) $(LIBS)
+# Shared WENO/TENO reconstruction: occupancy-cap this one object (see WENOREC_REGCAP above).
+$(OBJDIR)weno_reconstruction.o : EXTRA_FFLAGS := $(WENOREC_REGCAP)
 
-# -------------------------------------------------------
-# Compiling modules in PST_SRC
-# -------------------------------------------------------
-$(OBJDIR)%.o : $(PSTDIR)%.f90 Makefile
-	$(FC) $(FFLAGS) -c $< -o $@ $(MODULES) $(LIBS)
+# Blended KEEP sweeps: occupancy-cap this one object (see KEEP_REGCAP above).
+$(OBJDIR)hybrid_wenoEP_KEEP.o : EXTRA_FFLAGS := $(KEEP_REGCAP)
 
-# -------------------------------------------------------
-# Compiling modules in PST_SRC_STAT
-# -------------------------------------------------------
-$(OBJDIR)%.o : $(STADIR)%.f90 Makefile
-	$(FC) $(FFLAGS) -c $< -o $@ $(MODULES) $(LIBS)
-
-# -------------------------------------------------------
-# Compiling libraries
-# -------------------------------------------------------
-$(OBJDIR)%.o : $(LIBDIR)%.f90 Makefile
-	$(FC) $(FFLAGS) -c $< -o $@ $(MODULES) $(LIBS)
-
+	
 # Clean everything up
 .PHONY: clean
 clean: 
 	@echo "---------------------------------------"
 	@echo "Cleaning everything up"
 	@echo "---------------------------------------"
-	rm -rf *.exe *.o *.mod *.i rm -rf *dSYM
+	rm -rf *.exe *.o *.mod *.i *dSYM
 	rm -rf *.optrpt
 	rm -rf $(OBJDIR)
 	rm -rf $(MODDIR)
 
 #---------------------------------------------------------------------------
-# Dependency chains
+# Dependency chains (source files omitted: handled by vpath pattern rule)
 #---------------------------------------------------------------------------
-$(OBJDIR)parameters_module.o			: $(SRCDIR)parameters_module.f90
-$(OBJDIR)allocate_module.o			: $(SRCDIR)allocate_module.f90 $(addprefix $(OBJDIR), parameters_module.o)
-$(OBJDIR)mpi_comm_module.o			: $(SRCDIR)mpi_comm_module.f90 $(addprefix $(OBJDIR), parameters_module.o mpi_module.o)
-$(OBJDIR)mpi_module.o				: $(SRCDIR)mpi_module.f90 $(addprefix $(OBJDIR), parameters_module.o file_module.o allocate_module.o)
-$(OBJDIR)input_module.o				: $(SRCDIR)input_module.f90 $(addprefix $(OBJDIR), parameters_module.o mpi_module.o real_to_integer_module.o)
-$(OBJDIR)mesh_module.o				: $(SRCDIR)mesh_module.f90 $(addprefix $(OBJDIR), parameters_module.o mpi_module.o math_tools_module.o input_module.o matrix_inversion_module.o)
-$(OBJDIR)output_module.o			: $(SRCDIR)output_module.f90 $(addprefix $(OBJDIR), parameters_module.o mpi_module.o storage_module.o norm_module.o statistics_module.o fluid_functions_module.o file_module.o integration_module.o wmles_module.o fluid_functions_module.o onlineStats.o output_tch.o)
-$(OBJDIR)output_tch.o				: $(SRCDIR)output_tch.f90 $(addprefix $(OBJDIR), parameters_module.o mpi_module.o storage_module.o onlineStats.o file_module.o)
-$(OBJDIR)storage_module.o			: $(SRCDIR)storage_module.f90 $(addprefix $(OBJDIR), parameters_module.o mpi_module.o mesh_module.o allocate_module.o)
-$(OBJDIR)time_module.o				: $(SRCDIR)time_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o shock_detection_module.o)
-$(OBJDIR)ic_module.o				: $(SRCDIR)ic_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o fluid_functions_module.o math_tools_module.o random_module.o file_module.o df_module.o)
-$(OBJDIR)init_bc_module.o		 	: $(SRCDIR)init_bc_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o ic_module.o bc_module.o rhs_module.o)
-$(OBJDIR)bc_module.o			 	: $(SRCDIR)bc_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o fluid_functions_module.o inflow_module.o real_to_integer_module.o mpi_comm_module.o)
-$(OBJDIR)rhs_module.o			 	: $(SRCDIR)rhs_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o advection_module.o viscous_module.o integration_module.o sgs_module.o)
-$(OBJDIR)advection_module.o			: $(SRCDIR)advection_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o flux_module.o inflow_module.o nvtx.o roctx.o nscbc_boundary_conditions.o)
-$(OBJDIR)shock_detection_module.o		: $(SRCDIR)shock_detection_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o fluid_functions_module.o mpi_comm_module.o)
-$(OBJDIR)viscous_module.o			: $(SRCDIR)viscous_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o nvtx.o roctx.o)
-$(OBJDIR)flux_module.o				: $(SRCDIR)flux_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o)
-$(OBJDIR)inflow_module.o			: $(SRCDIR)inflow_module.f90 $(addprefix $(OBJDIR), storage_module.o fluid_functions_module.o math_tools_module.o df_module.o)
-$(OBJDIR)sgs_module.o				: $(SRCDIR)sgs_module.f90 $(addprefix $(OBJDIR), storage_module.o mpi_module.o parameters_module.o bc_module.o wmles_module.o)
-$(OBJDIR)df_module.o				: $(SRCDIR)df_module.f90 $(addprefix $(OBJDIR), parameters_module.o mpi_module.o fluid_functions_module.o)
-$(OBJDIR)GetRetau_module.o			: $(SRCDIR)GetRetau_module.f90 $(addprefix $(OBJDIR), parameters_module.o mpi_module.o fluid_functions_module.o mesh_module.o)
-$(OBJDIR)wmles_module.o				: $(SRCDIR)wmles_module.f90 $(addprefix $(OBJDIR), parameters_module.o fluid_functions_module.o)
-$(OBJDIR)profiling_module.o			: $(SRCDIR)profiling_module.f90 $(addprefix $(OBJDIR), nvtx.o roctx.o)
-$(OBJDIR)nscbc_boundary_conditions.o		: $(SRCDIR)nscbc_boundary_conditions.f90 $(addprefix $(OBJDIR), parameters_module.o mpi_module.o storage_module.o mesh_module.o)
-$(OBJDIR)nvtx.o					: $(SRCDIR)nvtx.f90
-$(OBJDIR)nvtx.o					: $(SRCDIR)nvtx.f90
-$(OBJDIR)roctx.o					: $(SRCDIR)roctx.f90
-
-$(OBJDIR)post_storage_module.o			: $(PSTDIR)post_storage_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o mesh_module.o)
-$(OBJDIR)post_input_module.o			: $(PSTDIR)post_input_module.f90 $(addprefix $(OBJDIR), post_storage_module.o post_shell_tools_module.o)
-$(OBJDIR)post_shell_tools_module.o		: $(PSTDIR)post_shell_tools_module.f90 $(addprefix $(OBJDIR), post_storage_module.o)
-$(OBJDIR)post_computation_module.o		: $(PSTDIR)post_computation_module.f90 $(addprefix $(OBJDIR), post_storage_module.o storage_module.o fluid_functions_module.o shock_detection_module.o post_solutions_module.o)
-$(OBJDIR)post_output_gnu_module.o		: $(PSTDIR)post_output_gnu_module.f90 $(addprefix $(OBJDIR), post_storage_module.o storage_module.o norm_module.o post_solutions_module.o post_statistic_module.o post_computation_module.o file_module.o fluid_functions_module.o statistics_module.o)  
-$(OBJDIR)post_output_vtk_module.o		: $(PSTDIR)post_output_vtk_module.f90 $(addprefix $(OBJDIR), post_storage_module.o storage_module.o post_computation_module.o vtk_utils_module.o)
-$(OBJDIR)post_output_module.o			: $(PSTDIR)post_output_module.f90 $(addprefix $(OBJDIR), post_storage_module.o post_output_gnu_module.o storage_module.o post_output_vtk_module.o npy.o file_module.o)
-$(OBJDIR)post_bc_module.o			: $(PSTDIR)post_bc_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o post_storage_module.o bc_module.o)
-$(OBJDIR)post_solutions_module.o		: $(PSTDIR)post_solutions_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o post_storage_module.o)
-$(OBJDIR)post_statistic_module.o		: $(PSTDIR)post_statistic_module.f90 $(addprefix $(OBJDIR), post_storage_module.o storage_module.o post_statistic_time_module.o post_statistic_spatial_module.o)
-$(OBJDIR)post_statistic_spatial_module.o	: $(PSTDIR)post_statistic_spatial_module.f90 $(addprefix $(OBJDIR), post_storage_module.o )
-$(OBJDIR)post_statistic_time_module.o		: $(PSTDIR)post_statistic_time_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o)
-
-# POST STAT MODULES
-$(OBJDIR)post_stat_storage_module.o		: $(STADIR)post_stat_storage_module.f90 $(addprefix $(OBJDIR), parameters_module.o file_module.o allocate_module.o mpi_module.o storage_module.o)
-$(OBJDIR)post_stat_input_module.o		: $(STADIR)post_stat_input_module.f90 $(addprefix $(OBJDIR), post_shell_tools_module.o post_stat_storage_module.o)
-$(OBJDIR)post_stat_output_module.o		: $(STADIR)post_stat_output_module.f90 $(addprefix $(OBJDIR), parameters_module.o post_stat_storage_module.o mpi_module.o post_stat_output_bl_module.o)
-$(OBJDIR)post_stat_computation_module.o		: $(STADIR)post_stat_computation_module.f90 $(addprefix $(OBJDIR), parameters_module.o post_stat_storage_module.o)
-$(OBJDIR)post_stat_output_bl_module.o		: $(STADIR)post_stat_output_bl_module.f90 $(addprefix $(OBJDIR), parameters_module.o post_stat_storage_module.o wmles_module.o)
-
-
-#---------------------------------------------------------------------------
-# Libraries
-#---------------------------------------------------------------------------
-$(OBJDIR)norm_module.o				: $(LIBDIR)norm_module.f90 $(addprefix $(OBJDIR), parameters_module.o)
-$(OBJDIR)fluid_functions_module.o		: $(LIBDIR)fluid_functions_module.f90 $(addprefix $(OBJDIR), parameters_module.o storage_module.o interpolation_module.o)
-$(OBJDIR)integration_module.o			: $(LIBDIR)integration_module.f90 $(addprefix $(OBJDIR), parameters_module.o mpi_module.o)
-$(OBJDIR)real_to_integer_module.o		: $(LIBDIR)real_to_integer_module.f90 $(addprefix $(OBJDIR), parameters_module.o)
-$(OBJDIR)dirac_delta_module.o			: $(LIBDIR)dirac_delta_module.f90 $(addprefix $(OBJDIR), parameters_module.o real_to_integer_module.o)
-$(OBJDIR)math_tools_module.o			: $(LIBDIR)math_tools_module.f90 $(addprefix $(OBJDIR), parameters_module.o)
-$(OBJDIR)matrix_inversion_module.o		: $(LIBDIR)matrix_inversion_module.f90 $(addprefix $(OBJDIR), parameters_module.o)
-$(OBJDIR)interpolation_module.o			: $(LIBDIR)interpolation_module.f90 $(addprefix $(OBJDIR), parameters_module.o real_to_integer_module.o matrix_inversion_module.o mpi_module.o)
-$(OBJDIR)random_module.o			: $(LIBDIR)random_module.f90 $(addprefix $(OBJDIR), parameters_module.o) 
-$(OBJDIR)reynolds_averaged_module.o		: $(LIBDIR)reynolds_averaged_module.f90 
-$(OBJDIR)file_module.o				: $(LIBDIR)file_module.f90 $(addprefix $(OBJDIR), parameters_module.o)  
-$(OBJDIR)vtk_utils_module.o			: $(LIBDIR)vtk_utils_module.f90 $(addprefix $(OBJDIR), parameters_module.o file_module.o)
-$(OBJDIR)statistics_module.o			: $(LIBDIR)statistics_module.f90 $(addprefix $(OBJDIR), parameters_module.o)
-$(OBJDIR)onlineStats.o	   			: $(LIBDIR)onlineStats.f90 $(addprefix $(OBJDIR), parameters_module.o statistics_module.o fluid_functions_module.o)
-$(OBJDIR)npy.o	                     		: $(LIBDIR)npy.f90 
-
-
-
-
-
-
-
-
-
-
-
-
+$(OBJDIR)allocate_module.o                   : $(addprefix $(OBJDIR), parameters_module.o)
+$(OBJDIR)file_module.o                       : $(addprefix $(OBJDIR), parameters_module.o)
+$(OBJDIR)mpi_module.o                        : $(addprefix $(OBJDIR), parameters_module.o file_module.o allocate_module.o)
+$(OBJDIR)thermodynamics_module.o             : $(addprefix $(OBJDIR), parameters_module.o mpi_module.o)
+$(OBJDIR)mpi_comm_module.o                   : $(addprefix $(OBJDIR), parameters_module.o mpi_module.o profiling_module.o)
+$(OBJDIR)real_to_integer_module.o            : $(addprefix $(OBJDIR), parameters_module.o)
+$(OBJDIR)math_tools_module.o                 : $(addprefix $(OBJDIR), parameters_module.o)
+$(OBJDIR)matrix_inversion_module.o           : $(addprefix $(OBJDIR), parameters_module.o)
+$(OBJDIR)norm_module.o                       : $(addprefix $(OBJDIR), parameters_module.o)
+$(OBJDIR)statistics_module.o                 : $(addprefix $(OBJDIR), parameters_module.o)
+$(OBJDIR)random_module.o                     : $(addprefix $(OBJDIR), parameters_module.o)
+$(OBJDIR)interpolation_module.o              : $(addprefix $(OBJDIR), parameters_module.o real_to_integer_module.o matrix_inversion_module.o mpi_module.o)
+$(OBJDIR)input_module.o                      : $(addprefix $(OBJDIR), parameters_module.o mpi_module.o real_to_integer_module.o thermodynamics_module.o)
+$(OBJDIR)mesh_module.o                       : $(addprefix $(OBJDIR), parameters_module.o mpi_module.o allocate_module.o matrix_inversion_module.o)
+$(OBJDIR)storage_module.o                    : $(addprefix $(OBJDIR), parameters_module.o mpi_module.o mesh_module.o allocate_module.o)
+$(OBJDIR)vtk_utils_module.o                  : $(addprefix $(OBJDIR), parameters_module.o file_module.o)
+$(OBJDIR)profiling_module.o                  : $(addprefix $(OBJDIR), nvtx.o parameters_module.o file_module.o)
+$(OBJDIR)fluid_functions_module.o            : $(addprefix $(OBJDIR), parameters_module.o storage_module.o interpolation_module.o thermodynamics_module.o)
+$(OBJDIR)onlineStats.o                       : $(addprefix $(OBJDIR), parameters_module.o profiling_module.o statistics_module.o fluid_functions_module.o)
+$(OBJDIR)df_module.o                         : $(addprefix $(OBJDIR), parameters_module.o mpi_module.o fluid_functions_module.o random_module.o)
+$(OBJDIR)inflow_module.o                     : $(addprefix $(OBJDIR), storage_module.o fluid_functions_module.o math_tools_module.o df_module.o)
+$(OBJDIR)shock_detection_module.o            : $(addprefix $(OBJDIR), parameters_module.o storage_module.o fluid_functions_module.o mpi_comm_module.o)
+$(OBJDIR)euler_matrices_module.o             : $(addprefix $(OBJDIR), parameters_module.o thermodynamics_module.o)
+$(OBJDIR)nscbc_boundary_conditions.o         : $(addprefix $(OBJDIR), parameters_module.o mpi_module.o storage_module.o mesh_module.o inflow_module.o euler_matrices_module.o)
+$(OBJDIR)GetRetau_module.o                   : $(addprefix $(OBJDIR), parameters_module.o mpi_module.o fluid_functions_module.o mesh_module.o thermodynamics_module.o)
+# per-scheme energy-preserving modules (src/advection_schemes/, via vpath)
+# Wired set (ep_id 1..5): JP, KEEP(2), AEC2-CP, AEC-TP, PEP (ep_type JP/KEEP/AEC/PEP).
+# AEC-TP and PEP carry the
+# thermodynamics_module dependency (their thermally-perfect caloric closure).
+EP_DEPS = $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o mesh_module.o profiling_module.o)
+$(OBJDIR)energy_preserving_JP.o              : $(EP_DEPS)
+$(OBJDIR)energy_preserving_KEEP.o           : $(EP_DEPS)
+$(OBJDIR)energy_preserving_AEC2CP.o          : $(EP_DEPS)
+$(OBJDIR)energy_preserving_AECTP.o           : $(EP_DEPS) $(OBJDIR)thermodynamics_module.o
+$(OBJDIR)energy_preserving_PEPTP.o           : $(EP_DEPS) $(OBJDIR)thermodynamics_module.o
+EP_OBJS = $(addprefix $(OBJDIR), energy_preserving_JP.o energy_preserving_KEEP.o \
+	  energy_preserving_AEC2CP.o energy_preserving_AECTP.o energy_preserving_PEPTP.o)
+# blended (hybrid shock-capturing + energy-preserving) convective schemes.
+# weno_reconstruction = shared WENO/TENO cell-boundary reconstruction, common to
+# every blended sibling; hybrid_wenoEP_JP / _KEEP = the JP- / KEEP(2)-split variants.
+$(OBJDIR)weno_reconstruction.o               : $(addprefix $(OBJDIR), parameters_module.o)
+$(OBJDIR)hybrid_wenoEP_JP.o                  : $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o mesh_module.o profiling_module.o euler_matrices_module.o weno_reconstruction.o)
+$(OBJDIR)hybrid_wenoEP_KEEP.o               : $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o mesh_module.o profiling_module.o euler_matrices_module.o weno_reconstruction.o)
+$(OBJDIR)hybrid_wenoEP_AEC2CP.o              : $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o mesh_module.o profiling_module.o euler_matrices_module.o weno_reconstruction.o)
+$(OBJDIR)hybrid_wenoEP_AECTP.o               : $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o mesh_module.o profiling_module.o euler_matrices_module.o weno_reconstruction.o thermodynamics_module.o)
+$(OBJDIR)hybrid_wenoEP_PEPTP.o               : $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o mesh_module.o profiling_module.o euler_matrices_module.o weno_reconstruction.o thermodynamics_module.o)
+$(OBJDIR)advection_module.o                  : $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o inflow_module.o nvtx.o nscbc_boundary_conditions.o hybrid_wenoEP_JP.o hybrid_wenoEP_KEEP.o hybrid_wenoEP_AEC2CP.o hybrid_wenoEP_AECTP.o hybrid_wenoEP_PEPTP.o) $(EP_OBJS)
+# viscous-flux schemes (src/viscous_schemes/, via vpath) + orchestrator (src/).
+# viscous_module = thin dispatcher over diffusion_scheme; the schemes it drives:
+#   viscous_shared    = DivergencyGradient3D + SGS-isotropic (shared completion),
+#   viscous_laplacian = chain-rule Laplacian form,
+#   viscous_staggered = conservative Lele face-flux form,
+#   viscous_conservative = compatible (energy-conserving) 2nd-order face form,
+$(OBJDIR)viscous_shared.o                    : $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o mpi_comm_module.o mesh_module.o nvtx.o fluid_functions_module.o profiling_module.o)
+$(OBJDIR)viscous_staggered.o                 : $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o mesh_module.o nvtx.o fluid_functions_module.o profiling_module.o)
+$(OBJDIR)viscous_laplacian.o                 : $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o mesh_module.o nvtx.o fluid_functions_module.o profiling_module.o)
+$(OBJDIR)viscous_conservative.o              : $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o mpi_comm_module.o mesh_module.o nvtx.o fluid_functions_module.o profiling_module.o)
+$(OBJDIR)viscous_module.o                    : $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o mesh_module.o profiling_module.o nvtx.o viscous_shared.o viscous_staggered.o viscous_laplacian.o viscous_conservative.o)
+$(OBJDIR)bc_module.o                         : $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o fluid_functions_module.o inflow_module.o real_to_integer_module.o mpi_comm_module.o thermodynamics_module.o)
+$(OBJDIR)sgs_bc_module.o                     : $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o bc_module.o mesh_module.o fluid_functions_module.o real_to_integer_module.o matrix_inversion_module.o math_tools_module.o file_module.o profiling_module.o)
+# WALE SGS kernel split into its own compilation unit (src/sgs_schemes/) so it
+# can be compiled with -gpu=maxregcount:128 (see WALE_REGCAP below) without
+# capping the sigma/MixedTimeScale kernels in sgs_module (194/234 regs, would spill).
+$(OBJDIR)wale_module.o                       : $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o mesh_module.o)
+$(OBJDIR)sgs_module.o                        : $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o bc_module.o sgs_bc_module.o wale_module.o)
+$(OBJDIR)output_probes.o                     : $(addprefix $(OBJDIR), parameters_module.o profiling_module.o storage_module.o mpi_module.o mesh_module.o fluid_functions_module.o file_module.o)
+$(OBJDIR)rhs_module.o                        : $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o advection_module.o viscous_module.o sgs_module.o thermodynamics_module.o)
+$(OBJDIR)update_variable_module.o            : $(addprefix $(OBJDIR), parameters_module.o storage_module.o profiling_module.o thermodynamics_module.o)
+$(OBJDIR)output_residuals.o                  : $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o profiling_module.o output_probes.o)
+$(OBJDIR)ic_module.o                         : $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o fluid_functions_module.o math_tools_module.o random_module.o file_module.o df_module.o thermodynamics_module.o)
+$(OBJDIR)init_bc_module.o                    : $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o ic_module.o bc_module.o rhs_module.o update_variable_module.o thermodynamics_module.o)
+$(OBJDIR)time_module.o                       : $(addprefix $(OBJDIR), parameters_module.o storage_module.o mpi_module.o shock_detection_module.o output_probes.o)
+# output modules (src/output/, via vpath); output_module is the driver
+$(OBJDIR)output_restart.o                    : $(addprefix $(OBJDIR), parameters_module.o mpi_module.o storage_module.o profiling_module.o file_module.o)
+$(OBJDIR)output_screen.o                     : $(addprefix $(OBJDIR), parameters_module.o profiling_module.o mpi_module.o storage_module.o)
+$(OBJDIR)output_stats_channel.o              : $(addprefix $(OBJDIR), parameters_module.o mpi_module.o storage_module.o mesh_module.o onlineStats.o file_module.o fluid_functions_module.o thermodynamics_module.o)
+$(OBJDIR)output_stats_tgv.o                  : $(addprefix $(OBJDIR), parameters_module.o mpi_module.o storage_module.o onlineStats.o file_module.o)
+$(OBJDIR)output_module.o                     : $(addprefix $(OBJDIR), parameters_module.o mpi_module.o storage_module.o profiling_module.o inflow_module.o onlineStats.o output_restart.o output_screen.o output_residuals.o output_probes.o output_stats_channel.o output_stats_tgv.o)

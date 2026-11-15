@@ -1,231 +1,241 @@
 module GetRetau_module
+
 use parameters_module
 use mpi_module
 implicit none
 
 private
-public init_reynolds
-
+public :: init_Reynolds
 
 contains
+
 subroutine init_Reynolds
 
-
         implicit none
+        real(rp), parameter :: reTauMin = 5.0e1_rp
+        real(rp), parameter :: reTauMax = 5.0e4_rp
 
-        selectcase(ic)
+        select case(ic)
         case('turbulent_channel')
+          call check_ReTau_input(reTauMin, reTauMax)
           call GetReynolds_TCH
 
         case('turbulent_BL')
+          call check_ReTau_input(reTauMin, reTauMax)
           call GetReynolds_TBL
-
-        case('smooth_body', 'supersonic_ramp')
-          call GetReynolds_SmoothBody
 
         case default
           ReTau = 0.0_rp
 
-        endselect
+        end select
 
         return
 end subroutine init_Reynolds
 
+subroutine check_ReTau_input(reTauMin, reTauMax)
 
+        implicit none
+        real(rp), intent(in) :: reTauMin, reTauMax
+        logical              :: bad
+
+        bad = (Reynolds /= Reynolds)                    &
+         .or. (abs(Reynolds) > huge(1.0_rp))            &
+         .or. (Reynolds <= 0.0_rp)                      &
+         .or. (Reynolds < reTauMin)                     &
+         .or. (Reynolds > reTauMax)
+
+        if(.not. bad) return
+
+        if(rank == root) then
+           write(*,'(A)')        ' ============== init_Reynolds: INPUT CHECK FAILED =============='
+           write(*,'(2A)')       '   ic             = ', trim(ic)
+           write(*,'(A,ES12.4)') '   Reynolds (dat) = ', Reynolds
+           write(*,'(A,ES10.2,A,ES10.2,A)') &
+                                 '   expected ReTau in [', reTauMin,' , ',reTauMax,']'
+           write(*,'(A)')        '   Please verify that a bulk or free-stream Reynolds was'
+           write(*,'(A)')        '   not provided instead of ReTau.'
+           write(*,'(A)')        ' ==============================================================='
+        endif
+
+        call secure_stop
+
+        return
+end subroutine check_ReTau_input
 
 subroutine GetReynolds_TCH
 
         use fluid_functions_module, only: ReichardtLaw
-        use mesh_module           , only: compute_grid_point
+        use thermodynamics_module , only: gamma_Tref
 
         implicit none
 
-        real(rp), dimension(:), allocatable :: y_tmp
+        real(rp), dimension(:), allocatable :: yTmp
         real(rp), dimension(:), allocatable :: uPlus, ucPlus, ucPlusOld
-        real(rp), dimension(:), allocatable :: RhoY, TmpY
-        real(rp), parameter                 :: toll = 1.0E-14_rp
-        integer , parameter                 :: itmx = 100
-        real(rp)                            :: yp, t_wl, r_wl,  refc, trec, s, alf
-        real(rp)                            :: uu, fuu, du, uci, te
-        real(rp)                            :: rerr, ReOut
-        real(rp)                            :: rhosum,  rhousum, dy, ubulk
+        real(rp), dimension(:), allocatable :: rhoY, tmpY
+        real(rp), parameter                 :: toll  = 1.0E-14_rp
+        integer , parameter                 :: itMax = 100
+        real(rp), parameter                 :: sRey  = 1.1_rp
+        real(rp)                            :: yP, tWall, rWall, tRec, alf
+        real(rp)                            :: uu, fuu, du, uci, tEdge
+        real(rp)                            :: errLoc, reOut
+        real(rp)                            :: rhoSum, rhouSum, dy, uBulk
         integer                             :: n, j, iter, err = 0
 
         ReTau = Reynolds
 
         n = 1000000
 
-        allocate(y_tmp(0:n),uPlus(0:n),ucPlus(0:n), &
-                 ucPlusOld(0:n),RhoY(0:n),TmpY(0:n), stat=err)
-        if(err .ne. 0) stop ' Allocation error get Reynolds Channel'
+        allocate(yTmp(0:n), uPlus(0:n), ucPlus(0:n),                      &
+                 ucPlusOld(0:n), rhoY(0:n), tmpY(0:n), stat=err)
+        if(err /= 0) stop ' Allocation error in GetReynolds_TCH'
 
-        ! build a temporary and very fine grid
         do j = 0,n
-           y_tmp(j) = j*2/real(2*n,rp)
+           yTmp(j) = j*2/real(2*n,rp)
         enddo
-       
-        ! init uPlus
+
         uPlus = 0.0_rp
         do j = 1,n
-           yP = (y_tmp(j))*ReTau
+           yP       = yTmp(j)*ReTau
            uPlus(j) = ReichardtLaw(yP)
         enddo
         ucPlus = uPlus
-        
-        ! get wall properties
-        t_Wl = 1.0_rp
-        r_wl = 1.0_rp
-        refc = Prandtl**(1.0_rp/3.0_rp)
-        Trec = 1.0_rp + refc*0.5_rp*(gamma0-1.0_rp)*Mach**2
-        s    = 1.1_rp
-        te   = Trec
-        alf  = s*Prandtl
 
-        iter = 0
-        rerr = 2*toll
-        do while(rerr > toll .and. iter < itmx)
-        
+        tWall  = 1.0_rp
+        rWall  = 1.0_rp
+        alf    = sRey*Prandtl
+
+        tRec  = T_recovery
+        tEdge = tRec
+
+        iter   = 0
+        errLoc = 2*toll
+        do while(errLoc > toll .and. iter < itMax)
+
            ucPlusOld = ucPlus
-           TmpY(0)   = t_wl
-           RhoY(0)   = r_wl
+           tmpY(0)   = tWall
+           rhoY(0)   = rWall
            do j = 1,n
-              uu      = ucplus(j)/ucplus(n)
-              fuu     = alf*uu+(1.0_rp-alf)*uu**2
-              TmpY(j) = t_wl+(trec-t_wl)*fuu+(te-trec)*uu**2
-              RhoY(j) = 1.0_rp/TmpY(j)
+              uu      = ucPlus(j)/ucPlus(n)
+              fuu     = alf*uu + (1.0_rp - alf)*uu**2
+              tmpY(j) = tWall + (tRec - tWall)*fuu + (tEdge - tRec)*uu**2
+              rhoY(j) = 1.0_rp/tmpY(j)
            enddo
 
-           do j=1,n
-            du        = uplus(j)-uplus(j-1)
-            uci       = 0.5_rp*(sqrt(r_wl/RhoY(j))+sqrt(r_wl/RhoY(j-1)))
-            ucplus(j) = ucplus(j-1)+uci*du
+           do j = 1,n
+              du        = uPlus(j) - uPlus(j-1)
+              uci       = 0.5_rp*(sqrt(rWall/rhoY(j)) + sqrt(rWall/rhoY(j-1)))
+              ucPlus(j) = ucPlus(j-1) + uci*du
            enddo
 
-           rerr  = maxval(abs(ucPlus - ucplusOld))
-           iter = iter + 1
+           errLoc = maxval(abs(ucPlus - ucPlusOld))
+           iter   = iter + 1
 
         enddo
 
-        rhosum   = 0.0_rp
-        rhousum  = 0.0_rp
-        do j=1,n
-         dy      = y_tmp(j)-y_tmp(j-1)
-         rhosum  = rhosum+RhoY(j)*dy
-         rhousum = rhousum+RhoY(j)*ucplus(j)*dy
+        rhoSum  = 0.0_rp
+        rhouSum = 0.0_rp
+        do j = 1,n
+           dy      = yTmp(j) - yTmp(j-1)
+           rhoSum  = rhoSum  + rhoY(j)*dy
+           rhouSum = rhouSum + rhoY(j)*ucPlus(j)*dy
         enddo
-        ubulk =  rhousum/rhosum
+        uBulk = rhouSum/rhoSum
 
-        ReOut = ReTau*ubulk*rhosum
+        reOut    = ReTau*uBulk*rhoSum
+        Reynolds = reOut
+        mu_inf   = sqrt(gamma_Tref)*Mach/Reynolds
 
-        Reynolds = ReOut
-        mu_inf   = sqrt(gamma0)*Mach/Reynolds
-
-        deallocate(y_tmp,uPlus,ucPlus,ucPlusOld,RhoY,TmpY)
+        deallocate(yTmp, uPlus, ucPlus, ucPlusOld, rhoY, tmpY)
 
         return
 end subroutine GetReynolds_TCH
 
-
 subroutine GetReynolds_TBL
-        
-        use mesh_module           , only: compute_grid_point
+
         use fluid_functions_module, only: MuskerProfile, CompressibleCorrection, &
                                           laminar_viscosity
+        use thermodynamics_module , only: gamma_Tref
 
         implicit none
 
-        ! local declarations
-        real(rp), dimension(:), allocatable :: y_tmp
-        real(rp), dimension(0:ny) :: UPlusInc, UplusCmp, RhoY, TmpY
-        real(rp)                  :: mWall,rWall,tWall,ue, ReOut
-        integer                   :: err = 0
+        integer , parameter                 :: nAux        = 100000
+        real(rp), parameter                 :: yMaxAux     = 10.0_rp
+        real(rp), parameter                 :: yPlusTarget = 0.001_rp
+
+        real(rp), dimension(:), allocatable :: yTmp, yMusker
+        real(rp), dimension(:), allocatable :: uPlusInc, uPlusCmp
+        real(rp), dimension(:), allocatable :: rhoY, tmpY
+        real(rp)                            :: tWall, rWall, mWall, uEdge
+        integer                             :: err = 0
 
         ReTau = Reynolds
-        
-        allocate(y_tmp(0:ny),stat=err)
-        if(err .ne. 0) stop ' Allocation error in GetRetau_TBL'
-        call compute_grid_point(y_tmp,ny,0,ny,ymin,ymax,stretching_par,gridpoint_y)
-        y_tmp(0) = 0.0_rp
 
-        ! init incompressible profile
-        call MuskerProfile(ny,y_tmp,ReTau,UplusInc)
-        uPlusCmp = uPlusInc
-        
-        ! iterate to get the compressible correction
-        call CompressibleCorrection(ny,.true.,Mach,Prandtl,Trat,tWall,rWall,&
-                                     UPlusInc,UPlusCmp,RhoY,TmpY)
-        
-        ! obtain reference Reynolds number
-        ue       = maxval(UPlusCmp)
-        mWall    = laminar_viscosity(tWall,Tref,vis_flag)
+        allocate(yTmp(0:nAux), yMusker(0:nAux),                              &
+                 uPlusInc(0:nAux), uPlusCmp(0:nAux),                         &
+                 rhoY(0:nAux), tmpY(0:nAux), stat=err)
+        if(err /= 0) stop ' Allocation error in GetReynolds_TBL'
 
-        ReOut    = ReTau*ue/rWall*mWall
-        Reynolds = ReOut
-        mu_inf   = sqrt(gamma0)*Mach/Reynolds
+        call BuildAuxYGrid(nAux, yMaxAux, ReTau, yPlusTarget, yTmp)
 
-        deallocate(y_tmp)
+        yMusker = yTmp + ymin
+        call MuskerProfile(nAux, yMusker, ReTau, uPlusInc)
+
+        call CompressibleCorrection(nAux, uPlusInc, uPlusCmp, rhoY, tmpY, tWall, rWall)
+
+        uEdge = uPlusCmp(nAux)
+        mWall = laminar_viscosity(tWall, Tref, vis_flag)
+
+        Reynolds = ReTau*uEdge/rWall*mWall
+        mu_inf   = sqrt(gamma_Tref)*Mach/Reynolds
+
+        deallocate(yTmp, yMusker, uPlusInc, uPlusCmp, rhoY, tmpY)
 
         return
 end subroutine GetReynolds_TBL
 
-
-
-subroutine GetReynolds_SmoothBody
-
-        use mesh_module, only: compute_grid_point
-        use fluid_functions_module, only: MuskerProfile, CompressibleCorrection, &
-                                          laminar_viscosity
+subroutine BuildAuxYGrid(n, Ly, reTauIn, yPlusTarget, y)
 
         implicit none
-        integer, parameter :: n = 10000
-        real(rp), dimension(:), allocatable :: y_tmp
-        real(rp), dimension(0:n)            :: uPlusInc, uPlusCmp, RhoY, TmpY
+        integer , intent(in)  :: n
+        real(rp), intent(in)  :: Ly, reTauIn, yPlusTarget
+        real(rp), intent(out) :: y(0:n)
 
-        real(rp) :: xi, a, mWall, tWall, rWall, ue, ReOut
-        integer  :: j, err = 0
+        real(rp), parameter :: toll  = 1.0E-15_rp
+        integer , parameter :: itMax = 1000
+        real(rp)            :: alpha, alphaOld, xi1, errLoc, kRatio
+        integer             :: iter, j
 
-        ReTau = Reynolds
+        xi1 = 1.0_rp/real(n,rp)
 
-        allocate(y_tmp(0:n),stat=err)
-        if(err .ne. 0) stop ' Allocation error in GetRetau_SmoothBody'
-        
-        a = 10.0_rp
-        do j = 0,n
-           xi = (j)/real(n,rp)
-           y_tmp(j) = (ymax-ymin)*(1.0_rp+tanh((xi-1.0_rp)*a)/tanh(a))
-        enddo
+        kRatio = reTauIn*Ly*xi1/yPlusTarget
 
-        call MuskerProfile(n,y_tmp,ReTau,UplusInc)
-        UPlusCmp = uPlusInc
+        if(kRatio <= 1.0_rp) then
+           alpha = 0.0_rp
+        else
+           alpha  = 1.0_rp
+           errLoc = 2.0_rp*toll
+           iter   = 0
+           do while(errLoc > toll .and. iter < itMax)
+              alphaOld = alpha
+              alpha    = asinh(reTauIn*Ly*sinh(alphaOld*xi1)/yPlusTarget)
+              errLoc   = abs(alpha - alphaOld)
+              iter     = iter + 1
+           enddo
+           if(alpha <= 0.0_rp) stop ' BuildAuxYGrid: stretching search failed'
+        endif
 
-        call CompressibleCorrection(n,.true.,Mach,Prandtl,Trat,tWall,rWall,&
-                                     UPlusInc,UPlusCmp,RhoY,TmpY)
-
-        ue = maxval(UPlusCmp)
-        mWall    = laminar_viscosity(tWall,Tref,vis_flag)
-
-        ReOut    = ReTau*ue/rWall*mWall!*(1.0_rp/0.032_rp)
-        Reynolds = ReOut
-        mu_inf   = sqrt(gamma0)*Mach/Reynolds
-
-        deallocate(y_tmp)
+        y(0) = 0.0_rp
+        if(alpha == 0.0_rp) then
+           do j = 1,n
+              y(j) = Ly*real(j,rp)/real(n,rp)
+           enddo
+        else
+           do j = 1,n
+              y(j) = Ly*sinh(alpha*real(j,rp)/real(n,rp))/sinh(alpha)
+           enddo
+        endif
 
         return
-end subroutine GetReynolds_SmoothBody
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+end subroutine BuildAuxYGrid
 
 end module GetRetau_module

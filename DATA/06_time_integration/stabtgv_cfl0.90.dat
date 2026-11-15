@@ -1,0 +1,67 @@
+&input_list
+    xmin = 0.0
+    xmax = 6.283185307179586
+    ymin = 0.0
+    ymax = 6.283185307179586
+    zmin = 0.0
+    zmax = 6.283185307179586
+    gridpoint_x = 'uniform'
+    gridpoint_y = 'uniform'
+    gridpoint_z = 'uniform'
+    dims = 3
+    nx = 32
+    ny = 32
+    nz = 32
+    cart_dims(1) = 0
+    cart_dims(2) = 0
+    cart_dims(3) = 0
+
+    ! ---- fixed time step: this is what the sweep refines ----
+    logical_CFL = .false.
+    Dt   = 4.6620046620046620e-03
+    CFL  = 0.5
+    tmax = 1.e9
+    itmax = 429
+    n_step = 3
+
+    bc(1) = 'periodic'
+    bc(2) = 'periodic'
+    bc(3) = 'periodic'
+    bc(4) = 'periodic'
+    bc(5) = 'periodic'
+    bc(6) = 'periodic'
+    Trat = 1.0
+
+    inflow_profile = 'none'
+    smooth_inflow  = .false.
+    turb_inflow    = .false.
+
+    Reynolds = 160.0
+    Mach     = 0.2
+    Prandtl  = 0.71
+    viscous  = .true.
+    vis_flag = 2
+    thermally_perfect_gas = 0
+
+    scheme     = 'energy_preserving'
+    ep_type    = 'KEEP'
+    sensor     = 'density'
+    fd_order   = 6
+    weno_order = 5
+    diffusion_scheme = 'laplacian'
+    LES        = .false.
+    sgs_model  = 'WALE'
+    yoshizawa  = .false.
+
+    ic = 'TGV'
+    itout  = 429
+    StOut  = 1000000
+    StFlg  = .false.
+    rsOut  = 1000000
+    printres = .true.
+    output_file_name = 'fld'
+    data_dir = '06_time_integration/stabtgv_cfl0.90'
+    mpi_opt_level = 2
+    cuda_aware = .false.
+
+&end

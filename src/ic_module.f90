@@ -3,2410 +3,1023 @@ use parameters_module
 use storage_module
 use mpi_module
 use fluid_functions_module
+use thermodynamics_module, only: gamma_Tref, heat_capacity_t, sound_speed, cp_local
 implicit none
 
 contains
 
-
 subroutine ambient(status)
-! -----------------------------------------------------------------------------------
-!       
-!       This subroutine zero field boundary condition
-!
-! -----------------------------------------------------------------------------------
         implicit none
         integer, intent(out) :: status
-        
+
         if(rank == root) write(*,'(A)', advance = 'no') ' Initializing ambient initial condition: '
-        do k = lbz, ubz
+
+        do k = lbz,ubz
            do j = lby,uby
               do i = lbx,ubx
 
-                 phi(i,j,k,1) = 1._rp
-                   P(i,j,k)   = 1._rp 
-                   U(i,j,k)   = 0._rp
-                   V(i,j,k)   = 0._rp
-                   W(i,j,k)   = 0._rp
+                 PHI(i,j,k,1) = 1.0_rp
+                 U  (i,j,k)   = 0.0_rp
+                 V  (i,j,k)   = 0.0_rp
+                 W  (i,j,k)   = 0.0_rp
+                 P  (i,j,k)   = 1.0_rp
 
               enddo
            enddo
         enddo
+
         if(rank == root) write(*, '(A)') 'done!'
         status = 0
-return
+        return
+
 end subroutine ambient
 
+subroutine TGV(status)
+        use mesh_module, only: xx, yy
+        implicit none
+        integer, intent(out) :: status
+        real(rp)             :: x_, y_, z_, rho_z, u_z, p_z
 
+        if(rank == root) write(*,'(A,A,A)', advance = 'no') 'Initializing TGV: '
 
+        p_z   = 100.0_rp
+        rho_z = 1.0_rp
+        u_z   = Mach*sqrt(gamma_Tref*p_z/rho_z)
 
+        do k = lbz,ubz
+           do j = lby,uby
+              do i = lbx,ubx
+
+                 x_ = xx(i,j)
+                 y_ = yy(i,j)
+                 z_ = z(k)
+
+                 P  (i,j,k)   =   p_z + u_z*u_z*(cos(2*x_)+cos(2*y_))*(2.0_rp+cos(2*z_))/16.0_rp
+                 PHI(i,j,k,1) =   P(i,j,k)*rho_z/p_z
+                 U  (i,j,k)   =   u_z*sin(x_)*cos(y_)*cos(z_)
+                 V  (i,j,k)   = - u_z*cos(x_)*sin(y_)*cos(z_)
+                 W  (i,j,k)   =   0.0_rp
+
+              enddo
+           enddo
+        enddo
+
+        if(rank == root) write(*, '(A)') 'done!'
+        status = 0
+        return
+
+end subroutine TGV
 
 subroutine init_periodic_euler(dir,status)
+        use mesh_module, only: xx, yy
         implicit none
         character(len=1), intent(in)  :: dir
-        integer, intent(out) :: status
-        
+        integer         , intent(out) :: status
+
         if(rank == root) write(*,'(A,A,A)', advance = 'no') ' Initializing periodic euler along ', dir, ': '
 
         select case(dir)
         case('x')
-        do k = lbz, ubz      
-           do j = lby,uby
-              do i=lbx,ubx
-                  phi(i,j,k,1) = 1._rp + 0.2_rp*sin(pi*x(i))
-                  u  (i,j,k)   = Mach
-                  v  (i,j,k)   = 0._rp
-                  w  (i,j,k)   = 0._rp
-                  p  (i,j,k)   = 1._rp
+           do k = lbz,ubz
+              do j = lby,uby
+                 do i = lbx,ubx
+
+                    PHI(i,j,k,1) = 1.0_rp + 0.2_rp*sin(pi*xx(i,j))
+                    U  (i,j,k)   = Mach
+                    V  (i,j,k)   = 0.0_rp
+                    W  (i,j,k)   = 0.0_rp
+                    P  (i,j,k)   = 1.0_rp
+
+                 enddo
               enddo
            enddo
-        enddo
 
         case('y')
-        do k = lbz, ubz
-           do j = lby,uby
-              do i=lbx,ubx
-                  phi(i,j,k,1) = 1._rp + 0.2_rp*sin(pi*y(j))
-                  u  (i,j,k)   = 0._rp
-                  v  (i,j,k)   = Mach
-                  w  (i,j,k)   = 0._rp
-                  p  (i,j,k)   = 1._rp
+           do k = lbz,ubz
+              do j = lby,uby
+                 do i = lbx,ubx
+
+                    PHI(i,j,k,1) = 1.0_rp + 0.2_rp*sin(pi*yy(i,j))
+                    U  (i,j,k)   = 0.0_rp
+                    V  (i,j,k)   = Mach
+                    W  (i,j,k)   = 0.0_rp
+                    P  (i,j,k)   = 1.0_rp
+
+                 enddo
               enddo
-          enddo
-        enddo
+           enddo
 
         case('z')
-        do k = lbz, ubz
-           do j = lby,uby
-              do i=lbx,ubx
-                  phi(i,j,k,1) = 1._rp + 0.2_rp*sin(pi*z(k))
-                  u  (i,j,k)   = 0._rp
-                  v  (i,j,k)   = 0._rp
-                  w  (i,j,k)   = Mach
-                  p  (i,j,k)   = 1._rp
+           do k = lbz,ubz
+              do j = lby,uby
+                 do i = lbx,ubx
+
+                    PHI(i,j,k,1) = 1.0_rp + 0.2_rp*sin(pi*z(k))
+                    U  (i,j,k)   = 0.0_rp
+                    V  (i,j,k)   = 0.0_rp
+                    W  (i,j,k)   = Mach
+                    P  (i,j,k)   = 1.0_rp
+
+                 enddo
               enddo
-          enddo
-        enddo
+           enddo
 
         endselect
+
         if(rank == root) write(*, '(A)') 'done!'
         status = 0
-return
+        return
+
 end subroutine init_periodic_euler
-
-
-
 
 subroutine init_shock_tube(dir, status)
         implicit none
         character(len=1), intent(in)  :: dir
         integer         , intent(out) :: status
-        
+
         if(rank == root) write(*,'(A,A,A)', advance = 'no') ' Initializing shock tube along ', dir, ': '
 
         select case(dir)
         case('x')
-        do k = lbz,ubz
-           do j = lby,uby        
-              do i = lbx, ubx
+           do k = lbz,ubz
+              do j = lby,uby
+                 do i = lbx,ubx
 
-                 if(x(i).le.0._rp)then
-                     phi(i,j,k,1) = 1._rp
-                       U(i,j,k)   = 0._rp
-                       V(i,j,k)   = 0._rp
-                       W(i,j,k)   = 0._rp
-                       P(i,j,k)   = 1._rp
-                 elseif(x(i).gt.0._rp) then
-                     phi(i,j,k,1) = 0.125_rp
-                       U(i,j,k)   = 0._rp
-                       V(i,j,k)   = 0._rp
-                       W(i,j,k)   = 0._rp
-                       P(i,j,k)   = 0.1_rp
-                 end if
+                    if(x(i) <= 0.0_rp) then
+                       PHI(i,j,k,1) = 1.0_rp
+                       U  (i,j,k)   = 0.0_rp
+                       V  (i,j,k)   = 0.0_rp
+                       W  (i,j,k)   = 0.0_rp
+                       P  (i,j,k)   = 1.0_rp
+                    else
+                       PHI(i,j,k,1) = 0.125_rp
+                       U  (i,j,k)   = 0.0_rp
+                       V  (i,j,k)   = 0.0_rp
+                       W  (i,j,k)   = 0.0_rp
+                       P  (i,j,k)   = 0.1_rp
+                    endif
 
+                 enddo
               enddo
            enddo
-        enddo
 
         case('y')
-        do k=lbz,ubz
-           do j=lby, uby
-              do i = lbx, ubx
+           do k = lbz,ubz
+              do j = lby,uby
+                 do i = lbx,ubx
 
-                 if(y(j).le.0._rp)then
-                     phi(i,j,k,1) = 1._rp
-                       U(i,j,k)   = 0._rp
-                       V(i,j,k)   = 0._rp
-                       W(i,j,k)   = 0._rp
-                       P(i,j,k)   = 1._rp
+                    if(y(j) <= 0.0_rp) then
+                       PHI(i,j,k,1) = 1.0_rp
+                       U  (i,j,k)   = 0.0_rp
+                       V  (i,j,k)   = 0.0_rp
+                       W  (i,j,k)   = 0.0_rp
+                       P  (i,j,k)   = 1.0_rp
+                    else
+                       PHI(i,j,k,1) = 0.125_rp
+                       U  (i,j,k)   = 0.0_rp
+                       V  (i,j,k)   = 0.0_rp
+                       W  (i,j,k)   = 0.0_rp
+                       P  (i,j,k)   = 0.1_rp
+                    endif
 
-                 elseif(y(j).gt.0._rp) then
-                     phi(i,j,k,1) = 0.125_rp
-                       U(i,j,k)   = 0._rp
-                       V(i,j,k)   = 0._rp
-                       W(i,j,k)   = 0._rp
-                       P(i,j,k)   = 0.1_rp
-                 end if
-
+                 enddo
               enddo
            enddo
-        enddo
 
         case('z')
-        do k=lbz,ubz
-           do j=lby, uby
-              do i = lbx, ubx
+           do k = lbz,ubz
+              do j = lby,uby
+                 do i = lbx,ubx
 
-                 if(z(k).le.0._rp)then
-                     phi(i,j,k,1) = 1._rp
-                       U(i,j,k)   = 0._rp
-                       V(i,j,k)   = 0._rp
-                       W(i,j,k)   = 0._rp
-                       P(i,j,k)   = 1._rp
+                    if(z(k) <= 0.0_rp) then
+                       PHI(i,j,k,1) = 1.0_rp
+                       U  (i,j,k)   = 0.0_rp
+                       V  (i,j,k)   = 0.0_rp
+                       W  (i,j,k)   = 0.0_rp
+                       P  (i,j,k)   = 1.0_rp
+                    else
+                       PHI(i,j,k,1) = 0.125_rp
+                       U  (i,j,k)   = 0.0_rp
+                       V  (i,j,k)   = 0.0_rp
+                       W  (i,j,k)   = 0.0_rp
+                       P  (i,j,k)   = 0.1_rp
+                    endif
 
-                 elseif(z(k).gt.0._rp) then
-                     phi(i,j,k,1) = 0.125_rp
-                       U(i,j,k)   = 0._rp
-                       V(i,j,k)   = 0._rp
-                       W(i,j,k)   = 0._rp
-                       P(i,j,k)   = 0.1_rp
-                 end if
-
+                 enddo
               enddo
            enddo
-        enddo
-
-        end select
-        if(rank == root) write(*, '(A)') 'done!'
-        status = 0
-return
-end subroutine init_shock_tube
-
-
-subroutine init_lax_problem(dir,status)
-        implicit none
-        character(len=1), intent(in)  :: dir
-        integer         , intent(out) :: status
-        
-        if(rank == root) write(*,'(A,A,A)', advance = 'no') ' Initializing Lax problem along ', dir,': '
-        select case(dir)
-
-        case('x')
-        do k = lbz,ubz
-           do j = lby,uby        
-              do i = lbx, ubx
-                      
-                 if(x(i).le.0.0_rp)then
-                     phi(i,j,k,1) = 0.445_rp
-                       U(i,j,k)   = 0.698_rp
-                       V(i,j,k)   = 0.0_rp
-                       W(i,j,k)   = 0.0_rp
-                       P(i,j,k)   = 3.528_rp
-                 elseif(x(i).gt.0.0_rp) then
-                     phi(i,j,k,1) = 0.5_rp
-                       U(i,j,k)   = 0.0_rp
-                       V(i,j,k)   = 0.0_rp
-                       W(i,j,k)   = 0.0_rp
-                       P(i,j,k)   = 0.571_rp
-                 end if
-
-              enddo
-           enddo
-        enddo
-
-        case('y')
-        do k = lbz,ubz
-           do j=lby, uby
-              do i = lbx, ubx
-
-                 if(y(j).le.0.0_rp)then
-                     phi(i,j,k,1) = 0.445_rp
-                       U(i,j,k)   = 0.0_rp
-                       V(i,j,k)   = 0.698_rp
-                       W(i,j,k)   = 0.0_rp
-                       P(i,j,k)   = 3.528_rp
-                 elseif(y(j).gt.0.0_rp) then
-                     phi(i,j,k,1) = 0.5_rp
-                       U(i,j,k)   = 0.0_rp
-                       V(i,j,k)   = 0.0_rp
-                       W(i,j,k)   = 0.0_rp
-                       P(i,j,k)   = 0.571_rp
-                 end if
-                      
-              enddo
-           enddo
-        enddo
-
-        case('z')
-        do k = lbz,ubz
-           do j=lby, uby
-              do i = lbx, ubx
-
-                 if(z(k).le.0.0_rp)then
-                     phi(i,j,k,1) = 0.445_rp
-                       U(i,j,k)   = 0.0_rp
-                       V(i,j,k)   = 0.0_rp
-                       W(i,j,k)   = 0.698_rp
-                       P(i,j,k)   = 3.528_rp
-                 elseif(z(k).gt.0.0_rp) then
-                     phi(i,j,k,1) = 0.5_rp
-                       U(i,j,k)   = 0.0_rp
-                       V(i,j,k)   = 0.0_rp
-                       W(i,j,k)   = 0.0_rp
-                       P(i,j,k)   = 0.571_rp
-                 end if
-                      
-              enddo
-           enddo
-        enddo
 
         endselect
+
         if(rank == root) write(*, '(A)') 'done!'
         status = 0
-return
-end subroutine init_lax_problem
+        return
 
-
-
-
-subroutine init_linear_ode(status)
-! -----------------------------------------------------------------------------------
-!       
-!       This subroutine initialize a zero state condition for linear ODE
-!       problem y' + y = 0._rp Just to test RK scheme.
-!
-! -----------------------------------------------------------------------------------
-        implicit none
-        integer, intent(out) :: status
-        
-        if(rank == root) write(*,'(A)', advance = 'no') ' Initializing time linear initial condition: '
-        do k = lbz, ubz
-           do j = lby,uby
-              do i = lbx,ubx
-
-                 phi(i,j,k,1) = 1._rp
-                   P(i,j,k)   = 1._rp 
-                   U(i,j,k)   = 0._rp
-                   V(i,j,k)   = 0._rp
-                   W(i,j,k)   = 0._rp
-
-              enddo
-           enddo
-        enddo
-        if(rank == root) write(*, '(A)') 'done!'
-        status = 0
-return
-end subroutine init_linear_ode
-
-
-subroutine init_linear_advection(status)
-! -----------------------------------------------------------------------------------
-!       
-!       This subroutine initialize a zero state condition for linear ODE
-!       problem y' + y = 0._rp Just to test RK scheme.
-!
-! -----------------------------------------------------------------------------------
-        implicit none
-        integer, intent(out) :: status
-        
-        if(rank == root) write(*,'(A)', advance = 'no') ' Initializing time linear initial condition: '
-        do k = lbz, ubz
-           do j = lby,uby
-              do i = lbx,ubx
-
-                 phi(i,j,k,1) = 1._rp + 0.2_rp*sin(pi*x(i))
-                   P(i,j,k)   = 1._rp 
-                   U(i,j,k)   = 0._rp
-                   V(i,j,k)   = 0._rp
-                   W(i,j,k)   = 0._rp
-
-              enddo
-           enddo
-        enddo
-        if(rank == root) write(*, '(A)') 'done!'
-        status = 0
-return
-end subroutine init_linear_advection
-
-
-
-
-
-subroutine init_shock_wave_interaction(dir,status)
-! -----------------------------------------------------------------------------------
-!       Initialization of a shock-entropy wave interaction in 2D:
-!       ref. "Conservative Hybrid Compact-WENO schemes for shock-turbolence
-!             interaction" pag. 101
-! -----------------------------------------------------------------------------------
-        implicit none
-        character(len=1), intent(in)  :: dir
-        integer         , intent(out) :: status
-
-        if(rank == root) write(*,'(A,A,A)', advance = 'no') ' Initializing shock-entropy wawe along ', dir, ': '
-        select case(dir)
-        case('x')
-        do k = lbz,ubz
-           do j = lby,uby
-              do i=lbx,ubx
-
-                 if(x(i).le.-4.0_rp)then
-                         phi(i,j,k,1) =  3.857143_rp
-                           U(i,j,k)   =  2.629369_rp
-                           V(i,j,k)   =  0.0_rp
-                           W(i,j,k)   =  0.0_rp
-                           P(i,j,k)   = 10.333333_rp
-                 elseif(x(i).gt.-4.0_rp) then
-                         phi(i,j,k,1) = 1.0_rp+0.2_rp*sin(5.0_rp*(x(i)))
-                           U(i,j,k)   = 0.0_rp
-                           V(i,j,k)   = 0.0_rp
-                           W(i,j,k)   = 0.0_rp
-                           P(i,j,k)   = 1.0_rp
-                 end if
-
-              enddo
-           end do
-        enddo
-        case('y')
-        do k = lbz,ubz
-           do j = lby,uby
-              do i=lbx,ubx
-
-                 if(y(j).le.-4.0_rp)then
-           
-                         phi(i,j,k,1) =  3.857143_rp
-                           U(i,j,k)   =  0.0_rp
-                           V(i,j,k)   =  2.629369_rp
-                           W(i,j,k)   =  0.0_rp
-                           P(i,j,k)   = 10.333333_rp
-           
-                 elseif(y(j).gt.-4.0_rp) then
-           
-                         phi(i,j,k,1) = 1.0_rp+0.2_rp*sin(5.0_rp*(y(j)))
-                           U(i,j,k)   = 0.0_rp
-                           V(i,j,k)   = 0.0_rp
-                           W(i,j,k)   = 0.0_rp
-                           P(i,j,k)   = 1.0_rp
-           
-                 end if
-
-              enddo
-           end do
-        enddo
-
-        case('z')
-        do k = lbz,ubz
-           do j = lby,uby
-              do i=lbx,ubx
-
-                 if(z(k).le.-4.0_rp)then
-           
-                         phi(i,j,k,1) =  3.857143_rp
-                           U(i,j,k)   =  0.0_rp
-                           V(i,j,k)   =  0.0_rp
-                           W(i,j,k)   =  2.629369_rp
-                           P(i,j,k)   = 10.333333_rp
-           
-                 elseif(z(k).gt.-4.0_rp) then
-           
-                         phi(i,j,k,1) = 1.0_rp+0.2_rp*sin(5.0_rp*(z(k)))
-                           U(i,j,k)   = 0.0_rp
-                           V(i,j,k)   = 0.0_rp
-                           W(i,j,k)   = 0.0_rp
-                           P(i,j,k)   = 1.0_rp
-           
-                 end if
-
-              enddo
-           end do
-        enddo
-
-        end select
-        if(rank == root) write(*, '(A)') 'done!'
-        status = 0
-return
-end subroutine init_shock_wave_interaction
-
-
+end subroutine init_shock_tube
 
 subroutine init_isentropic_vortex(dir,status)
-! -------------------------------------------------------------------
-!       
-!       This subroutine initializes an isentropic vortex.
-!       Reference: 2005, Kim, 
-!                  "A high-order accurate hybrid scheme using a central 
-!                   flux scheme and a WENO scheme for compressible
-!                   flowfield analysis"
-!
-! -------------------------------------------------------------------
+        use mesh_module, only: xx, yy
         implicit none
         character(len=1), intent(in ) :: dir
         integer         , intent(out) :: status
         real(rp)                      :: x0, y0, alpha, beta, r2
         real(rp)                      :: exp_, x_, y_
+        real(rp)                      :: gm1, exp_rho, exp_p
 
-        ! vortex geometry
-        x0   = 0._rp
-        y0   = 0._rp
-        beta = 5._rp
-        alpha = (beta**2)*(gamma0-1._rp)/(8._rp*gamma0*pi**2)
+        x0   = 0.0_rp
+        y0   = 0.0_rp
+        beta = 5.0_rp
 
-        if(rank == root) write(*,'(A,A,A)', advance = 'no') ' Initializing an isentropic vortex: '
-        selectcase(dir)
+        gm1     = gamma_Tref - 1.0_rp
+        exp_rho = 1.0_rp     / gm1
+        exp_p   = gamma_Tref / gm1
+        alpha   = beta*beta * gm1 / (8.0_rp*gamma_Tref*pi*pi)
 
+        if(rank == root) write(*,'(A,A,A)', advance = 'no') ' Initializing isentropic vortex along ', dir, ': '
+
+        select case(dir)
         case('x')
-        do k = lbz,ubz
-           do j = lby,uby
-              do i = lbx, ubx
-                      
-                 x_ = x(i) - x0
-                 y_ = y(j) - y0
+           do k = lbz,ubz
+              do j = lby,uby
+                 do i = lbx,ubx
 
-                 r2 = x_**2 + y_**2
-                 exp_ = exp(1._rp-r2)
-                 
-                 phi(i,j,k,1) = (1._rp - alpha * exp_)**(1._rp    /(gamma0-1._rp))
-                 P  (i,j,k)   = (1._rp - alpha * exp_)**(gamma0/(gamma0-1._rp))
+                    x_   = xx(i,j) - x0
+                    y_   = yy(i,j) - y0
+                    r2   = x_*x_ + y_*y_
+                    exp_ = exp(1.0_rp - r2)
 
-                 U(i,j,k) = u_inf - beta/(2._rp*pi) * (y_ * exp_**0.5_rp)
-                 V(i,j,k) =         beta/(2._rp*pi) * (x_ * exp_**0.5_rp)
-                 W(i,j,k) = 0._rp
+                    PHI(i,j,k,1) = (1.0_rp - alpha*exp_)**exp_rho
+                    U  (i,j,k)   = u_inf - beta/(2.0_rp*pi) * y_ * sqrt(exp_)
+                    V  (i,j,k)   =         beta/(2.0_rp*pi) * x_ * sqrt(exp_)
+                    W  (i,j,k)   = 0.0_rp
+                    P  (i,j,k)   = (1.0_rp - alpha*exp_)**exp_p
 
+                 enddo
               enddo
            enddo
-        enddo
 
         case('y')
-        do k = lbz,ubz
-           do j = lby,uby
-              do i = lbx, ubx
+           do k = lbz,ubz
+              do j = lby,uby
+                 do i = lbx,ubx
 
-                 x_ = x(i) - x0
-                 y_ = y(j) - y0
+                    x_   = xx(i,j) - x0
+                    y_   = yy(i,j) - y0
+                    r2   = x_*x_ + y_*y_
+                    exp_ = exp(1.0_rp - r2)
 
-                 r2 = x_**2 + y_**2
-                 exp_ = exp(1._rp-r2)
-                 
-                 phi(i,j,k,1) = (1._rp - alpha * exp_)**(1._rp    /(gamma0-1._rp))
-                 P  (i,j,k)   = (1._rp - alpha * exp_)**(gamma0/(gamma0-1._rp))
+                    PHI(i,j,k,1) = (1.0_rp - alpha*exp_)**exp_rho
+                    U  (i,j,k)   =         beta/(2.0_rp*pi) * y_ * sqrt(exp_)
+                    V  (i,j,k)   = u_inf - beta/(2.0_rp*pi) * x_ * sqrt(exp_)
+                    W  (i,j,k)   = 0.0_rp
+                    P  (i,j,k)   = (1.0_rp - alpha*exp_)**exp_p
 
-                 U(i,j,k) =         beta/(2._rp*pi) * (y_ * exp_**0.5_rp)
-                 V(i,j,k) = u_inf - beta/(2._rp*pi) * (x_ * exp_**0.5_rp)
-                 W(i,j,k) = 0._rp
-                      
+                 enddo
               enddo
-          enddo
-        enddo
+           enddo
 
         endselect
+
         if(rank == root) write(*, '(A)') 'done!'
         status = 0
-return
+        return
+
 end subroutine init_isentropic_vortex
 
-
-subroutine init_pirozzoli_vortex(status)
+subroutine init_turbulent_channel(status)
         implicit none
         integer, intent(out) :: status
 
-        ! local declarations
-        real(rp)            :: x_, y_, r
-        real(rp), parameter :: Mv = 0.4_rp
+        integer , parameter :: nAux   =  100000
+        integer , parameter :: nBand  =       4
+        real(rp), parameter :: ypStrk =    15.0_rp
+        real(rp), parameter :: rollAR =     5.0_rp
+        real(rp), parameter :: lamZp  =   100.0_rp
+        real(rp), parameter :: lamXp  =  1000.0_rp
+        real(rp), parameter :: lamZot =     3.0_rp
+        real(rp), parameter :: oNorm  = 3.4938562148_rp
+        real(rp), parameter :: aStrk  =     2.7_rp
+        real(rp), parameter :: aRoll  =     1.0_rp
+        real(rp), parameter :: wiggle =     0.6_rp
+        real(rp), parameter :: sRey   =     1.1_rp
+        real(rp), parameter :: tollVD = 1.0E-14_rp
+        integer , parameter :: itMxVD =     100
 
-        if(rank == root) write(*,'(A,A,A)', advance = 'no') ' Initializing Pirozzoli vortex: '
+        real(rp), dimension(nBand), parameter :: zBand = [0.7_rp, 1.0_rp, 1.4_rp, 2.0_rp]
+        real(rp), dimension(nBand), parameter :: xBand = [1.0_rp, 2.0_rp, 1.0_rp, 2.0_rp]
 
-        do k = lbz,ubz
-           do j = lby,uby
-              do i = lbx,ubx
+        integer , parameter :: nMode = 2*nBand + 1
+        real(rp), dimension(nMode) :: betaM, alphaM, phiM, chiM, yprM
+        integer , dimension(nMode) :: wallM
+        integer , dimension(nBand) :: nzB, nxB
 
-                 x_ = x(i)
-                 y_ = y(j)
+        real(rp), dimension(:), allocatable :: yAux, upAux, ucAux, ucOld, tAux, rAux
+        real(rp), dimension(:), allocatable :: uMean, rMean
+        real(rp), dimension(:), allocatable :: cosBz, sinBz, cosAx, sinAx
+        real(rp), dimension(:), allocatable :: fRoll, dRoll, gStrk
 
-                 r = sqrt(x_**2 + y_**2)
+        real(rp) :: nuWall, uTau, tWall, rWall, tRec, alfVD, errVD
+        real(rp) :: uu, fuu, du, uci, gold, silv, wDist, tPos, wgt
+        real(rp) :: ypl, ypr, dypdy, ang, csT, snT, amp, bandNorm, lamZm
+        real(rp) :: lclRU, lclVol, gblRU, gblVol, uBulk, scal, dv
+        integer  :: imode, iband, iw, jtab, mcount, iterVD, nzM, nxM, ierrA
 
-                 U(i,j,k) = u_inf*(1.0_rp - Mv/Mach * y_ * exp(0.5_rp*(1.0_rp-r**2)))
-                 V(i,j,k) = u_inf*(      Mv/Mach * x_ * exp(0.5_rp*(1.0_rp-r**2)))
-                 W(i,j,k) = 0.0_rp
+        if(rank == root) write(*,'(A)', advance = 'no') &
+        ' Initializing turbulent channel: '
 
-                 PHI(i,j,k,1) = (1.0_rp - 0.5_rp*(gamma0-1.0_rp) * Mv**2 * exp(1.0_rp-r**2))**(1.0_rp   /(gamma0-1.0_rp))
-                 P  (i,j,k)   = (1.0_rp - 0.5_rp*(gamma0-1.0_rp) * Mv**2 * exp(1.0_rp-r**2))**(gamma0/(gamma0-1.0_rp))
-
-              enddo
-           enddo
-        enddo
-
-
-        if(rank == root) write(*, '(A)') 'done!'
         status = 0
-        return
-end subroutine init_pirozzoli_vortex
 
-
-
-subroutine init_pirozzoli_vortex_y(status)
-        implicit none
-        integer, intent(out) :: status
-
-        ! local declarations
-        real(rp)            :: x_, y_, r
-        real(rp), parameter :: Mv = 0.4_rp
-
-        if(rank == root) write(*,'(A,A,A)', advance = 'no') ' Initializing Pirozzoli vortex: '
-
-        do k = lbz,ubz
-           do j = lby,uby
-              do i = lbx,ubx
-
-                 x_ = x(i)
-                 y_ = y(j)
-
-                 r = sqrt(x_**2 + y_**2)
-
-                 U(i,j,k) = u_inf*(    - Mv/Mach * y_ * exp(0.5_rp*(1.0_rp-r**2)))
-                 V(i,j,k) = u_inf*(1.0_rp + Mv/Mach * x_ * exp(0.5_rp*(1.0_rp-r**2)))
-                 W(i,j,k) = 0.0_rp
-
-                 PHI(i,j,k,1) = (1.0_rp - 0.5_rp*(gamma0-1.0_rp) * Mv**2 * exp(1.0_rp-r**2))**(1.0_rp   /(gamma0-1.0_rp))
-                 P  (i,j,k)   = (1.0_rp - 0.5_rp*(gamma0-1.0_rp) * Mv**2 * exp(1.0_rp-r**2))**(gamma0/(gamma0-1.0_rp))
-
-              enddo
-           enddo
-        enddo
-
-
-        if(rank == root) write(*, '(A)') 'done!'
-        status = 0
-        return
-end subroutine init_pirozzoli_vortex_y
-
-
-
-
-
-
-subroutine init_shock_wave(dir,status)
-        implicit none
-! --------------------------------------------------------------------------------
-!
-!       This subroutine initialize a non-stationary shock wave in a domain posizion. 
-!
-! --------------------------------------------------------------------------------
-        character(len=1), intent(in)  :: dir
-        integer         , intent(out) :: status
-
-        ! local variables
-        real(rp) :: r1, p1, T1, M1 
-        real(rp) :: r2, p2, T2, M2 
-        real(rp) :: vel1, vel2
-        real(rp) :: x0              !< shock wave initial position
-
-        if(rank == root) write(*,'(A,A,A)', advance = 'no') ' Initializing a shock wave : '
-
-        M1 = Mach
-        x0 = -2.0_rp
-        ! --------------|-------------- !
-        !     (2)       |     (1)       !   <---- M1 = MACH
-        ! --------------|-------------- !
-        !               ^
-        !               x0                
-
-        !
-        ! ==== state 1
-        !
-        p1   = 1.0_rp
-        r1   = 1.0_rp
-        T1   = p1/r1
-        vel1 = - M1 * sqrt(gamma0*T1)
-        !
-        ! ==== state 2
-        !
-        call Rankine_Hugoniot(r1,p1,T1,M1,r2,p2,T2,M2)
-
-        vel2 = - M2 * sqrt(gamma0*T2)
-       
-        if(dir == 'x') then
-
-          
-          do k = lbz,ubz
-             do j = lby,uby
-                do i = lbx,ubx
-
-                   if(x(i) < x0 ) then 
-
-                           phi(i,j,k,1) = r2
-                             U(i,j,k)   = vel2 - vel1
-                             V(i,j,k)   = 0.0_rp
-                             W(i,j,k)   = 0.0_rp
-                             P(i,j,k)   = p2
-
-                   elseif(x(i) >= x0 ) then
-
-                           phi(i,j,k,1) = r1
-                             U(i,j,k)   = vel1 - vel1
-                             V(i,j,k)   = 0.0_rp
-                             W(i,j,k)   = 0.0_rp
-                             P(i,j,k)   = p1
-                   endif
-
-                enddo
-             enddo
-          enddo
-
-        elseif(dir == 'y') then
-
-          do k = lbz,ubz
-             do j = lby,uby
-                do i = lbx,ubx
-
-                   if(y(j) < x0 ) then 
-
-                           phi(i,j,k,1) = r2
-                             U(i,j,k)   = 0.0_rp
-                             V(i,j,k)   = vel2 - vel1
-                             W(i,j,k)   = 0.0_rp
-                             P(i,j,k)   = p2
-
-                   elseif(y(j) >= x0 ) then
-
-                           phi(i,j,k,1) = r1
-                             U(i,j,k)   = 0.0_rp
-                             V(i,j,k)   = vel1 - vel1
-                             W(i,j,k)   = 0.0_rp
-                             P(i,j,k)   = p1
-                   endif
-
-                enddo
-             enddo
-          enddo
-
-        elseif(dir == 'z') then
-
-          do k = lbz,ubz
-             do j = lby,uby
-                do i = lbx,ubx
-
-                   if(z(k) .lt. x0 ) then 
-
-                           phi(i,j,k,1) = r2
-                             U(i,j,k)   = 0.0_rp
-                             V(i,j,k)   = 0.0_rp
-                             W(i,j,k)   = vel2-vel1
-                             P(i,j,k)   = p2
-
-                   elseif(z(k) .ge. x0 ) then
-
-                           phi(i,j,k,1) = r1
-                             U(i,j,k)   = 0.0_rp
-                             V(i,j,k)   = 0.0_rp
-                             W(i,j,k)   = vel1-vel1
-                             P(i,j,k)   = p1
-                   endif
-
-                enddo
-             enddo
-          enddo
-
+        if(dims /= 3) then
+           if(rank == root) print*, ' turbulent_channel requires dims = 3 (Lz unset in 2D)'
+           call secure_stop
         endif
 
-        if(rank == root) write(*, '(A)') 'done!'
-        status = 0
-        return
-endsubroutine init_shock_wave
+        nuWall = mu_inf
+        uTau   = ReTau*nuWall
 
+        allocate(yAux (0:nAux), upAux(0:nAux), ucAux(0:nAux), &
+                 ucOld(0:nAux), tAux (0:nAux), rAux (0:nAux), stat = ierrA)
+        if(ierrA /= 0) then
+           print*, ' Allocation error in init_turbulent_channel, rank ', rank
+           call secure_stop
+        endif
 
+        do jtab = 0,nAux
+           yAux (jtab) = real(jtab,rp)/real(nAux,rp)
+           upAux(jtab) = ReichardtLaw(yAux(jtab)*ReTau)
+        enddo
+        ucAux = upAux
 
+        tWall = 1.0_rp
+        rWall = 1.0_rp
+        tRec  = T_recovery
+        alfVD = sRey*Prandtl
 
-subroutine init_double_mach_reflection(status)
-! --------------------------------------------------------------------------------
-!
-!       This subroutine initialize the double mach reflection problem for 
-!       Navier-Stokes equations
-!
-! --------------------------------------------------------------------------------
-        implicit none
-        integer, intent(out) :: status
+        iterVD = 0
+        errVD  = 2.0_rp*tollVD
+        do while(errVD > tollVD .and. iterVD < itMxVD)
 
-        ! local variables
-        real(rp), parameter :: x0 = 1.0_rp/6.0_rp, theta = pi/6.0_rp
-        real(rp)            :: r1, p1, T1, M1
-        real(rp)            :: r2, p2, T2, u2, v2, M2
-        real(rp)            :: vel1, vel2, tan_theta, xi, yj
+           ucOld     = ucAux
+           tAux(0)   = tWall
+           rAux(0)   = rWall
+           do jtab = 1,nAux
+              uu         = ucAux(jtab)/ucAux(nAux)
+              fuu        = alfVD*uu + (1.0_rp - alfVD)*uu**2
+              tAux(jtab) = tWall + (tRec - tWall)*fuu
+              rAux(jtab) = 1.0_rp/tAux(jtab)
+           enddo
 
+           do jtab = 1,nAux
+              du          = upAux(jtab) - upAux(jtab-1)
+              uci         = 0.5_rp*(sqrt(rWall/rAux(jtab)) + sqrt(rWall/rAux(jtab-1)))
+              ucAux(jtab) = ucAux(jtab-1) + uci*du
+           enddo
 
-        if(rank == root) write(*,'(A,A,A)', advance = 'no') ' Initializing double mach reflection: '
+           errVD  = maxval(abs(ucAux - ucOld))
+           iterVD = iterVD + 1
 
-        tan_theta = tan(theta)
+        enddo
 
-        !
-        ! ==== state 1
-        !
-        M1   = Mach
-        p1   = 1.0_rp
-        r1   = 1.4_rp
-        T1   = p1/r1
-        vel1 = - M1 * sqrt(gamma0*T1)
-        !
-        ! ==== state 2
-        !
-        call Rankine_Hugoniot(r1,p1,T1,M1,r2,p2,T2,M2)
+        allocate(uMean(lby:uby), rMean(lby:uby), stat = ierrA)
+        if(ierrA /= 0) then
+           print*, ' Allocation error in init_turbulent_channel, rank ', rank
+           call secure_stop
+        endif
 
-        vel2 = - M2 * sqrt(gamma0*T2)
-        u2   =   (vel2 - vel1)*cos(theta)
-        v2   = - (vel2 - vel1)*sin(theta)
-        
+        do j = lby,uby
+           uMean(j) = 0.0_rp
+           rMean(j) = 1.0_rp
+           if(abs(y(j)) < 1.0_rp) then
+              wDist    = 1.0_rp - abs(y(j))
+              tPos     = wDist*real(nAux,rp)
+              jtab     = min(nAux-1, max(0, int(tPos)))
+              wgt      = tPos - real(jtab,rp)
+              uMean(j) = uTau*((1.0_rp - wgt)*ucAux(jtab) + wgt*ucAux(jtab+1))
+              rMean(j) =       (1.0_rp - wgt)*rAux (jtab) + wgt*rAux (jtab+1)
+           endif
+        enddo
+
+        uu = 0.0_rp
+        do jtab = 1,nAux
+           uu = uu + rAux(jtab)*ucAux(jtab)
+        enddo
+        uu = uu/real(nAux,rp)
+        du = Reynolds/ReTau
+
+        deallocate(yAux, upAux, ucAux, ucOld, tAux, rAux)
+
         do k       = lbz,ubz
            do j    = lby,uby
               do i = lbx,ubx
-
-                 xi = x(i)
-                 yj = y(j)
-
-                 if    (xi <  x0 + yj*tan_theta) then 
-
-                         phi(i,j,k,1) = r2
-                           U(i,j,k)   = u2
-                           V(i,j,k)   = v2
-                           W(i,j,k)   = 0.0_rp
-                           P(i,j,k)   = p2
-
-                 elseif(xi >= x0 + yj*tan_theta) then
-
-                         phi(i,j,k,1) = r1
-                           U(i,j,k)   = 0.0_rp
-                           V(i,j,k)   = 0.0_rp
-                           W(i,j,k)   = 0.0_rp
-                           P(i,j,k)   = p1
-                 endif
-
-              enddo
-           enddo
-        enddo
-
-        if(rank == root) write(*, '(A)') 'done!'
-        status = 0
-        return
-end subroutine init_double_mach_reflection
-
-
-subroutine init_I_stokes_problem(dir,status)
-        implicit none
-        character(len=1), intent(in)  :: dir
-        integer         , intent(out) :: status
-
-        if(rank == root) write(*,'(A,A,A)', advance = 'no') ' Initializing I Stokes problem field: '
-        
-        selectcase(dir)
-                
-          case('x')
-          do k = lbz,ubz
-             do j = lby,uby
-                do i = lbx,ubx
-
-                   phi(i,j,k,1) = 1.0_rp
-                     V(i,j,k)   = 0.0_rp
-                     W(i,j,k)   = 0.0_rp
-                     P(i,j,k)   = 1.0_rp
-
-                   if(y(j) <= 0.0_rp) then
-                     U(i,j,k)   = u_inf
-                   else
-                     U(i,j,k)   = 0.0_rp
-                   endif
-
-                enddo
-             enddo
-          enddo
-
-        case('y')
-          do k = lbz,ubz
-             do j = lby,uby
-                do i = lbx,ubx
-
-                   phi(i,j,k,1) = 1.0_rp
-                     U(i,j,k)   = 0.0_rp
-                     W(i,j,k)   = 0.0_rp
-                     P(i,j,k)   = 1.0_rp
-
-                   if(x(i) <= 0.0_rp) then
-                     V(i,j,k)   = u_inf
-                   else
-                     V(i,j,k)   = 0.0_rp
-                   endif
-
-                enddo
-             enddo
-          enddo
-
-        case('z')
-          do k = lbz,ubz
-             do j = lby,uby
-                do i = lbx,ubx
-
-                   phi(i,j,k,1) = 1.0_rp
-                     V(i,j,k)   = 0.0_rp
-                     W(i,j,k)   = 0.0_rp
-                     P(i,j,k)   = 1.0_rp
-
-                   if(z(k) <= 0.0_rp) then
-                     U(i,j,k)   = u_inf
-                   else
-                     U(i,j,k)   = 0.0_rp
-                   endif
-
-                enddo
-             enddo
-          enddo
-
-
-        end select
-
-        if(rank == root) write(*, '(A)') 'done!'
-        status = 0
-        return
-end subroutine init_I_stokes_problem
-
-
-subroutine init_II_stokes_problem(dir,status)
-! --------------------------------------------------------------------------------
-! 
-!       This subroutine initialize the velocity profile of the II Stokes problem. 
-!       The parameter of the problem are:
-!
-!       [1] u_ref   : reference speed (<< 1 to avoid compressibility effects)
-!       [2] omega   : wall frequency
-!       [3] omega_c : corrected wall frequency
-!
-! --------------------------------------------------------------------------------
-        implicit none
-        character(len=1), intent(in)  :: dir
-        integer         , intent(out) :: status
-        real(rp)             :: omega, omega_c
-
-        if(rank == root) write(*,'(A,A,A)', advance = 'no') ' Initializing II Stokes problem field: '
-
-        omega = 0.25_rp*pi
-        omega_c = sqrt((omega/(2*mu_inf)))
-        
-        selectcase(dir)
-
-                case('x')
-                do k = lbz,ubz
-                   do j = lby,uby
-                      do i =lbx,ubx
-
-                         phi(i,j,k,1) = 1._rp
-                           P(i,j,k)   = 1._rp 
-                           U(i,j,k)   = u_inf*exp(-omega_c*y(j)) * cos(- omega_c*y(j))
-                           V(i,j,k)   = 0._rp
-                           W(i,j,k)   = 0._rp
-
-                      enddo
-                   enddo
-                enddo
-
-                case('y')
-                do k = lbz,ubz
-                   do j = lby,uby
-                      do i =lbx,ubx
-
-                         phi(i,j,k,1) = 1._rp
-                           P(i,j,k)   = 1._rp 
-                           U(i,j,k)   = 0._rp
-                           V(i,j,k)   = u_inf*exp(-omega_c*x(i)) * cos(- omega_c*x(i))
-                           W(i,j,k)   = 0._rp
-
-                      enddo
-                   enddo
-                enddo
-
-                case('z')
-                do k = lbz,ubz
-                   do j = lby,uby
-                      do i =lbx,ubx
-
-                         phi(i,j,k,1) = 1._rp
-                           P(i,j,k)   = 1._rp 
-                           U(i,j,k)   = u_inf*exp(-omega_c*z(k)) * cos(- omega_c*z(k))
-                           V(i,j,k)   = 0._rp
-                           W(i,j,k)   = 0._rp
-
-                      enddo
-                   enddo
-                enddo
-
-        end select
-
-        if(rank == root) write(*, '(A)') 'done!'
-        status = 0
-        return
-end subroutine init_II_stokes_problem
-
-
-subroutine init_steady_couette(dir,status)
-        implicit none
-        character(len=1), intent(in)  :: dir
-        integer         , intent(out) :: status
-
-        real(rp) :: h
-
-        if(rank == root) write(*,'(A,A,A)', advance = 'no') ' Initializing steady Couette field: '
-        selectcase(dir)
-
-                case('x')
-
-                h = ymax - ymin
-
-                do k = lbz,ubz
-                   do j = lby,uby
-                      do i = lbx,ubx
-
-                         phi(i,j,k,1) = 1.0_rp
-                           U(i,j,k)   = u_inf * (y(j)-ymin)/h
-                           V(i,j,k)   = 0._rp
-                           W(i,j,k)   = 0._rp
-                           P(i,j,k)   = 1.0_rp
-
-                      enddo
-                   enddo
-                enddo
-
-                case('y')
-
-                h = xmax - xmin
-
-                do k = lbz,ubz
-                   do j = lby,uby
-                      do i = lbx,ubx
-
-                         phi(i,j,k,1) = 1.0_rp
-                           U(i,j,k)   = 0._rp
-                           V(i,j,k)   = u_inf * (x(i)-xmin)/h
-                           W(i,j,k)   = 0._rp
-                           P(i,j,k)   = 1.0_rp
-
-                      enddo
-                   enddo
-                enddo
-
-                case('z')
-
-                h = zmax - zmin
-
-                do k = lbz,ubz
-                   do j = lby,uby
-                      do i = lbx,ubx
-
-                         phi(i,j,k,1) = 1.0_rp
-                           U(i,j,k)   = u_inf * (z(k)-zmin)/h
-                           V(i,j,k)   = 0._rp
-                           W(i,j,k)   = 0._rp
-                           P(i,j,k)   = 1.0_rp
-
-                      enddo
-                   enddo
-                enddo
-
-        endselect
-
-        if(rank == root) write(*, '(A)') 'done!'
-        status = 0
-        return
-end subroutine init_steady_couette
-
-
-
-
-
-subroutine init_shock_vortex(status)
-! ------------------------------------------------------------------
-!
-!       This subroutine initialize a shock-vortex interaction.
-!       Ref: Andrey Rault & al. 
-!            "Shock vortex interaction at high mach number"
-!            Journal of scientific computing
-!
-! ------------------------------------------------------------------
-        implicit none
-        integer, intent(out) :: status
-        real(rp) :: rho1, p1, T1, M1, u1, v1, w1 !< left - shock state
-        real(rp) :: rho2, p2, T2, M2, u2, v2, w2 !< right- shock state
-
-        ! local vars
-        real(rp) :: theta, r, vm, v_th, c1, c2, alpha, beta
-
-        ! parameters
-        real(rp), parameter :: x0    = 0.5_rp   !< shock position
-        real(rp), parameter :: xc    = 0.25_rp  !< vortex x center 
-        real(rp), parameter :: yc    = 0.5_rp   !< vortex y center
-        real(rp), parameter :: a     = 0.075_rp !< vortex inner radius
-        real(rp), parameter :: b     = 0.175_rp !< vortex outer radius
-        real(rp), parameter :: Mv    = 1.7_rp   !< vortex mach number of max radial speed
-
-        if(rank == root) write(*,'(A,A,A)', advance = 'no') ' Initializing shock vortex: '
-        
-        M1 = Mach
-        vm = Mv * sqrt(gamma0)
-
-
-        ! left state
-        rho1 = 1._rp
-          p1 = 1._rp
-          T1 = p1/rho1
-          u1 = M1 * sqrt(gamma0 * T1)
-          v1 = 0._rp
-          w1 = 0._rp
-
-        ! right state
-        call Rankine_Hugoniot(rho1, p1, T1, M1, rho2, p2, T2, M2)
-
-          u2 = M2 * sqrt(gamma0 * T2)
-          v2 = 0._rp
-          w2 = 0._rp
-        
-        ! temperature parameters
-        alpha = (gamma0-1._rp)/gamma0 * (vm/a)**2
-        beta  = (gamma0-1._rp)/gamma0 * ((vm*a)/(a**2 - b**2))**2
-
-        c2 = T1 + beta * 2*(b**2)*log(b)
-        c1 = beta * ( -b**4/(2*a**2) - 2*b**2*log(a) + 0.5_rp*a**2) - 0.5_rp*alpha * a**2 + c2
-        
-        do k = lbz,ubz
-           do j = lby,uby
-              do i = lbx, ubx
-
-                      if(x(i) <= x0) then
-                              
-                              ! --- vortex field ------------------------------------------------------
-                              v_th = 0._rp
-                              T(i,j,k) = T1
-                              r = sqrt((x(i) - xc)**2 + (y(j) - yc)**2)
-
-                              if    (r .le. a) then
-                                      v_th = vm * r/a
-
-                                      T(i,j,k) = alpha * 0.5_rp*r**2 + c1
-
-                              elseif(r .le. b .and. r .ge. a) then
-                                      v_th = vm * a/(a**2 - b**2)*(r - b**2/r)
-
-                                      T(i,j,k) = beta * (- 0.5_rp*b**4/r**2 - 2*b**2*log(r) + 0.5_rp*r**2) + c2
-
-                              endif
-                              ! ------------------------------------------------------------------------
-                              theta  = atan2((y(j)-yc),(x(i)-xc))
-
-                                U(i,j,k)   = u1   + v_th * (-sin(theta))
-                                V(i,j,k)   = v1   + v_th * ( cos(theta))
-                                W(i,j,k)   = w1
-                              phi(i,j,k,1) = rho1 * (T(i,j,k)/T1) ** ((    1._rp)/(gamma0-1._rp))
-                                P(i,j,k)   = p1   * (T(i,j,k)/T1) ** ((gamma0)/(gamma0-1._rp))
-
-                      else
-                              phi(i,j,k,1) = rho2
-                                U(i,j,k)   = u2
-                                V(i,j,k)   = v2
-                                W(i,j,k)   = w2
-                                P(i,j,k)   = p2
-                      endif
-
-              enddo
-           enddo
-        enddo
-        if(rank == root) write(*, '(A)') 'done!'
-        status = 0
-        return
-end subroutine init_shock_vortex
-
-
-subroutine init_shear_layer(status)
-! ----------------------------------------------------------------
-!
-!       This subroutine initilizes a smooth shear layer without using 
-!       rondom numbers. 
-!       REF: "A Validated Nonlinear Kelvin-Helmholtz Benchmark 
-!             for Numerical Hydrodynamics"
-! ----------------------------------------------------------------
-        implicit none
-        integer, intent(out) :: status
-        real(rp), parameter  :: a     =  0.001_rp
-        real(rp), parameter  :: sigma =  0.001_rp
-        real(rp), parameter  :: y1    =  0.25_rp
-        real(rp), parameter  :: y2    =  0.75_rp
-        real(rp), parameter  :: AA    =  0.01_rp
-        real(rp), parameter  :: p0    = 10.0_rp
-
-        real(rp) :: htan1, htan2, exp1, exp2, yj, i_a, i_s2
-
-        if(rank == root) write(*,'(A,A,A)', advance = 'no') ' Initializing shear layer: '
-
-        i_a  = 1.0_rp/a
-        i_s2 = (1.0_rp/sigma)**2
-
-        do k = lbz,ubz
-           do j = lby,uby
-
-              yj = y(j)
-              htan1 = tanh((yj-y1)*i_a)
-              htan2 = tanh((yj-y2)*i_a)
-
-              exp1 = exp(-(yj-y1)**2*i_s2)
-              exp2 = exp(-(yj-y2)**2*i_s2)
-
-              do i = lbx, ubx
-
-                 phi(i,j,k,1) = 1.0_rp
-                 U  (i,j,k)   = u_inf * (htan1 - htan2 - 1.0_rp)
-                 V  (i,j,k)   = AA * sin(2*pi*x(i)) * (exp1 + exp2)
-                 W  (i,j,k)   = 0.0_rp
-                 P  (i,j,k)   = p0
-
-              enddo
-           enddo
-        enddo
-        
-
-        if(rank == root) write(*, '(A)') 'done!'
-        status = 0
-        return
-end subroutine init_shear_layer
-
-subroutine init_piecewise_shear_layer(status)
-        implicit none
-        integer, intent(out) :: status
-        real(rp)             :: u_n, u_s, drho
-
-        if(rank == root) write(*,'(A,A,A)', advance = 'no') ' Initializing piecewise shear layer: '
-
-        u_n = u_inf
-        u_s = 0.5_rp*u_n
-        drho = 0.2_rp
-        
-        do k = lbz,ubz
-           do j = lby,uby
-              do i = lbx,ubx
-                
-                 phi(i,j,k,1) = 0.5_rp*(2.0_rp - drho*tanh(100*y(j)))
-                 U  (i,j,k)   = 0.5_rp*((u_n+u_s) + (u_n-u_s)*tanh(100*y(j)))
-                 V  (i,j,k)   = 0.1_rp*u_inf*sin(10*pi*x(i)/lx)
-                 W  (i,j,k)   = 0.0_rp
-                 P  (i,j,k)   = 1.0_rp
-
-              enddo
-           enddo
-        enddo
-
-        if(rank == root) write(*, '(A)') 'done!'
-        status = 0
-        return
-end subroutine init_piecewise_shear_layer
-
-subroutine init_turbulent_channel(status)
-! ---------------------------------------------------------
-!
-!       Turbulent channel initialization
-!       REFERENCE: DANS.HENNINGSON, 
-!                 "On turbulent spots in plane Poiseuille flow"
-!                 pag 186
-!
-! ---------------------------------------------------------
-        implicit none
-        integer, intent(out) :: status
-
-        ! local declarations
-        real(rp) :: dp_dx, c_1, c_2, uy,psi_y, psi_z, exp_, xi, yj, zk
-        
-        if(rank == root) write(*,'(A,A,A)', advance = 'no') &
-        ' Initializing turbulent channal: '
-
-        dp_dx = -1.5_rp*2._rp*u_inf
-        c_1   =   0.0_rp
-        c_2   = - 0.5_rp*dp_dx
-        
-        do k       = lbz,ubz
-           do j    = lby,uby
-              do i = lbx,ubx
-
-                 xi = x(i)
-                 yj = y(j)
-                 zk = z(k)
-
-                 phi(i,j,k,1) = 1.0_rp
-                 U  (i,j,k)   = 0.0_rp
+                 phi(i,j,k,1) = rMean(j)
+                 U  (i,j,k)   = uMean(j)
                  V  (i,j,k)   = 0.0_rp
                  W  (i,j,k)   = 0.0_rp
                  P  (i,j,k)   = 1.0_rp
+              enddo
+           enddo
+        enddo
 
-                 if(abs(yj) < 1.0_rp) then
-                
-                   uy = 0.5_rp * dp_dx * yj**2 + c_1 * yj + c_2
+        gold = 0.5_rp*(sqrt(5.0_rp) - 1.0_rp)
+        silv =         sqrt(2.0_rp) - 1.0_rp
 
-                   exp_ = 0.01*exp(-4*(4*xi**2 + zk**2))
-                
-                   psi_y = -2*yj*zk * exp_
-                   psi_z = (yj**2*(8*zk**2-1.0_rp) - 8*zk**2 + 1.0_rp) * exp_
-        
-                   U(i,j,k) = uy
-                   V(i,j,k) =   psi_z
-                   W(i,j,k) = - psi_y
+        do iband = 1,nBand
+           nzB(iband) = max(1, min(nz/4, nint(Lz*ReTau/(lamZp*zBand(iband)))))
+           nxB(iband) = max(1, min(nx/4, nint(Lx*ReTau/(lamXp*xBand(iband)))))
+           if(iband > 1) nzB(iband) = max(1, min(nzB(iband), nzB(iband-1) - 1))
+        enddo
 
+        if(rank == root .and. nzB(2) /= max(1, nint(Lz*ReTau/lamZp))) then
+           write(*,'(/,A)') '  WARNING: spanwise seed clamped by the mesh -- the near-wall'
+           write(*,'(A)')   '           cycle is NOT resolved on this grid; the lambda_z+'
+           write(*,'(A)')   '           reported below is what the grid carries, not what'
+           write(*,'(A)')   '           was asked for.'
+        endif
+
+        mcount = 0
+        do iw = 1,2
+           do iband = 1,nBand
+              mcount = mcount + 1
+              nzM    = nzB(iband)
+              nxM    = nxB(iband)
+              lamZm  = Lz*ReTau/real(nzM,rp)
+              betaM (mcount) = 2.0_rp*pi*real(nzM,rp)/Lz
+              alphaM(mcount) = 2.0_rp*pi*real(nxM,rp)/Lx
+              yprM  (mcount) = lamZm/rollAR
+              wallM (mcount) = iw
+           enddo
+        enddo
+
+        mcount = mcount + 1
+        nzM    = max(1, nint(Lz/lamZot))
+        nxM    = max(1, nint(Lx*ReTau/lamXp))
+        betaM (mcount) = 2.0_rp*pi*real(nzM,rp)/Lz
+        alphaM(mcount) = 2.0_rp*pi*real(nxM,rp)/Lx
+        yprM  (mcount) = 0.0_rp
+        wallM (mcount) = 0
+
+        bandNorm = sqrt(2.0_rp/real(nBand,rp))
+
+        do imode = 1,nMode
+           phiM(imode) = 2.0_rp*pi*(real(imode,rp)*gold - floor(real(imode,rp)*gold))
+           chiM(imode) = 2.0_rp*pi*(real(imode,rp)*silv - floor(real(imode,rp)*silv))
+        enddo
+
+        allocate(cosBz(lbz:ubz), sinBz(lbz:ubz), cosAx(lbx:ubx), sinAx(lbx:ubx), &
+                 fRoll(lby:uby), dRoll(lby:uby), gStrk(lby:uby), stat = ierrA)
+        if(ierrA /= 0) then
+           print*, ' Allocation error in init_turbulent_channel, rank ', rank
+           call secure_stop
+        endif
+
+        do imode = 1,nMode
+
+           do k = lbz,ubz
+              ang      = betaM(imode)*z(k) + phiM(imode)
+              cosBz(k) = cos(ang)
+              sinBz(k) = sin(ang)
+           enddo
+
+           do i = lbx,ubx
+              ang      = wiggle*sin(alphaM(imode)*x(i) + chiM(imode))
+              cosAx(i) = cos(ang)
+              sinAx(i) = sin(ang)
+           enddo
+
+           do j = lby,uby
+
+              fRoll(j) = 0.0_rp
+              dRoll(j) = 0.0_rp
+              gStrk(j) = 0.0_rp
+              if(abs(y(j)) >= 1.0_rp) cycle
+
+              if(wallM(imode) == 0) then
+
+                 fRoll(j) = -oNorm*y(j)*(1.0_rp - y(j)**2)**2
+                 dRoll(j) =  oNorm*(1.0_rp - y(j)**2)*(5.0_rp*y(j)**2 - 1.0_rp)
+                 gStrk(j) =   1.0_rp - y(j)**2
+
+              else
+
+                 if(wallM(imode) == 1) then
+                    ypl   = (1.0_rp + y(j))*ReTau
+                    dypdy =  ReTau
+                 else
+                    ypl   = (1.0_rp - y(j))*ReTau
+                    dypdy = -ReTau
+                 endif
+
+                 ypr      = yprM(imode)
+                 fRoll(j) = (ypl/ypr)**2*exp(2.0_rp - 2.0_rp*ypl/ypr)
+                 dRoll(j) = dypdy*(2.0_rp/ypr)*(ypl/ypr)*(1.0_rp - ypl/ypr) &
+                          * exp(2.0_rp - 2.0_rp*ypl/ypr)
+                 gStrk(j) = (ypl/ypStrk)*exp(1.0_rp - ypl/ypStrk)
+
+              endif
+
+           enddo
+
+           amp = aRoll*bandNorm*uTau
+           if(wallM(imode) == 2) amp = -amp
+
+           do k       = lbz,ubz
+              do j    = lby,uby
+                 do i = lbx,ubx
+
+                    csT = cosBz(k)*cosAx(i) - sinBz(k)*sinAx(i)
+                    snT = sinBz(k)*cosAx(i) + cosBz(k)*sinAx(i)
+
+                    U(i,j,k) = U(i,j,k) + aStrk*bandNorm*uTau*gStrk(j)*sinBz(k)
+
+                    V(i,j,k) = V(i,j,k) - amp*fRoll(j)*snT
+                    W(i,j,k) = W(i,j,k) - amp/betaM(imode)*dRoll(j)*csT
+
+                 enddo
+              enddo
+           enddo
+
+        enddo
+
+        deallocate(cosBz, sinBz, cosAx, sinAx, fRoll, dRoll, gStrk)
+        deallocate(uMean, rMean)
+
+        lclRU  = 0.0_rp
+        lclVol = 0.0_rp
+        do k       = sz,ez
+           do j    = sy,ey
+              do i = sx,ex
+                 if(abs(y(j)) < 1.0_rp) then
+                    dv     = xstep(i)*ystep(j)*zstep(k)
+                    lclRU  = lclRU  + phi(i,j,k,1)*U(i,j,k)*dv
+                    lclVol = lclVol + dv
                  endif
               enddo
            enddo
         enddo
 
-        if(rank == root) write(*, '(A)') 'done!'
-        status = 0
+        call MPI_allreduce(lclRU ,gblRU ,1,MPI_RP,mpi_sum,mpi_comm_cart,mpi_err)
+        call MPI_allreduce(lclVol,gblVol,1,MPI_RP,mpi_sum,mpi_comm_cart,mpi_err)
+
+        uBulk = gblRU/gblVol
+        scal  = u_inf/uBulk
+
+        do k       = lbz,ubz
+           do j    = lby,uby
+              do i = lbx,ubx
+                 U(i,j,k) = scal*U(i,j,k)
+              enddo
+           enddo
+        enddo
+
+        if(rank == root) then
+           write(*,'(A)') 'done!'
+           write(*,'(A,ES13.6)') '    u_tau                   : ', uTau
+           write(*,'(A,F10.3,A,F9.3)') &
+                                 '    bulk u+  table/GetRetau : ', uu, '  /', du
+           write(*,'(A,F10.6)')  '    mass-flux rescaling     : ', scal
+           write(*,'(A,F10.2,A,F7.2,A)') '    streak lambda_z+        : ', &
+                                 Lz*ReTau/real(nzB(2),rp), '   (', real(nz,rp)/real(nzB(2),rp), ' pts/wave)'
+           write(*,'(A,F10.2,A,F7.2,A)') '    sinuous lambda_x+       : ', &
+                                 Lx*ReTau/real(nxB(1),rp), '   (', real(nx,rp)/real(nxB(1),rp), ' pts/wave)'
+           if(abs(uu - du) > 1.0E-3_rp*du) write(*,'(A)') &
+           '  WARNING: local mean-profile table disagrees with GetReynolds_TCH.'
+        endif
+
         return
 end subroutine init_turbulent_channel
 
-
-
-
-
-subroutine init_turbulent_channel_random(status)
-! ---------------------------------------------------------
-!
-!       Turbulent channel initialization
-!       REFERENCE: DANS.HENNINGSON, 
-!                 "On turbulent spots in plane Poiseuille flow"
-!                 pag 186
-!
-! ---------------------------------------------------------
-        use random_module, only: random_normal
-
-        implicit none
-        integer, intent(out) :: status
-
-        ! local declarations
-        real(rp) :: dp_dx, c_1, c_2, uy
-        real(rp) :: r1, r2, r3, u_, v_, w_, xi, yj, zk
-        
-        if(rank == root) write(*,'(A,A,A)', advance = 'no') &
-        ' Initializing turbulent channel with random numbers: '
-
-        dp_dx = -1.5_rp*2._rp*u_inf
-        c_1   =   0.0_rp
-        c_2   = - 0.5_rp*dp_dx
-        
-        do k       = lbz,ubz
-           do j    = lby,uby
-              do i = lbx,ubx
-
-                 xi = x(i)
-                 yj = y(j)
-                 zk = z(k)
-
-                 phi(i,j,k,1) = 1.0_rp
-                 U  (i,j,k)   = 0.0_rp
-                 V  (i,j,k)   = 0.0_rp
-                 W  (i,j,k)   = 0.0_rp
-                 P  (i,j,k)   = 1.0_rp
-
-                 if(abs(yj) < 1.0_rp) then
-
-                   uy = 0.5_rp * dp_dx * yj**2 + c_1 * yj + c_2
-                   U(i,j,k) = uy
-
-                 endif
-                 if(abs(yj) < 0.9_rp) then
-
-                   uy = 0.5_rp * dp_dx * yj**2 + c_1 * yj + c_2
-
-                   call random_normal(r1)
-                   call random_normal(r2)
-                   call random_normal(r3)
-
-                   u_ = 0.1*r1
-                   v_ = 0.2*r2
-                   w_ = 0.2*r3
-        
-                   U(i,j,k) = uy + u_
-                   V(i,j,k) = v_
-                   W(i,j,k) = w_
-
-                 endif
-              enddo
-           enddo
-        enddo
-
-        if(rank == root) write(*, '(A)') 'done!'
-        status = 0
-        return
-end subroutine init_turbulent_channel_random
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-subroutine init_nscbc_perturbation(status,dir)
-        implicit none
-        integer     , intent(out) :: status
-        character(1), intent(in)  :: dir
-
-        ! local
-        real(rp), parameter :: x0    = 0.0_rp
-        real(rp), parameter :: sigma = 0.5_rp
-        real(rp)            :: x_, y_
-
-        if(rank == root) write(*,'(A,A,A)', advance = 'no') ' Initializing perturbation: '
-        
-        selectcase(dir)
-
-          case('x')
-          do k = lbz,ubz
-             do j = lby,uby
-                do i = lbx,ubx
-
-                   x_ = (x(i) - x0)**2/(2*sigma**2)
-
-                   phi(i,j,k,1) = 1.0_rp + Mach * exp(-x_)
-                     U(i,j,k)   = 0.0_rp + u_inf
-                     V(i,j,k)   = 0.0_rp 
-                     W(i,j,k)   = 0.0_rp
-                     P(i,j,k)   = 1.0_rp
-
-                enddo
-             enddo
-          enddo
-
-          case('y')
-          do k = lbz,ubz
-             do j = lby,uby
-                do i = lbx,ubx
-
-                   y_ = (y(j) - x0)**2/(2*sigma**2)
-
-                   phi(i,j,k,1) = 1.0_rp + Mach * exp(-y_)
-                     U(i,j,k)   = 0.0_rp 
-                     V(i,j,k)   = 0.0_rp + u_inf
-                     W(i,j,k)   = 0.0_rp
-                     P(i,j,k)   = 1.0_rp
-
-                enddo
-             enddo
-          enddo
-
-        endselect
-
-        if(rank == root) write(*, '(A)') 'done!'
-        status = 0
-        return
-end subroutine init_nscbc_perturbation
-
-subroutine init_shock_bubble_2D(status)
-        implicit none
-        integer, intent(out) :: status
-
-        ! local variables
-        real(rp) :: r1, p1, T1, M1 
-        real(rp) :: r2, p2, T2, M2 
-        real(rp) :: vel1, vel2
-        real(rp) :: x0              !< shock wave initial position
-        real(rp), parameter :: density_ratio = 0.138_rp/1.29_rp ! Helium-air
-
-        if(rank == root) write(*,'(A,A,A)', advance = 'no') ' Initializing shock bubble 2D: '
-
-        ! applying Rankine-Hugoniot conditions in order to compute post-shocked field
-
-        M1 = Mach
-        x0 = -1.0_rp
-        !
-        ! ==== state 1
-        !
-        p1   = 1.0_rp
-        r1   = 1.0_rp
-        T1   = p1/r1
-        vel1 = - M1 * sqrt(gamma0*T1)
-        !
-        ! ==== state 2
-        !
-        call Rankine_Hugoniot(r1,p1,T1,M1,r2,p2,T2,M2)
-
-        vel2 = - M2 * sqrt(gamma0*T2)
-
-        do k = lbz,ubz
-           do j = lby,uby
-              do i = lbx,ubx
-
-                 if(x(i) .lt. x0 ) then 
-
-                   phi(i,j,k,1) = r2
-                     U(i,j,k)   = vel2 - vel1
-                     V(i,j,k)   = 0.0_rp
-                     W(i,j,k)   = 0.0_rp
-                     P(i,j,k)   = p2
-
-                 elseif(x(i) .ge. x0 ) then
-
-                   if((x(i)-1.0_rp)**2 + y(j)**2 <= 0.5_rp**2) then
-                     phi(i,j,k,1) = density_ratio * r1
-                   else
-                     phi(i,j,k,1) = r1
-                   endif
-
-                     U(i,j,k)   = 0.0_rp
-                     V(i,j,k)   = 0.0_rp
-                     W(i,j,k)   = 0.0_rp
-                     P(i,j,k)   = p1
-                 endif
-
-              enddo
-           enddo
-        enddo
-        
-        if(rank == root) write(*, '(A)') 'done!'
-        status = 0
-        return
-end subroutine init_shock_bubble_2D
-
-
-subroutine init_ambient_supersonic(status)
-        implicit none
-        integer, intent(out) :: status
-
-        if(rank == root) write(*,'(A,A,A)', advance = 'no') ' Initializing ambient supersonic: '
-        
-        do k = lbz,ubz
-           do j = lby,uby
-              do i = lbx,ubx
-
-                 if(x(i) < -4.0_rp) then
-                   U(i,j,k) = u_inf
-                 else
-                   U(i,j,k) = 0.0_rp
-                 endif
-
-                 phi(i,j,k,1) = 1.0_rp
-                   V(i,j,k)   = 0.0_rp
-                   W(i,j,k)   = 0.0_rp
-                   P(i,j,k)   = 1.0_rp
-                
-              enddo
-           enddo
-        enddo
-
-        if(rank == root) write(*, '(A)') 'done!'
-        status = 0
-        return
-end subroutine init_ambient_supersonic
-
-subroutine init_four_quadrants(status)
-        implicit none
-        integer, intent(out) :: status
-
-        real(rp)               :: xi,yj
-        real(rp), dimension(4) :: r_, u_, v_, w_, p_
-        
-        r_ = 1.0_rp
-        u_ = 0.0_rp
-        v_ = 0.0_rp
-        w_ = 0.0_rp
-        p_ = 1.0_rp
-        if(ic == 'four_quadrants_A') then
-          r_ = (/ 1.5_rp, 0.5323_rp, 0.138_rp, 0.5323_rp /)
-          u_ = (/ 0.0_rp, 1.206_rp,  1.206_rp, 0.0_rp    /)
-          v_ = (/ 0.0_rp, 0.0_rp,    1.206_rp, 1.206_rp  /)
-          w_ = (/ 0.0_rp, 0.0_rp,    0.0_rp  , 0.0_rp    /)
-          p_ = (/ 1.5_rp, 0.3_rp,    0.029_rp, 0.3_rp    /)
-
-        elseif(ic == 'four_quadrants_B') then
-          r_ = (/  1.0_rp , 2.0_rp ,  1.0_rp ,  3.0_rp  /)
-          p_ = (/  1.0_rp , 1.0_rp ,  1.0_rp ,  1.0_rp  /)
-          u_ = (/  0.75_rp, 0.75_rp, -0.75_rp, -0.75_rp /)
-          v_ = (/ -0.5_rp , 0.5_rp ,  0.5_rp , -0.5_rp  /)
-          w_ = (/ 0.0_rp  , 0.0_rp ,  0.0_rp ,  0.0_rp  /)
-
-        else
-          if(rank == root) print*, 'Four quadrants ', trim(ic), ' is not implemented.'
-          call secure_stop
-        endif
-
-        if(rank == root) write(*,'(A,A,A)', advance = 'no') ' Initializing : '//"'"//trim(ic)//"' "
-
-        do k = lbz,ubz
-           do j = lby,uby
-              do i = lbx,ubx
-
-                 xi = x(i)
-                 yj = y(j)
-                 if    (xi > 0.0_rp .and. yj >  0.0_rp) then ! I   quadrant
-                   phi(i,j,k,1) = r_(1)
-                   U  (i,j,k)   = u_(1)
-                   V  (i,j,k)   = v_(1)
-                   W  (i,j,k)   = w_(1)
-                   P  (i,j,k)   = p_(1)
-                 elseif(xi < 0.0_rp .and. yj >  0.0_rp) then ! II  quadrant
-                   phi(i,j,k,1) = r_(2)
-                   U  (i,j,k)   = u_(2)
-                   V  (i,j,k)   = v_(2)
-                   W  (i,j,k)   = w_(2)
-                   P  (i,j,k)   = p_(2)
-                 elseif(xi <  0.0_rp .and. yj < 0.0_rp) then ! III quadrant
-                   phi(i,j,k,1) = r_(3)
-                   U  (i,j,k)   = u_(3)
-                   V  (i,j,k)   = v_(3)
-                   W  (i,j,k)   = w_(3)
-                   P  (i,j,k)   = p_(3)
-                 elseif(xi > 0.0_rp .and. yj < 0.0_rp) then ! IV  quadrant
-                   phi(i,j,k,1) = r_(4)
-                   U  (i,j,k)   = u_(4)
-                   V  (i,j,k)   = v_(4)
-                   W  (i,j,k)   = w_(4)
-                   P  (i,j,k)   = p_(4)
-                 endif
-
-              enddo
-           enddo
-        enddo
-
-        if(rank == root) write(*, '(A)') 'done!'
-        status = 0
-        return
-end subroutine init_four_quadrants
-
-
-subroutine init_shock_inflow(status)
-
-        use math_tools_module     , only: newton_raphson
-        use fluid_functions_module, only: inverse_rankine_hugoniot
-
-        implicit none
-        integer, intent(out) :: status
-
-        ! local variables
-        real(rp), parameter :: x0 = -1.0_rp                  !< shock initial position
-        real(rp)            :: M1, r1, p1, T1, u1, v1, w1 !< state 1
-        real(rp)            :: M2, r2, p2, T2, u2, v2, w2 !< state 2
-        
-        ! === check coherency
-        if(trim(inflow_profile) .ne. 'shock_inflow') then
-          if(rank == root) then
-            print*, ' FATAL ERROR: '
-            print*, ' Initial condition "shock_inflow" needs inflow_profile to be "shock_inflow" as well.'
-          endif
-          call secure_stop
-        endif
-        if(Mach>1.85_rp) then
-          if(rank == root) then
-          print*, 'Shock inflow with mach > 1.85_rp is not compatible with Rankine-Hugoniot'
-          endif
-          call secure_stop
-        endif
-
-        if(rank == root) write(*,'(A,A,A)', advance = 'no') ' Initializing a shock wave : '
-        
-        ! ambient condition
-        r1 = 1.0_rp
-        p1 = 1.0_rp
-        T1 = p1/r1
-        u1 = 0.0_rp
-        v1 = 0.0_rp
-        w1 = 0.0_rp
-
-        ! compute post-shocked field bosed on the post shock Mach number
-
-        call newton_raphson(inverse_rankine_hugoniot, 10000, toll_equality, Mach+1.0_rp, M1)
-        call Rankine_Hugoniot(r1,p1,T1,M1,r2,p2,T2,M2)
-
-        u2 = Mach*sqrt(gamma0*T2)
-        v2 = 0.0_rp
-        w2 = 0.0_rp
-
-
-        do k = lbz,ubz
-           do j = lby,uby
-              do i = lbx,ubx
-
-                 if     (x(i) < x0 ) then 
-
-                   phi(i,j,k,1) = r2
-                     U(i,j,k)   = u2
-                     V(i,j,k)   = v2
-                     W(i,j,k)   = w2
-                     P(i,j,k)   = p2
-
-                 elseif(x(i) >= x0 ) then
-
-                   phi(i,j,k,1) = r1
-                     U(i,j,k)   = u1
-                     V(i,j,k)   = v1
-                     W(i,j,k)   = w1
-                     P(i,j,k)   = p1
-                 endif
-
-              enddo
-           enddo
-        enddo
-        
-        if(rank == root) write(*, '(A)') 'done!'
-        status = 0
-        return
-end subroutine init_shock_inflow
-
-
-
-subroutine init_shock_impact(status)
-! --------------------------------------------------------------------------------
-!
-!       This subroutine initialize a steady shock wave in a domain posizion. 
-!
-! --------------------------------------------------------------------------------
-        implicit none
-        integer , intent(out) :: status
-
-        ! local declarations
-        real(rp)            :: x0
-        real(rp)            :: r1, p1, T1, u1, M1
-        real(rp)            :: r2, p2, T2, u2, M2
-
-        if(rank == root) write(*,'(A,A,A)', advance = 'no') ' Initializing a steady shock wave : '
-
-        ! check input
-        if(Mach < 1.0_rp) then
-          if(rank == root) then
-            print*, ' Mach < 1._rp No possible steady shocks!'
-          endif
-          call secure_stop
-        endif
-
-        M1 = Mach
-        x0 = -2.0_rp
-        ! --------------|-------------- !
-        !     (2)       |     (1)       !   <---- M1 = MACH
-        ! --------------|-------------- !
-        !               ^
-        !               x0                
-
-        !
-        ! ==== state 1
-        !
-        p1 = 1.0_rp
-        r1 = 1.0_rp
-        T1 = p1/r1
-        u1 = - M1 * sqrt(gamma0*T1)
-
-        !
-        ! ==== state 2
-        !
-        call Rankine_Hugoniot(r1,p1,T1,M1,r2,p2,T2,M2)
-
-        u2 = - M2 * sqrt(gamma0*T2)
-       
-        x0  = -2.0_rp
-
-        do k = lbz,ubz
-           do j = lby,uby
-              do i = lbx,ubx
-
-                 if(x(i) <= x0 ) then 
-
-                   phi(i,j,k,1) = r2
-                     U(i,j,k)   = u2
-                     V(i,j,k)   = 0.0_rp
-                     W(i,j,k)   = 0.0_rp
-                     P(i,j,k)   = p2
-
-                 elseif(x(i) >= x0 ) then
-
-                   phi(i,j,k,1) = r1
-                     U(i,j,k)   = u1
-                     V(i,j,k)   = 0.0_rp
-                     W(i,j,k)   = 0.0_rp
-                     P(i,j,k)   = p1
-
-                 endif
-
-              enddo
-           enddo
-        enddo
-
-        if(rank == root) write(*, '(A)') 'done!'
-        status = 0
-        return
-end subroutine init_shock_impact
-
-
-
-subroutine init_swbli(status)
-! -------------------------------------------------------------------------------------
-!       
-!       This subroutine initialises the SHOCK-WAVE boundary layer problem
-!
-! -------------------------------------------------------------------------------------
-        use math_tools_module     , only: DegToRad, RadToDeg
-        use fluid_functions_module, only: oblique_shock
-
-        implicit none
-        integer, intent(out) :: status
-
-        ! parameters
-        real(rp), parameter :: thetaw = 3.75_rp     !< wedge angle DEGREZ
-        real(rp), parameter :: x1     = 100.0_rp    !< impingment point
-
-        ! local variables
-        real(rp) :: r1, p1, T1, u1, v1, M1 !< state 1 variables
-        real(rp) :: r2, p2, T2, u2, v2, M2 !< state 2 variables
-        real(rp) :: r3, p3, T3, u3, v3, M3 !< state 3 variables
-        real(rp) :: beta2                  !< first shock angle
-        real(rp) :: beta3                  !< secnd shock angle
-        real(rp) :: theta                  !< wedge angle (in radiants)
-        real(rp) :: slope1, slope2         !< slope of the first shock
-        real(rp) :: shock1, shock2         !< slope of the reflected shock
-        integer  :: i,j,k
-
-        if(rank == root) write(*,'(A,A,A)', advance = 'no') ' Initializing shock wave boundary layer interaction: '
-        
-        !
-        ! === STATE 1
-        !
-        M1 = Mach
-        r1 = 1.0_rp
-        p1 = 1.0_rp
-        T1 = p1/r1
-        u1 = M1 * sqrt(gamma0*T1)
-        v1 = 0.0_rp
-
-        !
-        ! === STATE 2
-        !
-        theta = DegToRad(thetaw)
-        call oblique_shock(r1,p1,T1,M1,theta,r2,p2,T2,M2,beta2)
-        
-        slope1 = tan(pi-beta2)
-
-        u2 = M2 * sqrt(gamma0*T2) * cos(theta)
-        v2 = M2 * sqrt(gamma0*T2) * sin(theta)
-
-        !
-        ! === STATE 3
-        !
-        call oblique_shock(r2,p2,T2,M2,theta,r3,p3,T3,M3,beta3)
-        
-        slope2 = tan(beta3 - theta)
-
-        u3 = M3 * sqrt(gamma0*T3)
-        v3 = 0.0_rp
-        
-        do k       = lbz,ubz
-           do j    = lby,uby
-              do i = lbx,ubx
-
-                   shock1 = y(j) - ymin - slope1 * (x(i) - x1)
-                   shock2 = y(j) - ymin - slope2 * (x(i) - x1)
-                
-                   ! REGION 1
-                   if(shock1 < 0.0_rp) then
-                           
-                     phi(i,j,k,1) = r1
-                       U(i,j,k)   = u1
-                       V(i,j,k)   = v1
-                       W(i,j,k)   = 0.0_rp
-                       P(i,j,k)   = p1
-                   
-                   ! REGION 2
-                   elseif(shock1 > 0.0_rp .and. shock2 < 0.0_rp) then
-
-                     phi(i,j,k,1) =   r3
-                       U(i,j,k)   =   u3
-                       V(i,j,k)   =   0.0_rp
-                       W(i,j,k)   =   0.0_rp
-                       P(i,j,k)   =   p3
-
-                   !! REGION 3
-                   else
-
-                     phi(i,j,k,1) =   r2
-                       U(i,j,k)   =   u2
-                       V(i,j,k)   = - v2
-                       W(i,j,k)   =   0.0_rp
-                       P(i,j,k)   =   p2
-
-                   endif
-
-              enddo
-           enddo
-        enddo
-
-        if(rank == root) write(*, '(A)') 'done!'
-        status = 0
-        return
-end subroutine init_swbli
-        
-
-
-subroutine init_LaminarBoundaryLayer(status)
-
-        use fluid_functions_module, only: BlasiusProfile
+subroutine init_TurbulentBoundaryLayerMean(status)
+
+        use fluid_functions_module, only: MuskerProfile, CompressibleCorrection, &
+                                          BoundaryLayerQuantities, laminar_viscosity
+        use mesh_module           , only: west_wall_normal_distance, &
+                                          bottom_wall_streamwise_distance, &
+                                          yy, dxi_dx, deta_dx, nx_xi, ny_xi
+        use real_to_integer_module, only: locate
+        use interpolation_module  , only: polint
         use FileModule
 
         implicit none
         integer, intent(out) :: status
 
-        ! local declarations
-        real(rp), dimension(1-GN:ny+GN) :: LaminarVel_inc
-        real(rp), dimension(1-GN:ny+GN) :: LaminarVel_cmp
-        real(rp), dimension(1-GN:ny+GN) :: LaminarTmp
-        real(rp), dimension(1-GN:ny+GN) :: LaminarRho
-
-        real(rp), allocatable, dimension(:) :: y_tmp
-        real(rp)                            :: Tw, Rw
-        type(FileType)                      :: Blasius
-        integer                             :: i,j,k
-
-        if(rank == root) write(*,'(A,A,A)', advance = 'no') ' Initializing Laminar boundary layer: '
-        
-        selectcase(inflow_profile)
-          case('blasius')
-          call BlasiusProfile(LaminarVel_inc, LaminarTmp, LaminarRho)
-
-          case('pohlhausen')
-          call PohlhausenProfile(LaminarVel_inc)
-          call CompressibleCorrection(ny,.false.,Mach,Prandtl,Trat,Tw,Rw,LaminarVel_inc,LaminarVel_cmp,LaminarRho,LaminarTmp)
-
-          case default
-          print*, ' Initial condition ', trim(inflow_profile), ' is not implemented.'
-          stop
-
-        endselect
-
-        do k       = lbz,ubz
-           do j    = lby,uby
-              do i = lbx,ubx
-
-                 phi(i,j,k,1) = LaminarRho(j)
-                   U(i,j,k)   = LaminarVel_inc(j)
-                   V(i,j,k)   = 0.0_rp
-                   W(i,j,k)   = 0.0_rp
-                   P(i,j,k)   = 1.0_rp
-
-              enddo
-           enddo
-        enddo
-        ! 
-        ! === print blasius profile
-        ! 
-        if(rank == root) then
-
-          Blasius%name = 'BlasiusProfile'
-          Blasius%dir  = trim(data_dir)//'/BLASIUS_PROFILE'
-          call OpenNewFile(Blasius,it)
-        
-          allocate(y_tmp(1-GN:ny+GN))
-          call compute_grid_point(y_tmp,ny,lbound(y_tmp,1),ubound(y_tmp,1),ymin,ymax,stretching_par,gridpoint_y)
-
-          do j = 1-GN,ny+GN
-             write(Blasius%unit,*) y_tmp(j), LaminarVel_inc(j), LaminarVel_cmp(j), LaminarTmp(j), LaminarRho(j)
-          enddo
-
-          deallocate(y_tmp)
-
-        endif   
-
-        if(rank == root) write(*, '(A)') 'done!'
-        status = 0
-        return
-end subroutine init_LaminarBoundaryLayer
-
-
-
-
-subroutine init_TurbulentBoundaryLayerMean(status)
-
-        use fluid_functions_module, only: MuskerProfile, CompressibleCorrection, BoundaryLayerQuantities, laminar_viscosity
-        use real_to_integer_module, only: locate
-        use interpolation_module  , only: polint
-        use FileModule 
-
-        implicit none
-        integer, intent(out) :: status
-
-        ! local declarations
         real(rp), dimension(:,:,:), allocatable :: tempPrim
-        real(rp), dimension(:)    , allocatable :: delta_array
-        real(rp), dimension(:)    , allocatable :: deltaVArray
-        real(rp), dimension(:)    , allocatable :: frict_array
-        real(rp), dimension(:)    , allocatable :: theta_array
+        real(rp), dimension(:)    , allocatable :: delta_array, deltaVArray
+        real(rp), dimension(:)    , allocatable :: theta_array, frict_array
         real(rp), dimension(:)    , allocatable :: y_tmp
-        real(rp), dimension(0:ny)               :: UPlusInc, UplusCmp, RhoY, TmpY, velY
-        real(rp), parameter                     :: toll = 1.0E-14_rp
-        real(rp)                                :: tWall, rWall
-        real(rp)                                :: delta, deltaV, thrat, deltaStar, theta, cf
-        real(rp)                                :: dx, dy, ReTau_new, ReTau_old, err
-        real(rp)                                :: ue, ReTauI, yl, errR, errU
-        real(rp)                                :: ri, ui, vi_j00, vi_jm1, vi_j
-        real(rp)                                :: r_, ir, u_, v_
-        integer                                 :: i,j,jj,jjj, m, jg, ji
-        integer                                 :: itr, itrmax = 30, ierr = 0
 
-        real(rp) :: delta_REF, theta_REF, deltaVREF, frict_REF
-        type(fileType) :: BlData
-#ifdef DEBUG
-        type(FileType) :: inflow, frictionFile
-        real(rp)       :: u_y, mu_wall
-#endif
+        real(rp), dimension(0:ny) :: UPlusInc, UPlusCmp, RhoY, TmpY, velY
+        real(rp), dimension(0:ny) :: wdist
+        real(rp), dimension(0:ny) :: dru_dx
 
-        !
-        ! === allocate temporary variables
-        !
-        allocate(delta_array(-GN:nx+GN), &
-                 deltaVArray(-GN:nx+GN), &
-                 frict_Array(-GN:nx+GN), &
-                 theta_array(-GN:nx+GN), stat = ierr)
-        if(ierr.ne.0) stop ' Allocation error'
-        
-        allocate(tempPrim(-GN:nx+GN, 1-GN:ny+GN, 3), &
-                 y_tmp(0:ny), stat = ierr)
-        if(ierr.ne.0) stop ' Allocation error'
-        
-        call compute_grid_point(y_tmp,ny,0,ny,ymin,ymax,stretching_par,gridpoint_y)
-        y_tmp(0) = 0.0_rp
-        
+        real(rp), dimension(-GN:nx+GN) :: sdist
 
-        if(rank == root) write(*,'(A,A,A)', advance = 'no') ' Initializing Turbulent boundary layer: '
+        real(rp), parameter :: toll   = 1.0E-14_rp
+        integer , parameter :: itrmax = 30
+        real(rp) :: tWall, rWall
+        real(rp) :: delta, deltaV, thrat, deltaStar, theta, cf
+        real(rp) :: dy, ReTau_new, ReTau_old, err
+        real(rp) :: ue, ReTauI, yl, errR, errU
+        real(rp) :: ri, ui, drxi, dreta
+        real(rp) :: r_, ir, u_, v_
+        real(rp) :: u_y, mu_wall
+        integer  :: i, j, jj, jjj, m, jg, ji
+        integer  :: itr, lbx_loc, k, isign, nbr
 
-        !
-        ! === getting the REFERENCE inflow profile
-        !
-        call MuskerProfile(ny,y_tmp,ReTau,UplusInc)
-        call CompressibleCorrection(ny,.true.,Mach,Prandtl,Trat,tWall,rWall,UPlusInc,UPlusCmp,RhoY,TmpY)
+        type(FileType) :: blData, inflow, frictionFile
 
-#ifdef DEBUG
-        if(rank == root) then
-          inflow%name = 'inflowProfile'
-          inflow%dir  = trim(data_dir)//'/INITIAL_CONDITION'
-          call OpenNewFile(inflow,it)
-          do j = 0,ny
-             write(inflow%unit,*) y_tmp(j), RhoY(j), uPlusCmp(j)/maxval(uPlusCmp), TmpY(j)
-          enddo
-          call CloseFile(inflow)
-        endif
-#endif
+        if(rank == root) write(*,'(A)', advance='no') ' Initializing Turbulent boundary layer: '
 
-        !
-        ! === computing the growth of the boundary layer
-        !
-        call BoundaryLayerQuantities(y_tmp,RhoY,UPlusCmp,rWall,thrat,deltaStar,cf)
-        delta_REF = 1.0_rp
-        deltaVREF = delta_REF/ReTau
-        frict_REF = cf
-        theta_REF = thrat*delta_REF
+        call AllocateReal(delta_array, -GN,nx+GN)
+        call AllocateReal(deltaVArray, -GN,nx+GN)
+        call AllocateReal(theta_array, -GN,nx+GN)
+        call AllocateReal(frict_array, -GN,nx+GN)
 
-        ReTau_old = ReTau - 1.0_rp
-        ReTau_new = ReTau
-        dx        = Lx/real(nx,rp)
+        lbx_loc = lbx - 1
+        call AllocateReal(tempPrim, lbx_loc,ubx, lby,uby, 1,3)
 
-        ! get the node-0 values integrating from REF in half cell space
-        itr = 0
-        err = huge(1.0_rp)
-        do while(err > toll .and. itr < itrmax)
+        call AllocateReal(y_tmp, 0,ny)
+        call west_wall_normal_distance(wdist)
+        y_tmp(0:ny) = ymin + wdist(0:ny)
 
-           call MuskerProfile(ny,y_tmp,ReTau_new,UplusInc)
-           call CompressibleCorrection(ny,.true.,Mach,Prandtl,Trat,tWall,rWall,UPlusInc,UPlusCmp,RhoY,TmpY)
-           call BoundaryLayerQuantities(y_tmp,RhoY,UPlusCmp,rWall,thrat,deltaStar,cf)
+        call bottom_wall_streamwise_distance(sdist)
 
-           theta     = theta_REF - 0.25_rp*0.5_rp*dx*(cf+frict_REF)
-           delta     = theta/thrat
-           deltaV    = deltaVREF*sqrt(frict_REF/cf)
-           reTau_new = delta/deltaV
+        call MuskerProfile         (ny, y_tmp, ReTau, UPlusInc)
+        call CompressibleCorrection(ny, UPlusInc, UPlusCmp, RhoY, TmpY, tWall, rWall)
+        call BoundaryLayerQuantities(y_tmp, RhoY, UPlusCmp, rWall, thrat, deltaStar, cf)
 
-           err = abs(ReTau_new - ReTau_old) 
-
-           ReTau_old = ReTau_new
-           itr = itr + 1
-
-        enddo
-        theta_array(0) = theta
+        delta_array(0) = 1.0_rp
+        deltaVArray(0) = 1.0_rp/ReTau
         frict_array(0) = cf
-        delta_array(0) = delta
-        deltaVArray(0) = deltaV
+        theta_array(0) = thrat
 
-        ! get the node 1 values integrating from REF in half cell space
-        itr = 0
-        err = huge(1.0_rp)
-        do while(err > toll .and. itr < itrmax)
+        ReTau_new = ReTau
+        ReTau_old = ReTau - 1.0_rp
 
-           call MuskerProfile(ny,y_tmp,ReTau_new,UplusInc)
-           call CompressibleCorrection(ny,.true.,Mach,Prandtl,Trat,tWall,rWall,UPlusInc,UPlusCmp,RhoY,TmpY)
-           call BoundaryLayerQuantities(y_tmp,RhoY,UPlusCmp,rWall,thrat,deltaStar,cf)
+        sweep_k: do k = 1, max(GN, nx+GN)
+           sweep_dir: do isign = 1, -1, -2
 
-           theta     = theta_REF + 0.25_rp*0.5_rp*dx*(cf+frict_REF)
-           delta     = theta/thrat
-           deltaV    = deltaVREF*sqrt(frict_REF/cf)
-           reTau_new = delta/deltaV
+              i = isign*k
+              if (i > nx+GN .or. i < -GN) cycle sweep_dir
+              nbr = i - isign
 
-           err = abs(ReTau_new - ReTau_old) 
+              itr = 0
+              err = huge(1.0_rp)
+              picard: do while(err > toll .and. itr < itrmax)
 
-           ReTau_old = ReTau_new
-           itr = itr + 1
+                 call MuskerProfile         (ny, y_tmp, ReTau_new, UPlusInc)
+                 call CompressibleCorrection(ny, UPlusInc, UPlusCmp, RhoY, TmpY, tWall, rWall)
+                 call BoundaryLayerQuantities(y_tmp, RhoY, UPlusCmp, rWall, thrat, deltaStar, cf)
 
-        enddo
-        theta_array(1) = theta
-        frict_array(1) = cf
-        delta_array(1) = delta
-        deltaVArray(1) = deltaV
+                 theta     = theta_array(nbr) + 0.25_rp*(sdist(i)-sdist(nbr))*(cf + frict_array(nbr))
+                 delta     = theta/thrat
+                 deltaV    = deltaVArray(nbr)*sqrt(frict_array(nbr)/cf)
+                 ReTau_new = delta/deltaV
 
-        !
-        ! integrating from -1 to -GN
-        !
-        do i = -1,-GN,-1
+                 err       = abs(ReTau_new - ReTau_old)
+                 ReTau_old = ReTau_new
+                 itr       = itr + 1
 
-           itr = 0
-           err = huge(1.0_rp)
-           do while(err > toll .and. itr < itrmax)
+              enddo picard
 
-              call MuskerProfile(ny,y_tmp,ReTau_new,UplusInc)
-              call CompressibleCorrection(ny,.true.,Mach,Prandtl,Trat,tWall,rWall,UPlusInc,UPlusCmp,RhoY,TmpY)
-              call BoundaryLayerQuantities(y_tmp,RhoY,UPlusCmp,rWall,thrat,deltaStar,cf)
+              theta_array(i) = theta
+              delta_array(i) = delta
+              deltaVArray(i) = deltaV
+              frict_array(i) = cf
 
-              theta     = theta_array(i+1) - 0.25_rp*dx*(cf+frict_array(i+1))
-              delta     = theta/thrat
-              deltaV    = deltaVArray(i+1)*sqrt(frict_array(i+1)/cf)
-              reTau_new = delta/deltaV
+           enddo sweep_dir
+        enddo sweep_k
 
-              err = abs(ReTau_new - ReTau_old) 
+        do i = lbx_loc, ubx
 
-              ReTau_old = ReTau_new
-              itr = itr + 1
-
-           enddo
-           theta_array(i) = theta
-           frict_array(i) = cf
-           delta_array(i) = delta
-           deltaVArray(i) = deltaV
-
-        enddo
-        !
-        ! integrating from 2 to nx+GN
-        !
-        do i = 2,nx+GN
-
-           itr = 0
-           err = huge(1.0_rp)
-           do while(err > toll .and. itr < itrmax)
-
-              call MuskerProfile(ny,y_tmp,ReTau_new,UplusInc)
-              call CompressibleCorrection(ny,.true.,Mach,Prandtl,Trat,tWall,rWall,UPlusInc,UPlusCmp,RhoY,TmpY)
-              call BoundaryLayerQuantities(y_tmp,RhoY,UPlusCmp,rWall,thrat,deltaStar,cf)
-
-              theta     = theta_array(i-1) + 0.25_rp*dx*(cf+frict_array(i-1))
-              delta     = theta/thrat
-              deltaV    = deltaVArray(i-1)*sqrt(frict_array(i-1)/cf)
-              ReTau_new = delta/deltaV
-
-              err       = abs(ReTau_new - Retau_old)
-              ReTau_old = ReTau_new
-              itr       = itr + 1
-
-           enddo
-           theta_array(i) = theta
-           delta_array(i) = delta
-           deltaVarray(i) = deltaV
-           frict_array(i) = cf
-
-        enddo
-
-        if(rank == root) then
-          bldata%name = 'blData'
-          bldata%dir  = trim(data_dir)//'/INITIAL_CONDITION'
-          call OpenNewFile(blData,it)
-          write(blData%unit,*)   '# x    theta   delta   delta_v   cf   ReTau'
-          do i = -GN,nx+GN
-             write(blData%unit,*) Lx*(i-0.5_rp)/real(nx,rp), theta_array(i), &
-                     delta_array(i), deltaVArray(i), frict_array(i), delta_array(i)/deltaVarray(i)
-          enddo
-          call CloseFile(BlData)
-        endif
-
-        !
-        ! === interpolation on the mesh
-        !
-        do i = -GN,nx+GN
            delta  = delta_array(i)
            deltaV = deltaVArray(i)
            ReTauI = delta/deltaV
 
-           call MuskerProfile(ny,y_tmp,ReTauI,UplusInc)
-           call CompressibleCorrection(ny,.true.,Mach,Prandtl,Trat,tWall,rWall,UPlusInc,UPlusCmp,RhoY,TmpY)
+           call MuskerProfile         (ny, y_tmp, ReTauI, UPlusInc)
+           call CompressibleCorrection(ny, UPlusInc, UPlusCmp, RhoY, TmpY, tWall, rWall)
 
-           ue = maxval(UPlusCmp)
-           VelY = UPlusCmp/ue
+           ue   = maxval(UPlusCmp)
+           velY = UPlusCmp/ue
 
            do j = 0, ny
+              yl  = wdist(j)/delta
+              call locate(wdist, 0, ny, yl, jj)
 
-              yl = y_tmp(j)/delta
-              call locate(y_tmp,0,ny,yl,jj)
-
-              m = 4
-              jjj = min(max(jj-(m-1)/2,1),ny+1-m)
-              call polint(y_tmp(jjj),rhoY(jjj),m,yl,ri,errR)
-              call polint(y_tmp(jjj),velY(jjj),m,yl,ui,errU)
+              m   = 4
+              jjj = min(max(jj-(m-1)/2, 1), ny+1-m)
+              call polint(wdist(jjj), RhoY(jjj), m, yl, ri, errR)
+              call polint(wdist(jjj), velY(jjj), m, yl, ui, errU)
 
               tempPrim(i,j,1) = ri
               tempPrim(i,j,2) = ri*ui
               tempPrim(i,j,3) = 0.0_rp
-
            enddo
+
         enddo
 
-        ! === integrate rhov
-        do j    = 1   , ny
-           do i = 1-GN, nx+GN
+        do i = lbx, ubx
 
-              dy = y_tmp(j) - y_tmp(j-1)
-
-              vi_j00 = (tempPrim(i,j  ,2) - tempPrim(i-1,j  ,2))/dx
-              vi_jm1 = (tempPrim(i,j-1,2) - tempPrim(i-1,j-1,2))/dx
-              vi_j   = 0.5_rp*(vi_j00 + vi_jm1)
-
-              tempPrim(i,j,3) = tempPrim(i,j-1,3) - vi_j * dy
-
+           do j = 0, ny
+              drxi  = tempPrim(i,j,2) - tempPrim(i-1,j,2)
+              if    (j == 0 ) then
+                 dreta = tempPrim(i,1 ,2) - tempPrim(i,0   ,2)
+              elseif(j == ny) then
+                 dreta = tempPrim(i,ny,2) - tempPrim(i,ny-1,2)
+              else
+                 dreta = 0.5_rp*(tempPrim(i,j+1,2) - tempPrim(i,j-1,2))
+              endif
+              dru_dx(j) = dxi_dx(i,j)*drxi + deta_dx(i,j)*dreta
            enddo
+
+           do j = 1, ny
+              dy = yy(i,j) - yy(i,j-1)
+              tempPrim(i,j,3) = tempPrim(i,j-1,3) - 0.5_rp*(dru_dx(j)+dru_dx(j-1))*dy
+           enddo
+
         enddo
 
-        ! extapolation on north face ghosts
-        do    j = 1,GN
-           do i = -GN,nx+GN
-
-              jg = ny + j      !< ghost node
-              ji = ny - (j-1)  !< inner node
-
+        do    j = 1,   GN
+           do i = lbx, ubx
+              jg = ny + j
+              ji = ny - (j-1)
               tempPrim(i,jg,1) =  tempPrim(i,ji,1)
               tempPrim(i,jg,2) =  tempPrim(i,ji,2)
               tempPrim(i,jg,3) =  tempPrim(i,ji,3)
-
            enddo
         enddo
 
-        ! extapolation on south face ghosts
-        do    j = 1,GN
-           do i = -GN,nx+GN
-
-              jg = 1 - j      !< ghost node
-              ji = 1 + (j-1)  !< inner node
-
+        do    j = 1,   GN
+           do i = lbx, ubx
+              jg = 1 - j
+              ji = 1 + (j-1)
               tempPrim(i,jg,1) =  tempPrim(i,ji,1)
               tempPrim(i,jg,2) = -tempPrim(i,ji,2)
               tempPrim(i,jg,3) = -tempPrim(i,ji,3)
-
            enddo
         enddo
 
-        !
-        ! === distribute the results within the procs
-        !
-        do       k = lbz,ubz
-           do    j = lby,uby
-              do i = lbx,ubx
-
+        do       k = lbz, ubz
+           do    j = lby, uby
+              do i = lbx, ubx
                  r_ = tempPrim(i,j,1)
                  ir = 1.0_rp/r_
                  u_ = tempPrim(i,j,2)*ir
                  v_ = tempPrim(i,j,3)*ir
-                
+
                  phi(i,j,k,1) = r_
-                 U  (i,j,k)   = u_inf*u_
-                 V  (i,j,k)   = u_inf*v_
+                 U  (i,j,k)   = u_inf*(nx_xi(i,j)*u_ - ny_xi(i,j)*v_)
+                 V  (i,j,k)   = u_inf*(ny_xi(i,j)*u_ + nx_xi(i,j)*v_)
                  W  (i,j,k)   = 0.0_rp
                  P  (i,j,k)   = 1.0_rp
-
               enddo
            enddo
         enddo
 
-#ifdef DEBUG
-        ! check consistency of the friction coefficient
+        if(rank == root) then
+           call MuskerProfile         (ny, y_tmp, ReTau, UPlusInc)
+           call CompressibleCorrection(ny, UPlusInc, UPlusCmp, RhoY, TmpY, tWall, rWall)
+
+           inflow%name = 'inflowProfile'
+           inflow%dir  = trim(data_dir)//'/INITIAL_CONDITION'
+           call OpenNewFile(inflow, it)
+           do j = 0, ny
+              write(inflow%unit,*) y_tmp(j), RhoY(j), UPlusCmp(j)/maxval(UPlusCmp), TmpY(j)
+           enddo
+           call CloseFile(inflow)
+
+           blData%name = 'blData'
+           blData%dir  = trim(data_dir)//'/INITIAL_CONDITION'
+           call OpenNewFile(blData, it)
+           write(blData%unit,*) '# s_wall    theta   delta   delta_v   cf   ReTau'
+           do i = -GN, nx+GN
+              write(blData%unit,*) sdist(i), theta_array(i), delta_array(i), &
+                                   deltaVArray(i), frict_array(i), delta_array(i)/deltaVArray(i)
+           enddo
+           call CloseFile(blData)
+        endif
+
         frictionFile%name = 'InitFriction'//trim(str(rank))
         frictionFile%dir  = trim(data_dir)//'/INITIAL_CONDITION'
-        call OpenNewFile(frictionFile,it)
-        do i = lbx,ubx
-           u_y     = U(i,sy,sz)/y_tmp(1)
-           mu_wall = laminar_viscosity(tWall,Tref,vis_flag)
+        call OpenNewFile(frictionFile, it)
+        mu_wall = laminar_viscosity(tWall, Tref, vis_flag)
+        do i = lbx, ubx
+           u_y = U(i,sy,sz)/y_tmp(1)
            write(frictionFile%unit,*) x(i), mu_wall*mu_inf*u_y/q_inf
         enddo
         call CloseFile(frictionFile)
-#endif
 
-        deallocate(delta_array,deltaVArray,frict_Array,theta_array)
-        deallocate(y_tmp,tempPrim)
+        call DeallocateReal(delta_array)
+        call DeallocateReal(deltaVArray)
+        call DeallocateReal(theta_array)
+        call DeallocateReal(frict_array)
+        call DeallocateReal(tempPrim)
+        call DeallocateReal(y_tmp)
 
-        if(rank == root) write(*, '(A)') 'done!'
+        if(rank == root) write(*,'(A)') 'done!'
         status = 0
 
         return
 end subroutine init_TurbulentBoundaryLayerMean
 
-
-
-
-subroutine init_TBLNoise(status)
-
-        use df_module
-        use random_module
-        use FileModule
+function tbl_noise_temperature(Tm, us_m, us_p, j) result(T_)
+        use df_module, only: DF_LundMatrix
 
         implicit none
+        real(rp), intent(in) :: Tm, us_m, us_p
+        integer , intent(in) :: j
+        real(rp)             :: T_, dTdu, th, sg
+
+        dTdu = GRATemperatureSlope(us_m/u_inf, Tm)/u_inf
+        th   = dTdu*us_p/Tm
+        sg   = dTdu*u_inf*DF_LundMatrix(1,1,max(0,min(ny,j)))/Tm
+        T_   = Tm*exp(th - 0.5_rp*sg*sg)
+
+        return
+end function tbl_noise_temperature
+
+subroutine init_TBLNoise_fast(status)
+        use df_module
+        use random_module
+        use mesh_module, only: nx_xi, ny_xi
+
+        implicit none
+
         integer, intent(out) :: status
 
-        ! local declarations
-        real(rp), dimension(:,:,:,:), allocatable :: vf
-        real(rp), dimension(:,:,:,:), allocatable :: uf
-        real(rp), dimension(:)      , allocatable :: y_tmp
-        real(rp), dimension(3)                    :: exppar1, exppar2, par1, par2
-        real(rp)                                  :: um, vm , wm, Tm, rm
-        real(rp)                                  :: up, vp , wp, Tp
-        real(rp)                                  :: dx
-        integer                                   :: err = 0, i, j, k, jg, ji, m
-#ifdef DEBUG
-        type(FileType)         :: reyStressFile
-        real(rp), dimension(3) :: rms, rmean, rmeansq
-        real(rp)               :: rey12, rey13, rey23
-#endif
+        real(rp), dimension(:,:,:), allocatable :: rnd_tmp, fy, vf, uf, uf_old
+
+        real(rp), dimension(3) :: mean, rmsq, rms
+        real(rp), dimension(3) :: exppar1, exppar2, par1, par2
+        real(rp) :: r, rm, um, vm, wm, Tm, up, vp, wp, T_, dx
+        real(rp) :: us_p, vn_p, us_m
+        integer :: j,k,m, jj, kk, l
+        integer :: req_recv, plane_count
+
         if(rank == root) write(*,'(A,A,A)', advance = 'no') ' Initializing a turbulent-consistent field: '
-        
-        ! allocations
-        allocate(y_tmp(0:ny), stat = err)
-        if(err .ne. 0) stop ' Allocation error in init_TBLNoise'
 
-        allocate(DF_Rnd3D(3, 1-GN:nx+GN+1, 1-DF_N:ny+DF_N, 1-DF_N:nz+DF_N), stat = err)
-        if(err .ne. 0) stop ' Allocation error in init_TBLNoise'
+        call AllocateReal(rnd_tmp, 1,3, 1-DF_N,ny+DF_N, 1-DF_N,nz+DF_N)
+        call AllocateReal(fy     , 1,3, 1-DF_N,ny+DF_N, 1-DF_N,nz+DF_N)
+        call AllocateReal(vf     , 1,3, 1,ny, 1,nz)
+        call AllocateReal(uf     , 1,3, 1-GN,ny+GN, 1-GN,nz+GN)
+        call AllocateReal(uf_old , 1,3, 1-GN,ny+GN, 1-GN,nz+GN)
 
-        allocate(vf(3,1-GN:nx+GN+1, 1:ny, 1:nz), stat = err)
-        if(err .ne. 0) stop ' Allocation error in init_TBLNoise'
+        uf_old = 0.0_rp
 
-        allocate(uf(3,1-GN:nx+GN+1, 1-GN:ny+GN, 1-GN:nz+GN), stat = err)
-        if(err .ne. 0) stop ' Allocation error in init_TBLNoise'
-        
-        ! get a temporary grid
-        call compute_grid_point(y_tmp,ny,0,ny,ymin,ymax,stretching_par,gridpoint_y)
-        y_tmp(0) = 0.0_rp
+        plane_count = 3*(ny+2*GN)*(nz+2*GN)
+        req_recv = MPI_REQUEST_NULL
+        if (my_neighbour(1) /= MPI_PROC_NULL) then
+           call MPI_IRECV(uf_old, plane_count, MPI_RP, my_neighbour(1), &
+                          700, mpi_comm_cart, req_recv, mpi_err)
+           call MPI_WAIT(req_recv, MPI_STATUS_IGNORE, mpi_err)
+        endif
 
-        ! create a 3D random field
-        call DFRandomField3D(nx,ny,nz,gn)
+        do i = sx,ex
 
-        ! filter the random data 
-        call DFConvolution3D(1-GN,nx+GN+1,1,ny,1,nz,vf)
+           do k = 1,nz
+              do j = 1-DF_N,ny+DF_N
+                 do m = 1,3
 
-        ! enforce statistics
-        call DFEnforceReynoldsStresses3D(1-GN,nx+GN+1,1,ny,1,nz,vf,uf)
+                    call random_normal(r)
+                    rnd_tmp(m,j,k) = r
 
-        ! extrapolation on north face
-        do j = 1,GN
-           jg = ny + j      !< ghost node
-           ji = ny - (j-1)  !< inner node
-
-           uf(:,:,jg,:) = uf(:,:,ji,:)
-        enddo
-        ! wall on south face
-        do j = 1,GN
-           jg = 1 - j      !< ghost node
-           ji = 1 + (j-1)  !< inner node
-
-           uf(:,:,jg,:) = - uf(:,:,ji,:)
-        enddo
-        ! periodicity along z
-        do k = 1,GN
-           uf(:,:,:,nz+k) = uf(:,:,:,k)
-           uf(:,:,:,1-k)  = uf(:,:,:,nz+1-k)
-        enddo
-
-        ! x correlation via Castro equation
-        dx      = gbl_min_step(1)
-        exppar1(1) = -0.5_rp*pi*dx/DF_xlen1
-        exppar1(2) = -0.5_rp*pi*dx/DF_xlen2
-        exppar1(3) = -0.5_rp*pi*dx/DF_xlen3
-        exppar2(1) = -pi*dx/DF_xlen1
-        exppar2(2) = -pi*dx/DF_xlen2
-        exppar2(3) = -pi*dx/DF_xlen3
-        par1    = exp(exppar1)
-        par2    = sqrt(1.0_rp-exp(exppar2))
-
-        do i=nx+GN,1,-1
-           do m = 1,3
-              uf(m,i,:,:) = uf(m,i+1,:,:)*par1(m) + uf(m,i,:,:)*par2(m)
+                 enddo
+              enddo
            enddo
-        enddo
-        
-        do k       = lbz,ubz
-           do j    = lby,uby
-              do i = lbx,ubx
+
+           do j = 1-DF_N,ny+DF_N
+
+              mean = 0.0_rp
+              rmsq = 0.0_rp
+              do k = 1,nz
+                 do m = 1,3
+                    mean(m) = mean(m) + rnd_tmp(m,j,k)
+                    rmsq(m) = rmsq(m) + rnd_tmp(m,j,k)**2
+                 enddo
+              enddo
+              mean = mean/real(nz,rp)
+              rmsq = rmsq/real(nz,rp)
+              rms  = sqrt(rmsq - mean**2)
+
+              do k = 1,nz
+                 do m = 1,3
+                    rnd_tmp(m,j,k) = (rnd_tmp(m,j,k) - mean(m))/rms(m)
+                 enddo
+              enddo
+           enddo
+
+           do k = 1,DF_N
+              do j = 1-DF_N,ny+DF_N
+                 do m = 1,3
+                    rnd_tmp(m,j,nz+k) = rnd_tmp(m,j,k)
+                    rnd_tmp(m,j,1 -k) = rnd_tmp(m,j,nz+1-k)
+                 enddo
+              enddo
+           enddo
+
+           fy = 0.0_rp
+           do k = 1-DF_N,nz+DF_N
+              do j = 1,ny
+                 do jj = -DF_N,DF_N
+                    do m = 1,3
+                       fy(m,j,k) = fy(m,j,k) + DF_By(m,jj,j)*rnd_tmp(m,j+jj,k)
+                    enddo
+                 enddo
+              enddo
+           enddo
+
+           vf = 0.0_rp
+           do k = 1,nz
+              do j = 1,ny
+                 do kk = -DF_N,DF_N
+                    do m = 1,3
+                       vf(m,j,k) = vf(m,j,k) + DF_Bz(m,kk,j)*fy(m,j,k+kk)
+                    enddo
+                 enddo
+              enddo
+           enddo
+
+           uf = 0.0_rp
+           do k = 1,nz
+              do j = 1,ny
+                 do m = 1,3
+                    do l = 1,3
+                       uf(m,j,k) = uf(m,j,k) + DF_LundMatrix(m,l,j)*vf(l,j,k)
+                    enddo
+                 enddo
+              enddo
+           enddo
+
+           dx      = gbl_min_step(1)
+           exppar1(1) = -0.5_rp*pi*dx/DF_xlen1
+           exppar1(2) = -0.5_rp*pi*dx/DF_xlen2
+           exppar1(3) = -0.5_rp*pi*dx/DF_xlen3
+           exppar2(1) = -pi*dx/DF_xlen1
+           exppar2(2) = -pi*dx/DF_xlen2
+           exppar2(3) = -pi*dx/DF_xlen3
+           par1    = exp(exppar1)
+           par2    = sqrt(1.0_rp-exp(exppar2))
+
+           do m = 1,3
+              uf(m,:,:) = uf_old(m,:,:)*par1(m) + uf(m,:,:)*par2(m)
+           enddo
+           uf_old = uf
+
+           do j = 1,GN
+              uf(:,ny + j,:) = uf(:,ny - (j-1),:)
+           enddo
+           do j = 1,GN
+              uf(:,1 - j,:) = - uf(:,1 + (j-1),:)
+           enddo
+           do k = 1,GN
+              uf(:,:,nz+k) = uf(:,:,k)
+              uf(:,:,1-k)  = uf(:,:,nz+1-k)
+           enddo
+
+           do    k = lbz,ubz
+              do j = lby,uby
 
                  rm = phi(i,j,k,1)
                  um = U(i,j,k)
                  vm = V(i,j,k)
                  wm = W(i,j,k)
-                 Tm = 1.0_rp/rm 
+                 Tm = 1.0_rp/rm
 
-                 up = u_inf*uf(1,i,j,k)
-                 vp = u_inf*uf(2,i,j,k)
-                 wp = u_inf*uf(3,i,j,k)
-                 Tp = -0.75_rp*(gamma0-1.0_rp)/gamma0 * up * um / Tm
-                
-                 phi(i,j,k,1) = 1.0_rp/(Tm + Tp)
+                 us_p = u_inf*uf(1,j,k)
+                 vn_p = u_inf*uf(2,j,k)
+                 wp   = u_inf*uf(3,j,k)
+
+                 us_m = nx_xi(i,j)*um + ny_xi(i,j)*vm
+                 T_   = tbl_noise_temperature(Tm, us_m, us_p, j)
+
+                 up = nx_xi(i,j)*us_p - ny_xi(i,j)*vn_p
+                 vp = ny_xi(i,j)*us_p + nx_xi(i,j)*vn_p
+
+                 phi(i,j,k,1) = 1.0_rp/T_
                  U(i,j,k)     = um + up
                  V(i,j,k)     = vm + vp
                  W(i,j,k)     = wm + wp
 
               enddo
            enddo
+
         enddo
+
+        if (my_neighbour(2) /= MPI_PROC_NULL) then
+           call MPI_SEND(uf_old, plane_count, MPI_RP, my_neighbour(2), &
+                         700, mpi_comm_cart, mpi_err)
+        endif
+
+        call DeallocateReal(rnd_tmp)
+        call DeallocateReal(fy)
+        call DeallocateReal(vf)
+        call DeallocateReal(uf)
+        call DeallocateReal(uf_old)
 
         if(rank == root) write(*, '(A)') 'done!'
 
-#ifdef DEBUG
-        reyStressFile%name = 'rey_computed' 
-        reyStressFile%dir  = trim(data_dir)//'/DF_REYNOLDS_STRESS'
-        call OpenNewFile(ReyStressFile,it)
-        do j=1,ny
-         rmean   = 0._rp
-         rmeansq = 0._rp
-         rey12   = 0._rp
-         rey13   = 0._rp
-         rey23   = 0._rp
-         do k=1,nz
-          do i=1-GN,nx+GN
-           do m=1,3
-            rmean(m)   = rmean(m)   + uf(m,i,j,k)
-            rmeansq(m) = rmeansq(m) + uf(m,i,j,k)**2
-           enddo
-           rey12 = rey12+uf(1,i,j,k)*uf(2,i,j,k)
-           rey13 = rey13+uf(1,i,j,k)*uf(3,i,j,k)
-           rey23 = rey23+uf(2,i,j,k)*uf(3,i,j,k)
-          enddo
-         enddo
-         rmean   = rmean/(nz)/(nx+2*gn)
-         rmeansq = rmeansq/(nz)/(nx+2*gn)
-         rms     = sqrt(rmeansq-rmean*rmean)
-         rey12   = rey12/(nz)/(nx+2*gn)
-         rey13   = rey13/(nz)/(nx+2*gn)
-         rey23   = rey23/(nz)/(nx+2*gn)
-         rey12   = rey12-rmean(1)*rmean(2)
-         rey13   = rey13-rmean(1)*rmean(3)
-         rey23   = rey23-rmean(2)*rmean(3)
-         write(reyStressFile%unit,*) &
-         y_tmp(j),(rms(m)**2,m=1,3),rey12,rey13,rey23,(rmean(m),m=1,3)
-        enddo
-        call CloseFile(ReyStressFile)
-#endif
-
-
-        deallocate(y_tmp,uf,vf,DF_Rnd3D)
         status = 0
 
         return
-end subroutine init_TBLNoise
-
-
-
-
-
-
+end subroutine init_TBLNoise_fast
 
 end module ic_module

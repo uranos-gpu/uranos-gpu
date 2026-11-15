@@ -2,7 +2,7 @@ module statistics_module
 implicit none
 
 private
-public mean0D, mean1D, mean2D, rey_averaged, gbl_mean!, ySymmetry, yAntMetry
+public mean0D, mean1D, mean2D, rey_averaged, gbl_mean
 
 interface gbl_mean
   module procedure gbl_mean3Dto1D, gbl_mean3Dto2D, gbl_mean4Dto1D, gbl_mean4Dto2D
@@ -24,17 +24,8 @@ interface rey_averaged
   module procedure ReynoldsAverage0D, ReynoldsAverage1D, ReynoldsAverage2D, ReynoldsAverage3D, ReynoldsAverage4D
 end interface rey_averaged
 
-!interface ySymmetry
-!  module procedure ySymmetry1D, ySymmetry2D
-!end interface ySymmetry
-!
-!interface yAntMetry
-!  module procedure yAntMetry1D, yAntMetry2D
-!end interface yAntMetry
-
-
 contains
-subroutine gbl_mean3Dto1D(v,dir,n1,n2,time,trestart,dt,sx,ex,sy,ey,sz,ez,comm,vmean,mpif)      
+subroutine gbl_mean3Dto1D(v,dir,n1,n2,time,trestart,dt,sx,ex,sy,ey,sz,ez,comm,vmean,mpif)
 
         use parameters_module, only: rp
 
@@ -47,11 +38,10 @@ subroutine gbl_mean3Dto1D(v,dir,n1,n2,time,trestart,dt,sx,ex,sy,ey,sz,ez,comm,vm
         character(*)                           , intent(in)    :: dir
         logical                                , intent(in)    :: mpif
 
-        !local declaration
         real(rp), allocatable, dimension(:) :: tmp
         integer , dimension(2)              :: b
         integer                             :: err = 0
-       
+
         b = 0
         if(dir == 'xy') b = (/sz,ez/)
         if(dir == 'xz') b = (/sy,ey/)
@@ -69,8 +59,7 @@ subroutine gbl_mean3Dto1D(v,dir,n1,n2,time,trestart,dt,sx,ex,sy,ey,sz,ez,comm,vm
         return
 end subroutine gbl_mean3Dto1D
 
-
-subroutine gbl_mean3Dto2D(v,dir,nSlice,time,trestart,dt,sx,ex,sy,ey,sz,ez,comm,vmean,mpif)      
+subroutine gbl_mean3Dto2D(v,dir,nSlice,time,trestart,dt,sx,ex,sy,ey,sz,ez,comm,vmean,mpif)
 
         use parameters_module, only: rp
 
@@ -83,20 +72,19 @@ subroutine gbl_mean3Dto2D(v,dir,nSlice,time,trestart,dt,sx,ex,sy,ey,sz,ez,comm,v
         character(*)                           , intent(in)    :: dir
         logical                                , intent(in)    :: mpif
 
-        !local declaration
         real(rp), allocatable, dimension(:,:) :: tmp
         integer , dimension(2)                :: lb, ub
         integer                               :: err = 0
-       
+
         lb = 0; ub = 0
         if    (dir == 'x') then
           lb = (/sy,sz/); ub = (/ey,ez/)
         elseif(dir == 'y') then
           lb = (/sx,sz/); ub = (/ex,ez/)
-        elseif(dir == 'z') then 
+        elseif(dir == 'z') then
           lb = (/sx,sy/); ub = (/ex,ey/)
         endif
-        
+
         allocate(tmp(lb(1):ub(1), lb(2):ub(2)), stat=err)
         if(err .ne. 0) stop ' Allocatation error in gbl_mean'
 
@@ -109,8 +97,7 @@ subroutine gbl_mean3Dto2D(v,dir,nSlice,time,trestart,dt,sx,ex,sy,ey,sz,ez,comm,v
         return
 end subroutine gbl_mean3Dto2D
 
-
-subroutine gbl_mean4Dto1D(v,dir,n1,n2,time,trestart,dt,sx,ex,sy,ey,sz,ez,comm,vmean,mpif)      
+subroutine gbl_mean4Dto1D(v,dir,n1,n2,time,trestart,dt,sx,ex,sy,ey,sz,ez,comm,vmean,mpif)
 
         use parameters_module, only: rp
         implicit none
@@ -122,11 +109,10 @@ subroutine gbl_mean4Dto1D(v,dir,n1,n2,time,trestart,dt,sx,ex,sy,ey,sz,ez,comm,vm
         character(*)                             , intent(in)    :: dir
         logical                                  , intent(in)    :: mpif
 
-        !local declaration
         real(rp), allocatable, dimension(:,:) :: tmp
         integer , dimension(2)                :: b
         integer                               :: err = 0
-       
+
         b = 0
         if(dir == 'xy') b = (/sz,ez/)
         if(dir == 'xz') b = (/sy,ey/)
@@ -134,7 +120,7 @@ subroutine gbl_mean4Dto1D(v,dir,n1,n2,time,trestart,dt,sx,ex,sy,ey,sz,ez,comm,vm
 
         allocate(tmp(b(1):b(2), lbound(v,4):ubound(v,4)), stat = err)
         if(err .ne. 0) stop ' Allocatation error in gbl_mean'
-        
+
         call MeanField4Dto1D(v,dir,n1,n2,sx,ex,sy,ey,sz,ez,comm,tmp,mpif)
 
         call rey_averaged(tmp,time,tRestart,dt,vmean)
@@ -144,12 +130,10 @@ subroutine gbl_mean4Dto1D(v,dir,n1,n2,time,trestart,dt,sx,ex,sy,ey,sz,ez,comm,vm
         return
 end subroutine gbl_mean4Dto1D
 
+subroutine gbl_mean4Dto2D(v,dir,nSlice,time,trestart,dt,sx,ex,sy,ey,sz,ez,comm,vmean,mpif)
 
+        use parameters_module, only: rp
 
-subroutine gbl_mean4Dto2D(v,dir,nSlice,time,trestart,dt,sx,ex,sy,ey,sz,ez,comm,vmean,mpif)      
-
-        use parameters_module, only: rp 
-        
         implicit none
         real(rp), allocatable, dimension(:,:,:,:), intent(in)    :: v
         real(rp), allocatable, dimension(:,:,:)  , intent(inout) :: vmean
@@ -159,20 +143,19 @@ subroutine gbl_mean4Dto2D(v,dir,nSlice,time,trestart,dt,sx,ex,sy,ey,sz,ez,comm,v
         character(*)                             , intent(in)    :: dir
         logical                                  , intent(in)    :: mpif
 
-        !local declaration
         real(rp), allocatable, dimension(:,:,:) :: tmp
         integer , dimension(2)                  :: lb, ub
         integer                                 :: err = 0
-       
+
         lb = 0; ub = 0
         if    (dir == 'x') then
           lb = (/sy,sz/); ub = (/ey,ez/)
         elseif(dir == 'y') then
           lb = (/sx,sz/); ub = (/ex,ez/)
-        elseif(dir == 'z') then 
+        elseif(dir == 'z') then
           lb = (/sx,sy/); ub = (/ex,ey/)
         endif
-        
+
         allocate(tmp(lb(1):ub(1), lb(2):ub(2),lbound(v,4):ubound(v,4)), stat=err)
         if(err .ne. 0) stop ' Allocatation error in gbl_mean'
 
@@ -185,13 +168,11 @@ subroutine gbl_mean4Dto2D(v,dir,nSlice,time,trestart,dt,sx,ex,sy,ey,sz,ez,comm,v
         return
 end subroutine gbl_mean4Dto2D
 
-
-
 subroutine MeanField4Dto2D(v,dir,nSlice,sx,ex,sy,ey,sz,ez,comm,vmean,mpif)
 
         use parameters_module, only: rp, MPI_RP, msm
         use mpi
-        
+
         implicit none
         real(rp), allocatable, dimension(:,:,:,:), intent(in)    :: v
         real(rp), allocatable, dimension(:,:,:)  , intent(inout) :: vmean
@@ -201,18 +182,16 @@ subroutine MeanField4Dto2D(v,dir,nSlice,sx,ex,sy,ey,sz,ez,comm,vmean,mpif)
         character(*)                             , intent(in)    :: dir
         logical                                  , intent(in)    :: mpif
 
-        ! local declaration
-
         real(rp) :: lcl_sum, irSlice
         integer  :: i,j,k,l, lb,ub,err = 0
 
         lb = lbound(v,4)
         ub = ubound(v,4)
-        
+
         selectcase(dir)
 
-          case('x') ! x mean field
-                
+          case('x')
+
             do l       = lb,ub
                do k    = sz,ez
                   do j = sy,ey
@@ -225,8 +204,8 @@ subroutine MeanField4Dto2D(v,dir,nSlice,sx,ex,sy,ey,sz,ez,comm,vmean,mpif)
                   enddo
                enddo
             enddo
-          
-          case('y') ! y mean field
+
+          case('y')
 
             do l       = lb,ub
                do k    = sz,ez
@@ -240,8 +219,8 @@ subroutine MeanField4Dto2D(v,dir,nSlice,sx,ex,sy,ey,sz,ez,comm,vmean,mpif)
                   enddo
                enddo
             enddo
-          
-          case('z') ! z mean field
+
+          case('z')
 
             do l       = lb,ub
                do j    = sy,ey
@@ -255,7 +234,7 @@ subroutine MeanField4Dto2D(v,dir,nSlice,sx,ex,sy,ey,sz,ez,comm,vmean,mpif)
                   enddo
                enddo
             enddo
-          
+
         endselect
 
         irSlice = 1.0_rp/real(nSlice,rp)
@@ -263,8 +242,6 @@ subroutine MeanField4Dto2D(v,dir,nSlice,sx,ex,sy,ey,sz,ez,comm,vmean,mpif)
 
         return
 end subroutine MeanField4Dto2D
-
-
 
 subroutine MeanField4Dto1D(v,dir,nSlice1,nSlice2,sx,ex,sy,ey,sz,ez,comm,vmean,mpif)
 
@@ -280,16 +257,15 @@ subroutine MeanField4Dto1D(v,dir,nSlice1,nSlice2,sx,ex,sy,ey,sz,ez,comm,vmean,mp
         character(*)                             , intent(in)    :: dir
         logical                                  , intent(in)    :: mpif
 
-        ! local declarations
         real(rp)           :: lcl_sum, irSlice
         integer            :: i,j,k,l,lb,ub,err=0
 
         lb = lbound(v,4)
         ub = ubound(v,4)
-        
+
         selectcase(dir)
 
-          case('xy') ! xy mean field
+          case('xy')
 
             do l    = lb,ub
                do k = sz,ez
@@ -302,7 +278,7 @@ subroutine MeanField4Dto1D(v,dir,nSlice1,nSlice2,sx,ex,sy,ey,sz,ez,comm,vmean,mp
                enddo
             enddo
 
-          case('xz') ! xz mean field
+          case('xz')
 
             do l    = lb,ub
                do j = sy,ey
@@ -315,7 +291,7 @@ subroutine MeanField4Dto1D(v,dir,nSlice1,nSlice2,sx,ex,sy,ey,sz,ez,comm,vmean,mp
                enddo
             enddo
 
-          case('yz') ! yz mean field
+          case('yz')
 
             do l    = lb,ub
                do i = sx,ex
@@ -336,9 +312,6 @@ subroutine MeanField4Dto1D(v,dir,nSlice1,nSlice2,sx,ex,sy,ey,sz,ez,comm,vmean,mp
         return
 end subroutine MeanField4Dto1D
 
-
-
-
 subroutine MeanField4Dto0D(v,nSlice1,nSlice2,nSlice3,sx,ex,sy,ey,sz,ez,comm,vmean,mpif)
 
         use parameters_module, only: rp, MPI_RP, msm
@@ -352,13 +325,12 @@ subroutine MeanField4Dto0D(v,nSlice1,nSlice2,nSlice3,sx,ex,sy,ey,sz,ez,comm,vmea
         integer                                  , intent(in)    :: comm
         logical                                  , intent(in)    :: mpif
 
-        ! local declarations
         real(rp)           :: lcl_sum, irSlice
         integer            :: l,lb,ub,err=0
 
         lb = lbound(v,4)
         ub = ubound(v,4)
-        
+
         do l    = lb,ub
            lcl_sum = sum(v(sx:ex,sy:ey,sz:ez,l))
            if(mpif) then
@@ -373,16 +345,12 @@ subroutine MeanField4Dto0D(v,nSlice1,nSlice2,nSlice3,sx,ex,sy,ey,sz,ez,comm,vmea
 
         return
 end subroutine MeanField4Dto0D
-! --------------------------------------------------------------------------------
-! --------------------------------------------------------------------------------
-! --------------------------------------------------------------------------------
-
 
 subroutine MeanField3Dto2D(v,dir,nSlice,sx,ex,sy,ey,sz,ez,comm,vmean,mpif)
 
         use parameters_module, only: rp, MPI_RP, msm
         use mpi
-        
+
         implicit none
         real(rp), allocatable, dimension(:,:,:), intent(in)    :: v
         real(rp), allocatable, dimension(:,:)  , intent(inout) :: vmean
@@ -392,15 +360,13 @@ subroutine MeanField3Dto2D(v,dir,nSlice,sx,ex,sy,ey,sz,ez,comm,vmean,mpif)
         character(*)                           , intent(in)    :: dir
         logical                                , intent(in)    :: mpif
 
-        ! local declaration
-
         real(rp) :: lcl_sum, irSlice
         integer  :: i,j,k, err = 0
 
         selectcase(dir)
 
-          case('x') ! x mean field
-                
+          case('x')
+
             do k    = sz,ez
                do j = sy,ey
                   lcl_sum = sum(v(sx:ex,j,k))
@@ -411,8 +377,8 @@ subroutine MeanField3Dto2D(v,dir,nSlice,sx,ex,sy,ey,sz,ez,comm,vmean,mpif)
                   endif
                enddo
             enddo
-          
-          case('y') ! y mean field
+
+          case('y')
 
             do k    = sz,ez
                do i = sx,ex
@@ -424,8 +390,8 @@ subroutine MeanField3Dto2D(v,dir,nSlice,sx,ex,sy,ey,sz,ez,comm,vmean,mpif)
                   endif
                enddo
             enddo
-          
-          case('z') ! z mean field
+
+          case('z')
 
             do j    = sy,ey
                do i = sx,ex
@@ -437,7 +403,7 @@ subroutine MeanField3Dto2D(v,dir,nSlice,sx,ex,sy,ey,sz,ez,comm,vmean,mpif)
                   endif
                enddo
             enddo
-          
+
         endselect
 
         irSlice = 1.0_rp/real(nSlice,rp)
@@ -445,8 +411,6 @@ subroutine MeanField3Dto2D(v,dir,nSlice,sx,ex,sy,ey,sz,ez,comm,vmean,mpif)
 
         return
 end subroutine MeanField3Dto2D
-
-
 
 subroutine MeanField3Dto1D(v,dir,nSlice1,nSlice2,sx,ex,sy,ey,sz,ez,comm,vmean,mpif)
 
@@ -462,13 +426,12 @@ subroutine MeanField3Dto1D(v,dir,nSlice1,nSlice2,sx,ex,sy,ey,sz,ez,comm,vmean,mp
         character(*)                           , intent(in)    :: dir
         logical                                , intent(in)    :: mpif
 
-        ! local declarations
         real(rp)           :: lcl_sum, irSlice
         integer            :: i,j,k,err=0
 
         selectcase(dir)
 
-          case('xy') ! xy mean field
+          case('xy')
 
             do k = sz,ez
                lcl_sum = sum(v(sx:ex,sy:ey,k))
@@ -479,7 +442,7 @@ subroutine MeanField3Dto1D(v,dir,nSlice1,nSlice2,sx,ex,sy,ey,sz,ez,comm,vmean,mp
                endif
             enddo
 
-          case('xz') ! xz mean field
+          case('xz')
 
             do j = sy,ey
                lcl_sum = sum(v(sx:ex,j,sz:ez))
@@ -490,7 +453,7 @@ subroutine MeanField3Dto1D(v,dir,nSlice1,nSlice2,sx,ex,sy,ey,sz,ez,comm,vmean,mp
                endif
             enddo
 
-          case('yz') ! yz mean field
+          case('yz')
 
             do i = sx,ex
                lcl_sum = sum(v(i,sy:ey,sz:ez))
@@ -509,7 +472,6 @@ subroutine MeanField3Dto1D(v,dir,nSlice1,nSlice2,sx,ex,sy,ey,sz,ez,comm,vmean,mp
         return
 end subroutine MeanField3Dto1D
 
-
 subroutine MeanField3Dto0D(v,nSlice1,nSlice2,nSlice3,sx,ex,sy,ey,sz,ez,comm,vmean,mpif)
 
         use parameters_module, only: rp, MPI_RP, msm
@@ -523,7 +485,6 @@ subroutine MeanField3Dto0D(v,nSlice1,nSlice2,nSlice3,sx,ex,sy,ey,sz,ez,comm,vmea
         integer                                , intent(in)    :: comm
         logical                                , intent(in)    :: mpif
 
-        ! local declarations
         real(rp)           :: lcl_sum, irSlice
         integer            :: err=0
 
@@ -539,8 +500,6 @@ subroutine MeanField3Dto0D(v,nSlice1,nSlice2,nSlice3,sx,ex,sy,ey,sz,ez,comm,vmea
 
         return
 end subroutine MeanField3Dto0D
-
-
 
 subroutine ReynoldsAverage0D(v,time,time_restart,dt,ReyAv)
 
@@ -562,9 +521,6 @@ subroutine ReynoldsAverage0D(v,time,time_restart,dt,ReyAv)
         return
 end subroutine ReynoldsAverage0D
 
-
-
-
 subroutine ReynoldsAverage1D(v,time,time_restart,dt,ReyAv)
 
         use parameters_module, only: rp
@@ -579,7 +535,7 @@ subroutine ReynoldsAverage1D(v,time,time_restart,dt,ReyAv)
         integer :: s1,e1
         s1 = lbound(v,1)
         e1 = ubound(v,1)
-        
+
         if(abs(time - time_restart) < 1.0E-14_rp) then
           ReyAv(s1:e1) = v(s1:e1)
         else
@@ -603,7 +559,7 @@ subroutine ReynoldsAverage2D(v,time,time_restart,dt,ReyAv)
         integer :: s1,e1,s2,e2
         s1 = lbound(v,1); s2 = lbound(v,2)
         e1 = ubound(v,1); e2 = ubound(v,2)
-        
+
         if(abs(time - time_restart) < 1.0E-14_rp) then
           ReyAv(s1:e1,s2:e2) = v(s1:e1,s2:e2)
         else
@@ -628,7 +584,7 @@ subroutine ReynoldsAverage3D(v,time,time_restart,dt,ReyAv)
         integer :: s1,e1,s2,e2,s3,e3
         s1 = lbound(v,1); s2 = lbound(v,2); s3 = lbound(v,3)
         e1 = ubound(v,1); e2 = ubound(v,2); e3 = ubound(v,3)
-        
+
         if(abs(time - time_restart) < 1.0E-14_rp) then
           ReyAv(s1:e1,s2:e2,s3:e3) = v(s1:e1,s2:e2,s3:e3)
         else
@@ -653,7 +609,7 @@ subroutine ReynoldsAverage4D(v,time,time_restart,dt,ReyAv)
         integer :: s1,e1,s2,e2,s3,e3,s4,e4
         s1 = lbound(v,1); s2 = lbound(v,2); s3 = lbound(v,3); s4 = lbound(v,4)
         e1 = ubound(v,1); e2 = ubound(v,2); e3 = ubound(v,3); e4 = ubound(v,4)
-        
+
         if(abs(time - time_restart) < 1.0E-14_rp) then
           ReyAv(s1:e1,s2:e2,s3:e3,s4:e4) = v(s1:e1,s2:e2,s3:e3,s4:e4)
         else
@@ -663,35 +619,5 @@ subroutine ReynoldsAverage4D(v,time,time_restart,dt,ReyAv)
 
         return
 end subroutine ReynoldsAverage4D
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 end module statistics_module

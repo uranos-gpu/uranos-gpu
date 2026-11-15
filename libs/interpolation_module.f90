@@ -1,14 +1,4 @@
 module interpolation_module
-! -----------------------------------------------------------------------------------------
-!
-!  This module produces an interface to interpolate the value of a generic field in a point.
-!  USAGE:
-!  - interpolate a field in 2 dimensions:
-!
-!       field_in_pt = interpl_field_2D(pt,x,y,field)     !< for 3D field
-!       field_in_pt = interpl_field_2D(pt,x,y,field,id)  !< for 3D field with co-dimension (id)
-!
-! -----------------------------------------------------------------------------------------
 
 private
 public interpl_field_1D, interpl_field_2D, interpl_field_3D, polint
@@ -38,39 +28,23 @@ function interpl_1Dfield_1D(pt,x,field1D) result(field_pt)
         real(rp), allocatable, dimension(:), intent(in) :: field1D
         real(rp)                                        :: field_pt
 
-        ! local declarations
         integer  :: il
         real(rp) :: x0, x1, phi0, phi1
 
-        ! ===== find the integer position of the cell
         il = optFloor(x,lbx,ubx,pt)
-       
-        ! ===== compute the line passing through two points
+
         x0   = x(il)
         x1   = x(il+1)
 
         phi0 = field1D(il)
         phi1 = field1D(il+1)
 
-        ! ===== interpolate the field linearly
         field_pt = phi0 + (phi1 - phi0)/(x1 - x0) * (pt - x0)
-        
+
         return
 end function interpl_1Dfield_1D
 
-
-
 function interpl_3Dfield_2D(pt,x,y,k,field3D) result(field_pt)
-! -------------------------------------------------------------------
-!
-!       This function interpolate the value of a 3D field in a point.
-!
-!       IN : pt          !< point in which we want to interpolate the field
-!            k           !< plane index
-!            field3D     !< field we want to interpolate
-!       OUT: field_pt    !> interpolated value
-!
-! -------------------------------------------------------------------
 
         use parameters_module       , only: rp
         use mpi_module              , only: lbx, ubx, lby, uby
@@ -84,26 +58,22 @@ function interpl_3Dfield_2D(pt,x,y,k,field3D) result(field_pt)
         integer                                , intent(in) :: k
         real(rp)                                            :: field_pt
 
-        ! local declarations
         integer, dimension(2)   :: il
         integer, dimension(4)   :: ic_, jc_
         real(rp),dimension(4)   :: phi_i,c
         real(rp),dimension(4,4) :: V
         real(rp)                :: xi, yj
         integer                 :: i0, i1, j0, j1, i,j,ib
-        
-        ! ===== find the integer position of the cell
+
         il(1) = optFloor(x,lbx,ubx,pt(1))
         il(2) = optFloor(y,lby,uby,pt(2))
 
-        ! ===== store the nodes in a array
         i0 = il(1); i1 = il(1)+1
         j0 = il(2); j1 = il(2)+1
 
         ic_ = (/i0,i1,i0,i1/)
         jc_ = (/j0,j0,j1,j1/)
-        
-        ! ===== interpolating the value of the cell
+
         do ib = 1,4
 
            i = ic_(ib)
@@ -124,20 +94,7 @@ function interpl_3Dfield_2D(pt,x,y,k,field3D) result(field_pt)
         return
 end function interpl_3Dfield_2D
 
-
-
 function interpl_4Dfield_2D(pt,x,y,k,field4D,id) result(field_pt)
-! -------------------------------------------------------------------
-!
-!       This function interpolate the value of a 4D field in a point.
-!
-!       IN : id          !< index of the field co-dimension
-!            pt          !< point in which we want to interpolate the field
-!            k           !< plane index
-!            field4D     !< field we want to interpolate
-!       OUT: field_pt    !> interpolated value
-!
-! -------------------------------------------------------------------
 
         use parameters_module       , only: rp
         use mpi_module              , only: lbx,ubx, lby,uby
@@ -151,26 +108,22 @@ function interpl_4Dfield_2D(pt,x,y,k,field4D,id) result(field_pt)
         integer                                  , intent(in) :: id, k
         real(rp)                                              :: field_pt
 
-        ! local declarations
         integer, dimension(2)   :: il
         integer, dimension(4)   :: ic_, jc_
         real(rp),dimension(4)   :: phi_i,c
         real(rp),dimension(4,4) :: V
         real(rp)                :: xi, yj
         integer                 :: i0, i1, j0, j1, i, j, ib
-        
-        ! ===== find the integer position of the cell
+
         il(1) = optFloor(x,lbx,ubx,pt(1))
         il(2) = optFloor(y,lby,uby,pt(2))
 
-        ! ===== store the nodes in a array
         i0 = il(1); i1 = il(1)+1
         j0 = il(2); j1 = il(2)+1
 
         ic_ = (/i0,i1,i0,i1/)
         jc_ = (/j0,j0,j1,j1/)
 
-        ! ===== interpolating the value of the cell
         do ib = 1,4
 
            i = ic_(ib)
@@ -191,20 +144,7 @@ function interpl_4Dfield_2D(pt,x,y,k,field4D,id) result(field_pt)
         return
 end function interpl_4Dfield_2D
 
-
-
-
 function interpl_4Dfield_3D(pt,x,sx,ex,y,sy,ey,z,sz,ez,field4D,id) result(field_pt)
-! -------------------------------------------------------------------
-!
-!       This function interpolate the value of a 4D field in a point (xp,yp,zp).
-!
-!       IN : pt          !< point in which we want to interpolate the field
-!            field4D     !< field we want to interpolate
-!            id          !< index of the field
-!       OUT: field_pt    !> interpolated value
-!
-! -------------------------------------------------------------------
 
         use parameters_module       , only: rp
         use real_to_integer_module  , only: optFloor
@@ -218,20 +158,17 @@ function interpl_4Dfield_3D(pt,x,sx,ex,y,sy,ey,z,sz,ez,field4D,id) result(field_
         integer                                  , intent(in) :: sx,ex,sy,ey,sz,ez
         real(rp)                                              :: field_pt
 
-        ! local declarations
         integer, dimension(3)   :: il
         integer, dimension(8)   :: ic_, jc_, kc_
         real(rp),dimension(8)   :: phi_i,c, pt_array
         real(rp),dimension(8,8) :: V
         real(rp)                :: xi, yj, zk
         integer                 :: i0, i1,j0,j1,k0,k1,i,j,k,ib
-        
-        ! ===== find the integer position of the cell
+
         il(1) = optFloor(x,sx,ex,pt(1))
         il(2) = optFloor(y,sy,ey,pt(2))
         il(3) = optFloor(z,sz,ez,pt(3))
 
-        ! ===== store the nodes in a array
         i0 = il(1); i1 = il(1)+1
         j0 = il(2); j1 = il(2)+1
         k0 = il(3); k1 = il(3)+1
@@ -239,8 +176,7 @@ function interpl_4Dfield_3D(pt,x,sx,ex,y,sy,ey,z,sz,ez,field4D,id) result(field_
         ic_ = (/i0,i1,i1,i0,i0,i1,i1,i0/)
         jc_ = (/j0,j0,j1,j1,j0,j0,j1,j1/)
         kc_ = (/k0,k0,k0,k0,k1,k1,k1,k1/)
-        
-        ! ===== interpolating the value of the cell
+
         do ib = 1,8
 
            i = ic_(ib)
@@ -264,8 +200,6 @@ function interpl_4Dfield_3D(pt,x,sx,ex,y,sy,ey,z,sz,ez,field4D,id) result(field_
 
         return
 end function interpl_4Dfield_3D
-
-
 
       SUBROUTINE POLINT(XA,YA,N,X,Y,DY)
       use parameters_module       , only: rp
@@ -300,7 +234,6 @@ end function interpl_4Dfield_3D
           HP=XA(I+M)-X
           W=C(I+1)-D(I)
           DEN=HO-HP
-!         IF(DEN.EQ.0._rp) PAUSE
           DEN=W/DEN
           D(I)=HP*DEN
           C(I)=HO*DEN
@@ -315,12 +248,5 @@ end function interpl_4Dfield_3D
 13    CONTINUE
       RETURN
       END
-!
-
-
-
-
-
-
 
 end module interpolation_module

@@ -4,23 +4,25 @@ use storage_module
 use mpi_module
 use shock_detection_module
 use profiling_module
+use output_probes     , only: flush_probes
+use mesh_module, only: dxi_dx, dxi_dy, deta_dx, deta_dy, m_xi, m_eta, iz_zta, ztastep_i
 
 implicit none
 private
-public init_runge_kutta, runge_kutta, compute_dt, last_iteration, explicit_filter_wmles
+public init_runge_kutta, runge_kutta, compute_dt, last_iteration
+
+real(rp) :: machineTmax        = -1.0_rp
+logical  :: wallclock_resolved = .false.
 
 contains
 
 subroutine init_runge_kutta
-! ------------------------------------------------------------------
-!
-!       This subroutine init the solution for Runge-Kutta substeps
-!       
-! ------------------------------------------------------------------
         implicit none
         integer :: i, j, k, l
 
-        call StartProfRange("init_runge_kutta") 
+        call StartProfRange("init_runge_kutta")
+
+        time_n = time
 
         !$acc parallel default(present)
         !$acc loop gang, vector collapse(4)
@@ -35,34 +37,22 @@ subroutine init_runge_kutta
         enddo
         !$acc end parallel
 
-        ! init ducros sensor if the scheme is hybrid
         if(hybrid_weno) call compute_hybrid_weno_flag
 
         call EndProfRange
 
-return
+        return
 end subroutine init_runge_kutta
 
-
 subroutine runge_kutta
-! ----------------------------------------------------------------------------------------
-!
-!       This subroutine evolves conservative variable via a a Runge-Kutta scheme. 
-!
-!       REF: SIGAL GOTTLIEB AND CHI-WANG SHU, 
-!            "TOTAL VARIATION DIMINISHING RUNGE-KUTTA SCHEMES"
-!
-! ----------------------------------------------------------------------------------------
         implicit none
         real(rp) :: aik, bik
         integer  :: i,j,k,l
 
         call StartProfRange("runge_kutta")
 
-        ! Runge - Kutta time
-        time = time + Dt * c_rk(ik)
+        time = time_n + Dt * c_rk(ik)
 
-        ! Runge - Kutta coefficient
         aik = a_rk(ik)
         bik = b_rk(ik)
 
@@ -80,285 +70,267 @@ subroutine runge_kutta
         enddo
         !$acc end parallel
 
-        call check_for_NAN_values
+        if(ik == n_step) call check_finite_time_step
 
         call EndProfRange
-        
-return
+
+        return
 end subroutine runge_kutta
 
-
 subroutine compute_dt
-! -------------------------------------------------------------------------------
-!
-!       This subroutine update time and iteration and calculate the time-step dt
-!       in order to ensure CFL condition. 
-!
-!       REFERENCE: 2002, Pirozzoli, "Conservative Hybrid Compact-WENO Schemes 
-!                                    for Schock-Turbolence Interaction",
-!                                    pag. 105
-!
-! -------------------------------------------------------------------------------
         implicit none
-        real(rp) :: my_dt          !< proc's time step
-        real(rp) :: my_dt_CFL      !< proc's dt courant condition
-        real(rp) :: my_dt_DIF1     !< proc's dt diffusion
-        real(rp) :: my_dt_DIF2     !< proc's dt diffusion
-       
-        real(rp) :: max_speed1, max_speed2, max_speed3
-        real(rp) :: dt_i1, dt_i2, dt_i3
-        real(rp) :: max_vis, max_lmd, min_st2
-        real(rp) :: ru, rv, rw, ir, T_, c_
+        real(rp), parameter :: four_thirds = 4.0_rp/3.0_rp
+        real(rp) :: my_dt, dt_conv, dt_diff
+        real(rp) :: max_conv, max_diff
+        real(rp) :: gbl_conv, gbl_diff
+        real(rp) :: c_, uu, vv, ww, ucon, vcon, wcon, sloc, m2, irho, dloc, m_zta
         integer  :: i,j,k
 
-        call StartProfRange("compute_dt") 
-
-        if(time+dt < tmax) then
-
-          max_speed1 = 0.0_rp
-          max_speed2 = 0.0_rp
-          max_speed3 = 0.0_rp
-          !$acc parallel default(present) copy(max_speed1,max_speed2,max_speed3)
-          !$acc loop gang, vector collapse(3) &
-          !$acc reduction(max:max_speed1,max_speed2,max_speed3)
-          do       k = sz,ez
-             do    j = sy,ey
-                do i = sx,ex
-                
-                   ru = phi(i,j,k,2)
-                   rv = phi(i,j,k,3)
-                   rw = phi(i,j,k,4)
-
-                   ir = 1.0_rp/phi(i,j,k,1)
-                   T_ = ir*cv_i*(phi(i,j,k,5) - 0.5_rp*ir*(ru*ru+rv*rv+rw*rw))
-                   c_ = sqrt(gamma0*T_)
-
-                   max_speed1 = max(abs(ru*ir) + c_, max_speed1)
-                   max_speed2 = max(abs(rv*ir) + c_, max_speed2)
-                   max_speed3 = max(abs(rw*ir) + c_, max_speed3)
-
-                enddo
-             enddo
-          enddo
-          !$acc end parallel
-        
-          ! critical dt for ith direction
-          dt_i1 = gbl_min_step(1)/max_speed1
-          dt_i2 = gbl_min_step(2)/max_speed2
-          dt_i3 = gbl_min_step(3)/max_speed3
-        
-          ! convective criteria
-          my_dt_CFL = CFL * min(dt_i1, dt_i2, dt_i3)
-
-          my_dt = my_dt_CFL
+        call StartProfRange("compute_dt")
 
           if(viscous) then
 
-            max_vis = 0.0_rp
-            max_lmd = 0.0_rp
-            !$acc parallel default(present) copy(max_vis,max_lmd) 
+            max_conv = 0.0_rp
+            max_diff = 0.0_rp
+            !$acc parallel default(present) copy(max_conv,max_diff)
             !$acc loop gang, vector collapse(3) &
-            !$acc reduction(max:max_vis,max_lmd) 
+            !$acc   reduction(max:max_conv,max_diff)
             do       k = sz,ez
                do    j = sy,ey
                   do i = sx,ex
-                     max_vis = max(VIS(i,j,k),max_vis)
-                     max_lmd = max(LMD(i,j,k),max_lmd)
+                     c_   = sqrt(GAMMA_T(i,j,k)*T(i,j,k))
+                     uu   = U(i,j,k)
+                     vv   = V(i,j,k)
+                     ww   = W(i,j,k)
+                     m_zta = ztastep_i(k)*iz_zta(k)
+                     ucon = uu*dxi_dx (i,j) + vv*dxi_dy (i,j)
+                     vcon = uu*deta_dx(i,j) + vv*deta_dy(i,j)
+                     wcon = ww*m_zta
+                     sloc =      abs(ucon) + m_xi (i,j)*c_   &
+                            +       abs(vcon) + m_eta(i,j)*c_   &
+                            +       abs(wcon) + m_zta      *c_
+
+                     irho = 1.0_rp/phi(i,j,k,1)
+                     m2   = m_xi(i,j)**2 + m_eta(i,j)**2 + m_zta**2
+                     dloc = max(four_thirds*VIS(i,j,k),                     &
+                                LMD(i,j,k)*(GAMMA_T(i,j,k) - 1.0_rp)) * irho
+
+                     max_conv = max(max_conv, sloc)
+                     max_diff = max(max_diff, dloc*m2)
                   enddo
                enddo
             enddo
             !$acc end parallel
 
-            min_st2 = min(gbl_min_step(1),gbl_min_step(2),gbl_min_step(3))**2
-        
-            my_dt_DIF1 = 0.1_rp * min_st2 / (mu_inf*max_vis)
-            my_dt_DIF2 = 0.1_rp * min_st2 / (mu_inf*max_lmd)
+          else
 
-            my_dt = min(my_dt_CFL, my_dt_DIF1, my_dt_DIF2)
+            max_conv = 0.0_rp
+            !$acc parallel default(present) copy(max_conv)
+            !$acc loop gang, vector collapse(3) reduction(max:max_conv)
+            do       k = sz,ez
+               do    j = sy,ey
+                  do i = sx,ex
+                     c_   = sqrt(GAMMA_T(i,j,k)*T(i,j,k))
+                     uu   = U(i,j,k)
+                     vv   = V(i,j,k)
+                     ww   = W(i,j,k)
+                     m_zta = ztastep_i(k)*iz_zta(k)
+                     ucon = uu*dxi_dx (i,j) + vv*dxi_dy (i,j)
+                     vcon = uu*deta_dx(i,j) + vv*deta_dy(i,j)
+                     wcon = ww*m_zta
+                     sloc =      abs(ucon) + m_xi (i,j)*c_   &
+                            +       abs(vcon) + m_eta(i,j)*c_   &
+                            +       abs(wcon) + m_zta      *c_
+                     max_conv = max(max_conv, sloc)
+                  enddo
+               enddo
+            enddo
+            !$acc end parallel
+
+            max_diff = 0.0_rp
 
           endif
 
-        else ! get exactly to tmax
+        call MPI_allreduce(max_conv, gbl_conv, 1, MPI_RP, MPI_MAX, mpi_comm_cart, mpi_err)
+        call MPI_allreduce(max_diff, gbl_diff, 1, MPI_RP, MPI_MAX, mpi_comm_cart, mpi_err)
 
-          my_dt = (tmax - time)
-          istop = 1
-
+        dt_conv = CFL/gbl_conv
+        if(gbl_diff > 0.0_rp) then
+          dt_diff = Fourier/(mu_inf*gbl_diff)
+          dt      = 1.0_rp/(1.0_rp/dt_conv + 1.0_rp/dt_diff)
+        else
+          dt      = dt_conv
         endif
+        my_dt = dt
 
-        ! compute GLOBAL time step
-        call MPI_allreduce(my_dt, dt, 1, MPI_RP, MPI_MIN, mpi_comm_cart, mpi_err)
+        if(dt >= 0.0_rp .and. dt <= tmax .and. time + dt >= tmax) then
+           dt    = tmax - time
+           istop = 1
+        endif
 
         call EndProfRange
 
         return
 end subroutine compute_dt
 
-
-
-subroutine explicit_filter_wmles
+subroutine check_finite_time_step
+        use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
+        use, intrinsic :: iso_fortran_env, only: error_unit
         implicit none
-        
-        real(rp), allocatable, dimension(:,:,:,:) :: tmp
-        real(rp), dimension(5)                    :: phif
-        real(rp), parameter                       :: alpha = 0.999_rp
-        real(rp), dimension(-2:2, -2:2, -2:2)     :: a
-        logical                                   :: wmflag
-        character(3)                              :: bchar
-        integer                                   :: f,i,j,k,m,n,l
+        logical :: sane
 
-        wmflag = .false.
-        do f = 1,6
-           bchar = trim(bc(f))
-           if(bchar == 'aws') WMflag = .true.
-        enddo
+        sane = ieee_is_finite(time) .and. ieee_is_finite(dt) .and. &
+               dt > 0.0_rp .and. dt <= tmax
+        if(logical_CFL) then
+           sane = sane .and. time <= tmax + 1.0e3_rp*spacing(tmax)
+        else
+           sane = sane .and. time <= tmax + dt
+        endif
+        if(sane) return
 
-        if(wmflag) then
+        if(rank == root) then
+           write(error_unit,'(A)')        ''
+           write(error_unit,'(A)')        ' URANOS: SIMULATION DIVERGED -- non-finite or unphysical time/dt (blow-up)'
+           write(error_unit,'(A,I0)')     '   iteration : ', it
+           write(error_unit,'(A,ES12.5)') '   time      : ', time
+           write(error_unit,'(A,ES12.5)') '   dt        : ', dt
+           flush(error_unit)
+        endif
 
-          a = 0.0_rp
-          a(0,0,0) = 1.0_rp/ 2.0_rp
+        call flush_probes
+        call MPI_Barrier(mpi_comm_cart, mpi_err)
+        call secure_stop
 
-          a(1,0,0) = 1.0_rp/16.0_rp; a(-1,0,0) = a(1,0,0)
-          a(0,1,0) = a(1,0,0); a(0,-1,0) = a(1,0,0)
-          a(0,0,1) = a(1,0,0); a(0,0,-1) = a(1,0,0)
+end subroutine check_finite_time_step
 
-          a(2,0,0) = -1.0_rp/16.0_rp; a(-2,0,0) = a(2,0,0)
-          a(0,2,0) =  a(2,0,0); a(0,-2,0) = a(2,0,0)
-          a(0,0,2) =  a(2,0,0); a(0,0,-2) = a(2,0,0)
+subroutine last_iteration(sTime, istop)
+        use mpi
+        implicit none
+        real(rp), intent(in)  :: sTime
+        integer , intent(out) :: istop
 
-          a(1,1,0) = 1.0_rp/32.0_rp; a(-1,-1,0) = a(1,1,0)
-          a(0,1,1) = a(1,1,0); a(0,-1,-1) = a(1,1,0)
-          a(1,0,1) = a(1,1,0); a(-1,0,-1) = a(1,1,0)
+        real(rp)      :: actualTime, budget
+        integer       :: ierr
+        logical       :: from_batch
 
-          a(1,-1,0) = a(1,1,0); a(-1,1,0) = a(1,1,0)
-          a(0,-1,1) = a(1,1,0); a(0,1,-1) = a(1,1,0)
-          a(1,0,-1) = a(1,1,0); a(-1,0,1) = a(1,1,0)
+        call StartProfRange("last_iteration")
 
-          a( 1 ,1,1) = 1.0_rp/64.0_rp
-          a(-1 ,1,1) = a(1,1,1)
-          a( 1,-1,1) = a(1,1,1)
-          a( 1,1,-1) = a(1,1,1)
-          a(1,-1,-1) = a(1,1,1)
-          a(-1,-1,1) = a(1,1,1)
-          a(-1,1,-1) = a(1,1,1)
-          a(-1,-1,-1) = a(1,1,1)
+        istop = 0
 
-          allocate(tmp(lbx:ubx, lby:uby, lbz:ubz, 5))
+        if(.not. wallclock_resolved) then
 
-          tmp = phi
-          do k = sz,ez
-             do j = sy,ey
-                do i = sx,ex
+           wallclock_resolved = .true.
 
-                   phif = 0.0_rp
-                   do       l = -2,2
-                      do    m = -2,2
-                         do n = -2,2
-                            phif = phif + a(n,m,l)*tmp(i+n,j+m,k+l,:)
-                         enddo
-                      enddo
-                   enddo
+           if(rank == root) then
 
-                   phi(i,j,k,:) = alpha*phi(i,j,k,:) + (1.0_rp-alpha)*phif
+              call batch_wallclock_budget(budget, from_batch)
 
-                enddo
-             enddo
-          enddo
+              if(from_batch) then
 
-          deallocate(tmp)
+                 machineTmax = (MPI_WTIME() - sTime) + budget
+
+                 write(*,'(A,F10.2)') '[last_iteration] batch deadline, stopping after [s] : ', machineTmax
+
+              else
+
+                 machineTmax = -1.0_rp
+
+              endif
+
+           endif
+
+           call MPI_BCAST(machineTmax, 1, MPI_RP, root, mpi_comm_cart, ierr)
 
         endif
 
-        return
-end subroutine explicit_filter_wmles
-
-
-
-subroutine check_for_NAN_values
-        use, intrinsic ::ieee_arithmetic
-        implicit none
-        !implicit none
-        !character(3)   :: check_nan
-        !character(3), parameter   :: nan_val = 'NaN' 
-
-        !do iv = 1,5
-        !   write(check_nan,'(F3.3)') phi(sx,sy,sz,iv)
-        !   if (check_nan.eq.nan_val) stop 'Divergency has been detected' 
-        !   write(check_nan,'(F3.3)') phi(ex,ey,ez,iv)
-        !   if (check_nan.eq.nan_val) stop 'Divergency has been detected' 
-        !enddo
-
-        do iv = 1,5
-           if (ieee_is_nan(phi(sx,sy,sz,iv))) stop 'Divergency has been detected'
-           if (ieee_is_nan(phi(ex,ey,ez,iv))) stop 'Divergency has been detected'
-        enddo
-
-        return
-end subroutine check_for_NAN_values
-
-
-subroutine last_iteration(sTime,istop)
-        implicit none
-        real(rp), intent(in)  :: sTime
-        integer , intent(out) :: iStop
-        
-        character(dl), parameter :: marconi100u01 = '/m100/home/userexternal/fdevanna/uranos_mpi'
-        character(dl), parameter :: marconi100u02 = '/m100_scratch/userexternal/gbaldan0/uranos_mpi'
-        character(dl), parameter :: sapienza   = '/scratch/mbernard/uranos_mpi'
-        character(dl), parameter :: irene      = '/ccc/scratch/cont005/ra0111/devannaf/uranos_mpi'
-        character(dl), parameter :: galileo100 = '/g100_work/IscrC_iWLES/uranosToGPU/fdevanna/uranos_mpi'
-        character(dl), parameter :: leonardou01= '/leonardo_scratch/large/userexternal/fdevanna/uranos_mpi'
-        character(dl), parameter :: leonardou02= '/path/to/user/folder'
-        character(dl)            :: wrkdir
-        real(rp)                 :: ActualTime, MachinTmax
-
-        call StartProfRange("last_iteration") 
-
-        call getcwd(wrkdir)
-        
-        selectcase(trim(wrkdir))
-
-          case(trim(marconi100u01), trim(marconi100u02), trim(irene), &
-               trim(leonardou01), trim(leonardou02))
-
-            ActualTime = MPI_WTIME()
-            MachinTmax = 23.00_rp*3600.0_rp
-
-            if(ActualTime - sTime > MachinTmax) then
-              if(rank == root) print*, ' Last iteration!'
-              istop = 1
-            endif
-
-          case(trim(galileo100))
-
-            ActualTime = MPI_WTIME()
-            MachinTmax = 7.50_rp*3600.0_rp
-
-            if(ActualTime - sTime > MachinTmax) then
-              if(rank == root) print*, ' Last iteration!'
-              istop = 1
-            endif
-
-          case(trim(sapienza))
-
-            ActualTime = MPI_WTIME()
-            MachinTmax = 71.0_rp*3600.0_rp
-
-            if(ActualTime - sTime > MachinTmax) then
-              if(rank == root) print*, ' Last iteration!'
-              istop = 1
-            endif
-
-          case default
-            continue
-
-        endselect
+        if(machineTmax > 0.0_rp) then
+           actualTime = MPI_WTIME()
+           if(actualTime - sTime >= machineTmax) istop = 1
+           call MPI_allreduce(MPI_IN_PLACE, istop, 1, MPI_INTEGER, MPI_MAX, mpi_comm_cart, ierr)
+           if(istop == 1) then
+             if(rank == root) then
+               write(*,'(A)')        '[last_iteration] Wall-clock limit reached: stopping at next safe point.'
+               write(*,'(A, F10.2)') '  Elapsed time [s] : ', actualTime - sTime
+               write(*,'(A, F10.2)') '  Limit       [s]  : ', machineTmax
+             endif
+           endif
+        endif
 
         call EndProfRange
 
         return
 end subroutine last_iteration
 
+subroutine batch_wallclock_budget(budget, ok)
+        implicit none
+        real(rp), intent(out) :: budget
+        logical , intent(out) :: ok
 
+        real(8), parameter :: margin_frac = 0.1_8
+        real(8), parameter :: margin_max  = 1800.0_8
 
+        character(64) :: buffer
+        real(8)       :: t_end, t_start, t_now, span, margin
+        integer       :: buflen, status, ios
+
+        budget = -1.0_rp
+        ok     = .false.
+
+        call get_environment_variable('SLURM_JOB_END_TIME', buffer, buflen, status)
+        if(status /= 0 .or. buflen == 0) return
+        read(buffer, *, iostat = ios) t_end
+        if(ios /= 0) return
+
+        t_now = epoch_seconds()
+        if(t_end - t_now <= 0.0_rp) return
+
+        span = t_end - t_now
+        call get_environment_variable('SLURM_JOB_START_TIME', buffer, buflen, status)
+        if(status == 0 .and. buflen > 0) then
+          read(buffer, *, iostat = ios) t_start
+          if(ios == 0 .and. t_end - t_start > 0.0_rp) span = t_end - t_start
+        endif
+
+        margin = min(margin_frac * span, margin_max)
+        budget = (t_end - t_now) - margin
+
+        if(budget <= 0.0_rp) return
+
+        ok = .true.
+
+        return
+end subroutine batch_wallclock_budget
+
+function epoch_seconds() result(secs)
+        implicit none
+        real(rp) :: secs
+
+        integer :: v(8), y, m, era, yoe, doy, doe, days
+
+        call date_and_time(values = v)
+
+        y = v(1)
+        m = v(2)
+        if(m <= 2) y = y - 1
+
+        era = (y - modulo(y, 400)) / 400
+        yoe = y - era*400
+        if(v(2) > 2) then
+          doy = (153*(v(2) - 3) + 2)/5 + v(3) - 1
+        else
+          doy = (153*(v(2) + 9) + 2)/5 + v(3) - 1
+        endif
+        doe  = yoe*365 + yoe/4 - yoe/100 + doy
+        days = era*146097 + doe - 719468
+
+        secs =   real(days, rp) * 86400.0_rp &
+             & + real(v(5), rp) * 3600.0_rp  &
+             & + real(v(6), rp) * 60.0_rp    &
+             & + real(v(7), rp)              &
+             & + real(v(8), rp) * 1.0e-3_rp  &
+             & - real(v(4), rp) * 60.0_rp
+
+        return
+end function epoch_seconds
 
 end module time_module

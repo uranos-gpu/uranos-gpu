@@ -1,0 +1,33 @@
+&input_list
+    ! ===================================================================
+    !  Generator input of the DNS mesh of the 24-deg Mach 2.91 ramp.
+    !    cd DATA/07_supersonic_compression_ramp/mesh
+    !    python3 make_ramp_mesh.py --retau-dir dns --inflow-retau 380 --view
+    !  DOMAIN below is the tuned "nice" one; edit RESOLUTION (nx,ny,nz,YPlus)
+    !  and CLUSTERING (GridTypeX, x_cluster) per case.  ReTau = mesh clustering.
+    ! ===================================================================
+    xmin = -29.0
+    xmax =  12.0
+    ymin =   0.0
+    ymax =   6.0
+    zmin =  -1.1
+    zmax =   1.1
+    nx = 2560
+    ny = 384
+    nz = 192
+    GridTypeX = 'uniform'
+    GridTypeY = 'hyperbolicSin'
+    GridTypeZ = 'uniform'
+    ReTau = 335
+    Mach  = 2.91
+    ramp_angle_deg       = 24.0
+    corner_length_bottom = 0.15
+    corner_length_top    = 0.4
+    x_corner = 0.0
+    x_top    = -1.5
+    x_cluster = 2.8
+    LyWr  = 2.5
+    YPlus = 0.5
+    NyWr  = 0
+    out_file = 'MeshXY_ramp.txt'
+&end

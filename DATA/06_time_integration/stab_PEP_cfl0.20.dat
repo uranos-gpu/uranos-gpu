@@ -1,0 +1,67 @@
+&input_list
+    xmin = -1.0
+    xmax = 1.0
+    ymin = -1.0
+    ymax = 1.0
+    zmin = 0.0
+    zmax = 0.0
+    gridpoint_x = 'uniform'
+    gridpoint_y = 'uniform'
+    gridpoint_z = 'uniform'
+    dims = 2
+    nx = 32
+    ny = 32
+    nz = 0
+    cart_dims(1) = 0
+    cart_dims(2) = 0
+    cart_dims(3) = 0
+
+    ! ---- fixed time step: this is what the sweep refines ----
+    logical_CFL = .false.
+    Dt   = 3.9729837107667859e-03
+    CFL  = 0.5
+    tmax = 1.e9
+    itmax = 5034
+    n_step = 3
+
+    bc(1) = 'periodic'
+    bc(2) = 'periodic'
+    bc(3) = 'periodic'
+    bc(4) = 'periodic'
+    bc(5) = 'periodic'
+    bc(6) = 'periodic'
+    Trat = 1.0
+
+    inflow_profile = 'none'
+    smooth_inflow  = .false.
+    turb_inflow    = .false.
+
+    Reynolds = 1000.0
+    Mach     = 0.5
+    Prandtl  = 0.71
+    viscous  = .false.
+    vis_flag = 0
+    thermally_perfect_gas = 1
+
+    scheme     = 'energy_preserving'
+    ep_type    = 'PEP'
+    sensor     = 'density'
+    fd_order   = 6
+    weno_order = 5
+    diffusion_scheme = 'laplacian'
+    LES        = .false.
+    sgs_model  = 'WALE'
+    yoshizawa  = .false.
+
+    ic = 'periodic_euler_x'
+    itout  = 5034
+    StOut  = 1000000
+    StFlg  = .false.
+    rsOut  = 1000000
+    printres = .true.
+    output_file_name = 'fld'
+    data_dir = '06_time_integration/stab_PEP_cfl0.20'
+    mpi_opt_level = 2
+    cuda_aware = .false.
+
+&end

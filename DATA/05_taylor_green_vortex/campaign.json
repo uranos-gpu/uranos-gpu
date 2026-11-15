@@ -1,0 +1,1351 @@
+{
+ "U0": 1.1832159566199232,
+ "tstar_end": 20.0,
+ "amp": 0.2,
+ "cases": [
+  {
+   "tag": "cart_CP_JP_lap_N0064",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "JP",
+   "visc": "laplacian",
+   "N": 64
+  },
+  {
+   "tag": "cart_CP_JP_stag_N0064",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "JP",
+   "visc": "staggered",
+   "N": 64
+  },
+  {
+   "tag": "cart_CP_JP_cons_N0064",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "JP",
+   "visc": "conservative",
+   "N": 64
+  },
+  {
+   "tag": "cart_CP_JP_lap_N0128",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "JP",
+   "visc": "laplacian",
+   "N": 128
+  },
+  {
+   "tag": "cart_CP_JP_stag_N0128",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "JP",
+   "visc": "staggered",
+   "N": 128
+  },
+  {
+   "tag": "cart_CP_JP_cons_N0128",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "JP",
+   "visc": "conservative",
+   "N": 128
+  },
+  {
+   "tag": "cart_CP_JP_lap_N0256",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "JP",
+   "visc": "laplacian",
+   "N": 256
+  },
+  {
+   "tag": "cart_CP_JP_stag_N0256",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "JP",
+   "visc": "staggered",
+   "N": 256
+  },
+  {
+   "tag": "cart_CP_JP_cons_N0256",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "JP",
+   "visc": "conservative",
+   "N": 256
+  },
+  {
+   "tag": "cart_CP_JP_lap_N0512",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "JP",
+   "visc": "laplacian",
+   "N": 512
+  },
+  {
+   "tag": "cart_CP_JP_stag_N0512",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "JP",
+   "visc": "staggered",
+   "N": 512
+  },
+  {
+   "tag": "cart_CP_JP_cons_N0512",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "JP",
+   "visc": "conservative",
+   "N": 512
+  },
+  {
+   "tag": "cart_CP_KEEP_lap_N0064",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "KEEP",
+   "visc": "laplacian",
+   "N": 64
+  },
+  {
+   "tag": "cart_CP_KEEP_stag_N0064",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "KEEP",
+   "visc": "staggered",
+   "N": 64
+  },
+  {
+   "tag": "cart_CP_KEEP_cons_N0064",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "KEEP",
+   "visc": "conservative",
+   "N": 64
+  },
+  {
+   "tag": "cart_CP_KEEP_lap_N0128",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "KEEP",
+   "visc": "laplacian",
+   "N": 128
+  },
+  {
+   "tag": "cart_CP_KEEP_stag_N0128",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "KEEP",
+   "visc": "staggered",
+   "N": 128
+  },
+  {
+   "tag": "cart_CP_KEEP_cons_N0128",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "KEEP",
+   "visc": "conservative",
+   "N": 128
+  },
+  {
+   "tag": "cart_CP_KEEP_lap_N0256",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "KEEP",
+   "visc": "laplacian",
+   "N": 256
+  },
+  {
+   "tag": "cart_CP_KEEP_stag_N0256",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "KEEP",
+   "visc": "staggered",
+   "N": 256
+  },
+  {
+   "tag": "cart_CP_KEEP_cons_N0256",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "KEEP",
+   "visc": "conservative",
+   "N": 256
+  },
+  {
+   "tag": "cart_CP_KEEP_lap_N0512",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "KEEP",
+   "visc": "laplacian",
+   "N": 512
+  },
+  {
+   "tag": "cart_CP_KEEP_stag_N0512",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "KEEP",
+   "visc": "staggered",
+   "N": 512
+  },
+  {
+   "tag": "cart_CP_KEEP_cons_N0512",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "KEEP",
+   "visc": "conservative",
+   "N": 512
+  },
+  {
+   "tag": "cart_CP_AEC_lap_N0064",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "AEC",
+   "visc": "laplacian",
+   "N": 64
+  },
+  {
+   "tag": "cart_CP_AEC_stag_N0064",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "AEC",
+   "visc": "staggered",
+   "N": 64
+  },
+  {
+   "tag": "cart_CP_AEC_cons_N0064",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "AEC",
+   "visc": "conservative",
+   "N": 64
+  },
+  {
+   "tag": "cart_CP_AEC_lap_N0128",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "AEC",
+   "visc": "laplacian",
+   "N": 128
+  },
+  {
+   "tag": "cart_CP_AEC_stag_N0128",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "AEC",
+   "visc": "staggered",
+   "N": 128
+  },
+  {
+   "tag": "cart_CP_AEC_cons_N0128",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "AEC",
+   "visc": "conservative",
+   "N": 128
+  },
+  {
+   "tag": "cart_CP_AEC_lap_N0256",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "AEC",
+   "visc": "laplacian",
+   "N": 256
+  },
+  {
+   "tag": "cart_CP_AEC_stag_N0256",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "AEC",
+   "visc": "staggered",
+   "N": 256
+  },
+  {
+   "tag": "cart_CP_AEC_cons_N0256",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "AEC",
+   "visc": "conservative",
+   "N": 256
+  },
+  {
+   "tag": "cart_CP_AEC_lap_N0512",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "AEC",
+   "visc": "laplacian",
+   "N": 512
+  },
+  {
+   "tag": "cart_CP_AEC_stag_N0512",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "AEC",
+   "visc": "staggered",
+   "N": 512
+  },
+  {
+   "tag": "cart_CP_AEC_cons_N0512",
+   "grid": "cart",
+   "gas": "CP",
+   "conv": "AEC",
+   "visc": "conservative",
+   "N": 512
+  },
+  {
+   "tag": "cart_TP_JP_lap_N0064",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "JP",
+   "visc": "laplacian",
+   "N": 64
+  },
+  {
+   "tag": "cart_TP_JP_stag_N0064",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "JP",
+   "visc": "staggered",
+   "N": 64
+  },
+  {
+   "tag": "cart_TP_JP_cons_N0064",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "JP",
+   "visc": "conservative",
+   "N": 64
+  },
+  {
+   "tag": "cart_TP_JP_lap_N0128",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "JP",
+   "visc": "laplacian",
+   "N": 128
+  },
+  {
+   "tag": "cart_TP_JP_stag_N0128",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "JP",
+   "visc": "staggered",
+   "N": 128
+  },
+  {
+   "tag": "cart_TP_JP_cons_N0128",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "JP",
+   "visc": "conservative",
+   "N": 128
+  },
+  {
+   "tag": "cart_TP_JP_lap_N0256",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "JP",
+   "visc": "laplacian",
+   "N": 256
+  },
+  {
+   "tag": "cart_TP_JP_stag_N0256",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "JP",
+   "visc": "staggered",
+   "N": 256
+  },
+  {
+   "tag": "cart_TP_JP_cons_N0256",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "JP",
+   "visc": "conservative",
+   "N": 256
+  },
+  {
+   "tag": "cart_TP_JP_lap_N0512",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "JP",
+   "visc": "laplacian",
+   "N": 512
+  },
+  {
+   "tag": "cart_TP_JP_stag_N0512",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "JP",
+   "visc": "staggered",
+   "N": 512
+  },
+  {
+   "tag": "cart_TP_JP_cons_N0512",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "JP",
+   "visc": "conservative",
+   "N": 512
+  },
+  {
+   "tag": "cart_TP_KEEP_lap_N0064",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "KEEP",
+   "visc": "laplacian",
+   "N": 64
+  },
+  {
+   "tag": "cart_TP_KEEP_stag_N0064",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "KEEP",
+   "visc": "staggered",
+   "N": 64
+  },
+  {
+   "tag": "cart_TP_KEEP_cons_N0064",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "KEEP",
+   "visc": "conservative",
+   "N": 64
+  },
+  {
+   "tag": "cart_TP_KEEP_lap_N0128",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "KEEP",
+   "visc": "laplacian",
+   "N": 128
+  },
+  {
+   "tag": "cart_TP_KEEP_stag_N0128",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "KEEP",
+   "visc": "staggered",
+   "N": 128
+  },
+  {
+   "tag": "cart_TP_KEEP_cons_N0128",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "KEEP",
+   "visc": "conservative",
+   "N": 128
+  },
+  {
+   "tag": "cart_TP_KEEP_lap_N0256",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "KEEP",
+   "visc": "laplacian",
+   "N": 256
+  },
+  {
+   "tag": "cart_TP_KEEP_stag_N0256",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "KEEP",
+   "visc": "staggered",
+   "N": 256
+  },
+  {
+   "tag": "cart_TP_KEEP_cons_N0256",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "KEEP",
+   "visc": "conservative",
+   "N": 256
+  },
+  {
+   "tag": "cart_TP_KEEP_lap_N0512",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "KEEP",
+   "visc": "laplacian",
+   "N": 512
+  },
+  {
+   "tag": "cart_TP_KEEP_stag_N0512",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "KEEP",
+   "visc": "staggered",
+   "N": 512
+  },
+  {
+   "tag": "cart_TP_KEEP_cons_N0512",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "KEEP",
+   "visc": "conservative",
+   "N": 512
+  },
+  {
+   "tag": "cart_TP_AEC_lap_N0064",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "AEC",
+   "visc": "laplacian",
+   "N": 64
+  },
+  {
+   "tag": "cart_TP_AEC_stag_N0064",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "AEC",
+   "visc": "staggered",
+   "N": 64
+  },
+  {
+   "tag": "cart_TP_AEC_cons_N0064",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "AEC",
+   "visc": "conservative",
+   "N": 64
+  },
+  {
+   "tag": "cart_TP_AEC_lap_N0128",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "AEC",
+   "visc": "laplacian",
+   "N": 128
+  },
+  {
+   "tag": "cart_TP_AEC_stag_N0128",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "AEC",
+   "visc": "staggered",
+   "N": 128
+  },
+  {
+   "tag": "cart_TP_AEC_cons_N0128",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "AEC",
+   "visc": "conservative",
+   "N": 128
+  },
+  {
+   "tag": "cart_TP_AEC_lap_N0256",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "AEC",
+   "visc": "laplacian",
+   "N": 256
+  },
+  {
+   "tag": "cart_TP_AEC_stag_N0256",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "AEC",
+   "visc": "staggered",
+   "N": 256
+  },
+  {
+   "tag": "cart_TP_AEC_cons_N0256",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "AEC",
+   "visc": "conservative",
+   "N": 256
+  },
+  {
+   "tag": "cart_TP_AEC_lap_N0512",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "AEC",
+   "visc": "laplacian",
+   "N": 512
+  },
+  {
+   "tag": "cart_TP_AEC_stag_N0512",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "AEC",
+   "visc": "staggered",
+   "N": 512
+  },
+  {
+   "tag": "cart_TP_AEC_cons_N0512",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "AEC",
+   "visc": "conservative",
+   "N": 512
+  },
+  {
+   "tag": "cart_TP_PEP_lap_N0064",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "PEP",
+   "visc": "laplacian",
+   "N": 64
+  },
+  {
+   "tag": "cart_TP_PEP_stag_N0064",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "PEP",
+   "visc": "staggered",
+   "N": 64
+  },
+  {
+   "tag": "cart_TP_PEP_cons_N0064",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "PEP",
+   "visc": "conservative",
+   "N": 64
+  },
+  {
+   "tag": "cart_TP_PEP_lap_N0128",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "PEP",
+   "visc": "laplacian",
+   "N": 128
+  },
+  {
+   "tag": "cart_TP_PEP_stag_N0128",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "PEP",
+   "visc": "staggered",
+   "N": 128
+  },
+  {
+   "tag": "cart_TP_PEP_cons_N0128",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "PEP",
+   "visc": "conservative",
+   "N": 128
+  },
+  {
+   "tag": "cart_TP_PEP_lap_N0256",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "PEP",
+   "visc": "laplacian",
+   "N": 256
+  },
+  {
+   "tag": "cart_TP_PEP_stag_N0256",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "PEP",
+   "visc": "staggered",
+   "N": 256
+  },
+  {
+   "tag": "cart_TP_PEP_cons_N0256",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "PEP",
+   "visc": "conservative",
+   "N": 256
+  },
+  {
+   "tag": "cart_TP_PEP_lap_N0512",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "PEP",
+   "visc": "laplacian",
+   "N": 512
+  },
+  {
+   "tag": "cart_TP_PEP_stag_N0512",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "PEP",
+   "visc": "staggered",
+   "N": 512
+  },
+  {
+   "tag": "cart_TP_PEP_cons_N0512",
+   "grid": "cart",
+   "gas": "TP",
+   "conv": "PEP",
+   "visc": "conservative",
+   "N": 512
+  },
+  {
+   "tag": "wavy_CP_JP_lap_N0064",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "JP",
+   "visc": "laplacian",
+   "N": 64
+  },
+  {
+   "tag": "wavy_CP_JP_stag_N0064",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "JP",
+   "visc": "staggered",
+   "N": 64
+  },
+  {
+   "tag": "wavy_CP_JP_cons_N0064",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "JP",
+   "visc": "conservative",
+   "N": 64
+  },
+  {
+   "tag": "wavy_CP_JP_lap_N0128",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "JP",
+   "visc": "laplacian",
+   "N": 128
+  },
+  {
+   "tag": "wavy_CP_JP_stag_N0128",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "JP",
+   "visc": "staggered",
+   "N": 128
+  },
+  {
+   "tag": "wavy_CP_JP_cons_N0128",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "JP",
+   "visc": "conservative",
+   "N": 128
+  },
+  {
+   "tag": "wavy_CP_JP_lap_N0256",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "JP",
+   "visc": "laplacian",
+   "N": 256
+  },
+  {
+   "tag": "wavy_CP_JP_stag_N0256",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "JP",
+   "visc": "staggered",
+   "N": 256
+  },
+  {
+   "tag": "wavy_CP_JP_cons_N0256",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "JP",
+   "visc": "conservative",
+   "N": 256
+  },
+  {
+   "tag": "wavy_CP_JP_lap_N0512",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "JP",
+   "visc": "laplacian",
+   "N": 512
+  },
+  {
+   "tag": "wavy_CP_JP_stag_N0512",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "JP",
+   "visc": "staggered",
+   "N": 512
+  },
+  {
+   "tag": "wavy_CP_JP_cons_N0512",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "JP",
+   "visc": "conservative",
+   "N": 512
+  },
+  {
+   "tag": "wavy_CP_KEEP_lap_N0064",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "KEEP",
+   "visc": "laplacian",
+   "N": 64
+  },
+  {
+   "tag": "wavy_CP_KEEP_stag_N0064",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "KEEP",
+   "visc": "staggered",
+   "N": 64
+  },
+  {
+   "tag": "wavy_CP_KEEP_cons_N0064",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "KEEP",
+   "visc": "conservative",
+   "N": 64
+  },
+  {
+   "tag": "wavy_CP_KEEP_lap_N0128",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "KEEP",
+   "visc": "laplacian",
+   "N": 128
+  },
+  {
+   "tag": "wavy_CP_KEEP_stag_N0128",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "KEEP",
+   "visc": "staggered",
+   "N": 128
+  },
+  {
+   "tag": "wavy_CP_KEEP_cons_N0128",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "KEEP",
+   "visc": "conservative",
+   "N": 128
+  },
+  {
+   "tag": "wavy_CP_KEEP_lap_N0256",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "KEEP",
+   "visc": "laplacian",
+   "N": 256
+  },
+  {
+   "tag": "wavy_CP_KEEP_stag_N0256",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "KEEP",
+   "visc": "staggered",
+   "N": 256
+  },
+  {
+   "tag": "wavy_CP_KEEP_cons_N0256",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "KEEP",
+   "visc": "conservative",
+   "N": 256
+  },
+  {
+   "tag": "wavy_CP_KEEP_lap_N0512",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "KEEP",
+   "visc": "laplacian",
+   "N": 512
+  },
+  {
+   "tag": "wavy_CP_KEEP_stag_N0512",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "KEEP",
+   "visc": "staggered",
+   "N": 512
+  },
+  {
+   "tag": "wavy_CP_KEEP_cons_N0512",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "KEEP",
+   "visc": "conservative",
+   "N": 512
+  },
+  {
+   "tag": "wavy_CP_AEC_lap_N0064",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "AEC",
+   "visc": "laplacian",
+   "N": 64
+  },
+  {
+   "tag": "wavy_CP_AEC_stag_N0064",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "AEC",
+   "visc": "staggered",
+   "N": 64
+  },
+  {
+   "tag": "wavy_CP_AEC_cons_N0064",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "AEC",
+   "visc": "conservative",
+   "N": 64
+  },
+  {
+   "tag": "wavy_CP_AEC_lap_N0128",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "AEC",
+   "visc": "laplacian",
+   "N": 128
+  },
+  {
+   "tag": "wavy_CP_AEC_stag_N0128",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "AEC",
+   "visc": "staggered",
+   "N": 128
+  },
+  {
+   "tag": "wavy_CP_AEC_cons_N0128",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "AEC",
+   "visc": "conservative",
+   "N": 128
+  },
+  {
+   "tag": "wavy_CP_AEC_lap_N0256",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "AEC",
+   "visc": "laplacian",
+   "N": 256
+  },
+  {
+   "tag": "wavy_CP_AEC_stag_N0256",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "AEC",
+   "visc": "staggered",
+   "N": 256
+  },
+  {
+   "tag": "wavy_CP_AEC_cons_N0256",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "AEC",
+   "visc": "conservative",
+   "N": 256
+  },
+  {
+   "tag": "wavy_CP_AEC_lap_N0512",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "AEC",
+   "visc": "laplacian",
+   "N": 512
+  },
+  {
+   "tag": "wavy_CP_AEC_stag_N0512",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "AEC",
+   "visc": "staggered",
+   "N": 512
+  },
+  {
+   "tag": "wavy_CP_AEC_cons_N0512",
+   "grid": "wavy",
+   "gas": "CP",
+   "conv": "AEC",
+   "visc": "conservative",
+   "N": 512
+  },
+  {
+   "tag": "wavy_TP_JP_lap_N0064",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "JP",
+   "visc": "laplacian",
+   "N": 64
+  },
+  {
+   "tag": "wavy_TP_JP_stag_N0064",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "JP",
+   "visc": "staggered",
+   "N": 64
+  },
+  {
+   "tag": "wavy_TP_JP_cons_N0064",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "JP",
+   "visc": "conservative",
+   "N": 64
+  },
+  {
+   "tag": "wavy_TP_JP_lap_N0128",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "JP",
+   "visc": "laplacian",
+   "N": 128
+  },
+  {
+   "tag": "wavy_TP_JP_stag_N0128",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "JP",
+   "visc": "staggered",
+   "N": 128
+  },
+  {
+   "tag": "wavy_TP_JP_cons_N0128",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "JP",
+   "visc": "conservative",
+   "N": 128
+  },
+  {
+   "tag": "wavy_TP_JP_lap_N0256",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "JP",
+   "visc": "laplacian",
+   "N": 256
+  },
+  {
+   "tag": "wavy_TP_JP_stag_N0256",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "JP",
+   "visc": "staggered",
+   "N": 256
+  },
+  {
+   "tag": "wavy_TP_JP_cons_N0256",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "JP",
+   "visc": "conservative",
+   "N": 256
+  },
+  {
+   "tag": "wavy_TP_JP_lap_N0512",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "JP",
+   "visc": "laplacian",
+   "N": 512
+  },
+  {
+   "tag": "wavy_TP_JP_stag_N0512",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "JP",
+   "visc": "staggered",
+   "N": 512
+  },
+  {
+   "tag": "wavy_TP_JP_cons_N0512",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "JP",
+   "visc": "conservative",
+   "N": 512
+  },
+  {
+   "tag": "wavy_TP_KEEP_lap_N0064",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "KEEP",
+   "visc": "laplacian",
+   "N": 64
+  },
+  {
+   "tag": "wavy_TP_KEEP_stag_N0064",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "KEEP",
+   "visc": "staggered",
+   "N": 64
+  },
+  {
+   "tag": "wavy_TP_KEEP_cons_N0064",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "KEEP",
+   "visc": "conservative",
+   "N": 64
+  },
+  {
+   "tag": "wavy_TP_KEEP_lap_N0128",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "KEEP",
+   "visc": "laplacian",
+   "N": 128
+  },
+  {
+   "tag": "wavy_TP_KEEP_stag_N0128",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "KEEP",
+   "visc": "staggered",
+   "N": 128
+  },
+  {
+   "tag": "wavy_TP_KEEP_cons_N0128",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "KEEP",
+   "visc": "conservative",
+   "N": 128
+  },
+  {
+   "tag": "wavy_TP_KEEP_lap_N0256",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "KEEP",
+   "visc": "laplacian",
+   "N": 256
+  },
+  {
+   "tag": "wavy_TP_KEEP_stag_N0256",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "KEEP",
+   "visc": "staggered",
+   "N": 256
+  },
+  {
+   "tag": "wavy_TP_KEEP_cons_N0256",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "KEEP",
+   "visc": "conservative",
+   "N": 256
+  },
+  {
+   "tag": "wavy_TP_KEEP_lap_N0512",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "KEEP",
+   "visc": "laplacian",
+   "N": 512
+  },
+  {
+   "tag": "wavy_TP_KEEP_stag_N0512",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "KEEP",
+   "visc": "staggered",
+   "N": 512
+  },
+  {
+   "tag": "wavy_TP_KEEP_cons_N0512",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "KEEP",
+   "visc": "conservative",
+   "N": 512
+  },
+  {
+   "tag": "wavy_TP_AEC_lap_N0064",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "AEC",
+   "visc": "laplacian",
+   "N": 64
+  },
+  {
+   "tag": "wavy_TP_AEC_stag_N0064",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "AEC",
+   "visc": "staggered",
+   "N": 64
+  },
+  {
+   "tag": "wavy_TP_AEC_cons_N0064",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "AEC",
+   "visc": "conservative",
+   "N": 64
+  },
+  {
+   "tag": "wavy_TP_AEC_lap_N0128",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "AEC",
+   "visc": "laplacian",
+   "N": 128
+  },
+  {
+   "tag": "wavy_TP_AEC_stag_N0128",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "AEC",
+   "visc": "staggered",
+   "N": 128
+  },
+  {
+   "tag": "wavy_TP_AEC_cons_N0128",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "AEC",
+   "visc": "conservative",
+   "N": 128
+  },
+  {
+   "tag": "wavy_TP_AEC_lap_N0256",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "AEC",
+   "visc": "laplacian",
+   "N": 256
+  },
+  {
+   "tag": "wavy_TP_AEC_stag_N0256",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "AEC",
+   "visc": "staggered",
+   "N": 256
+  },
+  {
+   "tag": "wavy_TP_AEC_cons_N0256",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "AEC",
+   "visc": "conservative",
+   "N": 256
+  },
+  {
+   "tag": "wavy_TP_AEC_lap_N0512",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "AEC",
+   "visc": "laplacian",
+   "N": 512
+  },
+  {
+   "tag": "wavy_TP_AEC_stag_N0512",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "AEC",
+   "visc": "staggered",
+   "N": 512
+  },
+  {
+   "tag": "wavy_TP_AEC_cons_N0512",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "AEC",
+   "visc": "conservative",
+   "N": 512
+  },
+  {
+   "tag": "wavy_TP_PEP_lap_N0064",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "PEP",
+   "visc": "laplacian",
+   "N": 64
+  },
+  {
+   "tag": "wavy_TP_PEP_stag_N0064",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "PEP",
+   "visc": "staggered",
+   "N": 64
+  },
+  {
+   "tag": "wavy_TP_PEP_cons_N0064",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "PEP",
+   "visc": "conservative",
+   "N": 64
+  },
+  {
+   "tag": "wavy_TP_PEP_lap_N0128",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "PEP",
+   "visc": "laplacian",
+   "N": 128
+  },
+  {
+   "tag": "wavy_TP_PEP_stag_N0128",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "PEP",
+   "visc": "staggered",
+   "N": 128
+  },
+  {
+   "tag": "wavy_TP_PEP_cons_N0128",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "PEP",
+   "visc": "conservative",
+   "N": 128
+  },
+  {
+   "tag": "wavy_TP_PEP_lap_N0256",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "PEP",
+   "visc": "laplacian",
+   "N": 256
+  },
+  {
+   "tag": "wavy_TP_PEP_stag_N0256",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "PEP",
+   "visc": "staggered",
+   "N": 256
+  },
+  {
+   "tag": "wavy_TP_PEP_cons_N0256",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "PEP",
+   "visc": "conservative",
+   "N": 256
+  },
+  {
+   "tag": "wavy_TP_PEP_lap_N0512",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "PEP",
+   "visc": "laplacian",
+   "N": 512
+  },
+  {
+   "tag": "wavy_TP_PEP_stag_N0512",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "PEP",
+   "visc": "staggered",
+   "N": 512
+  },
+  {
+   "tag": "wavy_TP_PEP_cons_N0512",
+   "grid": "wavy",
+   "gas": "TP",
+   "conv": "PEP",
+   "visc": "conservative",
+   "N": 512
+  }
+ ]
+}

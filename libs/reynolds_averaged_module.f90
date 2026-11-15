@@ -20,7 +20,6 @@ subroutine reynolds_averaged_0D(v,time,time_restart,dt,Rey_av_v)
         real(rp), intent(in)    :: time_restart
         real(rp), intent(in)    :: dt
         real(rp), intent(inout) :: Rey_av_v
-        
 
         if(abs(time - time_restart) < toll) then
           Rey_av_v = v
@@ -32,8 +31,5 @@ subroutine reynolds_averaged_0D(v,time,time_restart,dt,Rey_av_v)
 
         return
 end subroutine reynolds_averaged_0D
-
-
-
 
 end module reynolds_averaged_module

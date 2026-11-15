@@ -1,5 +1,4 @@
-
-#if defined (NVTX) 
+#if defined (NVTX)
 
 #if  !(defined(__PGIF90__) && (__PGIF90__ >= 22) )
 module nvtx
@@ -12,25 +11,23 @@ character,private,target :: tempName(256)
 
 type, bind(C):: nvtxEventAttributes
   integer(C_INT16_T):: version=1
-  integer(C_INT16_T):: size=48 !
+  integer(C_INT16_T):: size=48
   integer(C_INT):: category=0
-  integer(C_INT):: colorType=1 ! NVTX_COLOR_ARGB = 1
+  integer(C_INT):: colorType=1
   integer(C_INT):: color
-  integer(C_INT):: payloadType=0 ! NVTX_PAYLOAD_UNKNOWN = 0
+  integer(C_INT):: payloadType=0
   integer(C_INT):: reserved0
-  integer(C_INT64_T):: payload   ! union uint,int,double
-  integer(C_INT):: messageType=1  ! NVTX_MESSAGE_TYPE_ASCII     = 1 
-  type(C_PTR):: message  ! ascii char
+  integer(C_INT64_T):: payload
+  integer(C_INT):: messageType=1
+  type(C_PTR):: message
 end type
 
 interface nvtxRangePush
-  ! push range with custom label and standard color
   subroutine nvtxRangePushA(name) bind(C, name='nvtxRangePushA')
   use iso_c_binding
   character(kind=C_CHAR) :: name(256)
   end subroutine
 
-  ! push range with custom label and custom color
   subroutine nvtxRangePushEx(event) bind(C, name='nvtxRangePushEx')
   use iso_c_binding
   import:: nvtxEventAttributes
@@ -54,11 +51,9 @@ subroutine nvtxStartRange(name,id)
 
   trimmed_name=trim(name)//c_null_char
 
-  ! move scalar trimmed_name into character array tempName
   do i=1,LEN(trim(name)) + 1
      tempName(i) = trimmed_name(i:i)
   enddo
-
 
   if ( .not. present(id)) then
     call nvtxRangePush(tempName)
@@ -80,6 +75,4 @@ end module nvtx
 module nvtx
 end module nvtx
 
-
 #endif
-

@@ -2,9 +2,9 @@ module m_npy
    implicit none
 
    integer(4), parameter               :: p_un = 23
-   character, parameter                :: magic_num = achar(147) ! x93
-   character, parameter                :: major = achar(2)   !major *.npy version
-   character, parameter                :: minor = achar(0)   !minor *.npy version
+   character, parameter                :: magic_num = achar(147)
+   character, parameter                :: major = achar(2)
+   character, parameter                :: minor = achar(0)
    character(len=*), parameter         :: zip_flag = "-q0"
    character(len=*), parameter         :: magic_str = "NUMPY"
 
@@ -56,7 +56,6 @@ contains
       npy_name = var_name//".npy"
 
       call save_npy(npy_name, vec)
-      ! just store and be quite while zipping
       call run_sys("zip "//zip_flag//" "//zipfile &
                    //" "//npy_name, succ)
       if (succ /= 0) then
@@ -79,7 +78,6 @@ contains
       npy_name = var_name//".npy"
 
       call save_npy(npy_name, mtx)
-      ! just store and be quite while zipping
       call run_sys("zip "//zip_flag//" "//zipfile &
                    //" "//npy_name, succ)
       if (succ /= 0) then
@@ -102,7 +100,6 @@ contains
       npy_name = var_name//".npy"
 
       call save_npy(npy_name, vec)
-      ! just store and be quite while zipping
       call run_sys("zip "//zip_flag//" "//zipfile &
                    //" "//npy_name, succ)
       if (succ /= 0) then
@@ -125,7 +122,6 @@ contains
       npy_name = var_name//".npy"
 
       call save_npy(npy_name, mtx)
-      ! just store and be quite while zipping
       call run_sys("zip "//zip_flag//" "//zipfile &
                    //" "//npy_name, succ)
       if (succ /= 0) then
@@ -148,7 +144,6 @@ contains
       npy_name = var_name//".npy"
 
       call save_npy(npy_name, vec)
-      ! just store and be quite while zipping
       call run_sys("zip "//zip_flag//" "//zipfile &
                    //" "//npy_name, succ)
       if (succ /= 0) then
@@ -171,7 +166,6 @@ contains
       npy_name = var_name//".npy"
 
       call save_npy(npy_name, mtx)
-      ! just store and be quite while zipping
       call run_sys("zip "//zip_flag//" "//zipfile &
                    //" "//npy_name, succ)
       if (succ /= 0) then
@@ -194,7 +188,6 @@ contains
       npy_name = var_name//".npy"
 
       call save_npy(npy_name, vec)
-      ! just store and be quite while zipping
       call run_sys("zip "//zip_flag//" "//zipfile &
                    //" "//npy_name, succ)
       if (succ /= 0) then
@@ -217,7 +210,6 @@ contains
       npy_name = var_name//".npy"
 
       call save_npy(npy_name, mtx)
-      ! just store and be quite while zipping
       call run_sys("zip "//zip_flag//" "//zipfile &
                    //" "//npy_name, succ)
       if (succ /= 0) then
@@ -240,7 +232,6 @@ contains
       npy_name = var_name//".npy"
 
       call save_npy(npy_name, vec)
-      ! just store and be quite while zipping
       call run_sys("zip "//zip_flag//" "//zipfile &
                    //" "//npy_name, succ)
       if (succ /= 0) then
@@ -263,7 +254,6 @@ contains
       npy_name = var_name//".npy"
 
       call save_npy(npy_name, mtx)
-      ! just store and be quite while zipping
       call run_sys("zip "//zip_flag//" "//zipfile &
                    //" "//npy_name, succ)
       if (succ /= 0) then
@@ -286,7 +276,6 @@ contains
       npy_name = var_name//".npy"
 
       call save_npy(npy_name, vec)
-      ! just store and be quite while zipping
       call run_sys("zip "//zip_flag//" "//zipfile &
                    //" "//npy_name, succ)
       if (succ /= 0) then
@@ -309,7 +298,6 @@ contains
       npy_name = var_name//".npy"
 
       call save_npy(npy_name, mtx)
-      ! just store and be quite while zipping
       call run_sys("zip "//zip_flag//" "//zipfile &
                    //" "//npy_name, succ)
       if (succ /= 0) then
@@ -332,7 +320,6 @@ contains
       npy_name = var_name//".npy"
 
       call save_npy(npy_name, vec)
-      ! just store and be quite while zipping
       call run_sys("zip "//zip_flag//" "//zipfile &
                    //" "//npy_name, succ)
       if (succ /= 0) then
@@ -355,7 +342,6 @@ contains
       npy_name = var_name//".npy"
 
       call save_npy(npy_name, mtx)
-      ! just store and be quite while zipping
       call run_sys("zip "//zip_flag//" "//zipfile &
                    //" "//npy_name, succ)
       if (succ /= 0) then
@@ -378,7 +364,6 @@ contains
       npy_name = var_name//".npy"
 
       call save_npy(npy_name, vec)
-      ! just store and be quite while zipping
       call run_sys("zip "//zip_flag//" "//zipfile &
                    //" "//npy_name, succ)
       if (succ /= 0) then
@@ -401,7 +386,6 @@ contains
       npy_name = var_name//".npy"
 
       call save_npy(npy_name, mtx)
-      ! just store and be quite while zipping
       call run_sys("zip "//zip_flag//" "//zipfile &
                    //" "//npy_name, succ)
       if (succ /= 0) then

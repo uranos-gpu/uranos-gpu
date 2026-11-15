@@ -1,62 +1,49 @@
-reated by https://www.gitignore.io/api/fortran
-### Folder ###
-DATA
-DATA/
-DATA_IcraCUranos3D
-DATA_IcraCUranos3D/
-DATA2_RAID
-DATA2_RAID/
-grids/
-DATABIN/
-utils/fft1D/res*
-utils/interpolator_res/
-log_files
-run
-mods/
-objs/
-*.dSYM/
-tests/log_files
-*.pdf
-*.optrpt
-
-### Fortran ###
-# Prerequisites
-*.d
-
-# Compiled Object files
-*.slo
-*.lo
+# --- build artifacts ---------------------------------------------------------
+.objs/
+.mods/
 *.o
-*.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-
-# Fortran module files
 *.mod
 *.smod
-
-# Compiled Static libraries
-*.lai
-*.la
 *.a
-*.lib
-
-# Executables
+*.so
+*.dylib
 *.exe
-*.out
-*.app
-*.eps
-#files
-*.swp
-*.bin
-#*.dat
+*.dSYM/
+*.optrpt
+__pycache__/
+*.pyc
+
+# --- DATA/: the paper cases are versioned, their outputs are not -------------
+# Each DATA/<case>/ ships decks, meshes and scripts; every run writes its
+# output in a subfolder (DATA/<case>/<run>/, runs/, out/, logs/, results/),
+# which stays untracked.
+DATA/**
+!DATA/README.md
+!DATA/*/
+!DATA/*/*.dat
+!DATA/*/*.py
+!DATA/*/*.txt
+!DATA/*/*.json
+!DATA/*/*.md
+!DATA/*/decks/
+!DATA/*/decks/**
+!DATA/*/grids/
+!DATA/*/grids/**
+!DATA/*/reference/
+!DATA/*/reference/**
+!DATA/*/mesh/
+!DATA/*/mesh/*.py
+!DATA/*/mesh/*.f90
+!DATA/*/mesh/*/
+!DATA/*/mesh/*/*.dat
+!DATA/*/mesh/*/*.txt
+
+# --- misc --------------------------------------------------------------------
 .DS_Store
-input.dat
-# End of https://www.gitignore.io/api/fortran
+*.swp
+*.ncu-rep
+*.nsys-rep
+*.sqlite
+
+CLAUDE.md
+.claude/

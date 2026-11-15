@@ -3,195 +3,410 @@ use parameters_module
 use mpi_module
 use mesh_module
 use storage_module
+use inflow_module
+use profiling_module
+use thermodynamics_module, only:enthalpy_t, gamma_Tref
+use euler_matrices_module, only: euler_system_n
 implicit none
 
 private
-public refl_wall
+public set_nscbc_boundary_conditions
 
 contains
-
-subroutine refl_wall(phi,bnode,bnorm,bface,Twall)
+subroutine set_nscbc_boundary_conditions(RHS)
         implicit none
-        real(rp), dimension(:,:,:,:), allocatable, intent(inout) :: phi
-        integer                                  , intent(in)    :: bnode
-        integer                                  , intent(in)    :: bnorm
-        character(1)                             , intent(in)    :: bface
-        real(rp)                                 , intent(in)    :: Twall
+        real(rp), allocatable, dimension(:,:,:,:), intent(inout) :: RHS
 
-        real(rp) :: rho, uu, vv, ww, tt, h, qq, cc, c, ci
-        real(rp) :: b1, b2, b3
-        real(rp) :: p_rho, p_e, etot, df
-        real(rp) :: ttW,uuW,vvW,wwW,rrW,rEW,yW,y1,y2,idy
-        integer  :: i,j,k,j0,j1,j2,m,mm
-        real(rp), dimension(5) :: dw_dn, dwc_dn, ev
-        real(rp), dimension(5,5) :: el, er
-        integer  :: node, norm
+        integer, dimension(6)      :: bound_nodes
+        integer, dimension(6)      :: bound_norms
+        character(1), dimension(6) :: bound_faces
+        integer                    :: bnode, bnorm, f
+        character(1)               :: bface
 
-        node = bnode
-        norm = bnorm
-        j0 = bnode + bnorm
-        j1 = bnode
-        j2 = bnode - bnorm
+        call StartProfRange("set_nscbc_boundary_conditions")
 
-        ttW = TWall
-        uuW = 0.0_rp
-        vvW = 0.0_rp
-        wwW = 0.0_rp
-        yW = 0.5_rp*(y(j1) + y(j0))
-        y1 = abs(y(j1)-yW)
-        y2 = abs(y(j2)-yW)
-        !idy = 1._rp/(abs(y(j1) - y(j0)))
-        idy = 1._rp/(1.5_rp*0._rp+2._rp*y1-0.5_rp*y2)
+        bound_nodes = (/ sx , ex , sy , ey , sz ,  ez/)
+        bound_norms = (/ -1 ,  1 , -1 ,  1 , -1 ,  1 /)
+        bound_faces = (/ 'W', 'E', 'S', 'N', 'B', 'F'/)
 
-        selectcase(bface)
-        case('S','N')
+        do f = 1,6
+           if(my_neighbour(f) == MPI_PROC_NULL) then
 
-        !$acc parallel default(present)
-        !$acc loop gang, vector collapse(2) private(dw_dn,dwc_dn,ev,el,er)
-        do        k = sz,ez
-           do     i = sx,ex
+             bface = bound_faces(f)
+             bnode = bound_nodes(f)
+             bnorm = bound_norms(f)
 
+             select case(bc(f))
 
-               rrW = 0.5_rp*(phi(i,j0,k,1)+phi(i,j1,k,1))
-               rEW = rrW*ttW/(gamma0-1._rp)
-        
-               ! wall derivative of conservative variables
-               !dw_dn(1) = phi(i,j1,k,1)-phi(i,j0,k,1) 
-               !dw_dn(2) = phi(i,j1,k,2)-phi(i,j0,k,2) 
-               !dw_dn(3) = phi(i,j1,k,3)-phi(i,j0,k,3) 
-               !dw_dn(4) = phi(i,j1,k,4)-phi(i,j0,k,4) 
-               !dw_dn(5) = phi(i,j1,k,5)-phi(i,j0,k,5) 
+               case('nscbc_inflow_generalized')
+                 call nscbc_inflow_generalized(RHS,bface,bnode,bnorm)
 
-               dw_dn(1) = -1.5_rp*rrW+2._rp*phi(i,j1,k,1)-0.5_rp*phi(i,j2,k,1)
-               dw_dn(2) = -1.5_rp*uuW+2._rp*phi(i,j1,k,2)-0.5_rp*phi(i,j2,k,2)
-               dw_dn(3) = -1.5_rp*vvW+2._rp*phi(i,j1,k,3)-0.5_rp*phi(i,j2,k,3)
-               dw_dn(4) = -1.5_rp*wwW+2._rp*phi(i,j1,k,4)-0.5_rp*phi(i,j2,k,4)
-               dw_dn(5) = -1.5_rp*rEW+2._rp*phi(i,j1,k,5)-0.5_rp*phi(i,j2,k,5)
+               case('nscbc_outflow')
+                 call nscbc_outflow(RHS,bface,bnode,bnorm)
 
-               !Compute eigenvectors
-               rho = rrW
-               uu  = uuW
-               vv  = vvW
-               ww  = wwW
-               tt  = ttw
-               h   = cp*tt
-               qq  = 0.5_rp*(uu*uu  +vv*vv + ww*ww)
-               cc  = gamma0*tt
-               c   = sqrt(cc)
-               ci  =  1._rp/c
-               p_rho     = tt 
-               p_e = rho*(gamma0-1._rp)
-               etot = h - tt
-               
-               b3 = etot - rho*p_rho/p_e
-               b2 = p_e/(rho*cc)
-               b1 = p_rho/cc - b2*(etot - 2._rp*qq)
-               
-               el(1,1) =   0.5_rp * (b1     + vv * ci)
-               el(2,1) =  -0.5_rp * (b2 * uu         )
-               el(3,1) =  -0.5_rp * (b2 * vv +     ci)
-               el(4,1) =  -0.5_rp * (b2 * ww         )
-               el(5,1) =   0.5_rp * b2
-               el(1,2) =   1._rp - b1
-               el(2,2) =   b2 * uu
-               el(3,2) =   b2 * vv
-               el(4,2) =   b2 * ww
-               el(5,2) =  -b2
-               el(1,3) =   0.5_rp * (b1     - vv * ci)
-               el(2,3) =  -0.5_rp * (b2 * uu         )
-               el(3,3) =  -0.5_rp * (b2 * vv -     ci)
-               el(4,3) =  -0.5_rp * (b2 * ww         )
-               el(5,3) =   0.5_rp * b2
-               el(1,4) =  -ww 
-               el(2,4) =   0._rp 
-               el(3,4) =   0._rp
-               el(4,4) =   1._rp 
-               el(5,4) =   0._rp
-               el(1,5) =   uu 
-               el(2,5) =  -1._rp 
-               el(3,5) =   0._rp
-               el(4,5) =   0._rp 
-               el(5,5) =   0._rp
+             end select
 
-               er(1,1) =  1._rp
-               er(2,1) =  1._rp
-               er(3,1) =  1._rp
-               er(4,1) =  0._rp
-               er(5,1) =  0._rp
-               er(1,2) =  uu
-               er(2,2) =  uu
-               er(3,2) =  uu
-               er(4,2) =  0._rp 
-               er(5,2) = -1._rp 
-               er(1,3) =  vv - c
-               er(2,3) =  vv
-               er(3,3) =  vv + c
-               er(4,3) =  0._rp
-               er(5,3) =  0._rp
-               er(1,4) =  ww
-               er(2,4) =  ww
-               er(3,4) =  ww
-               er(4,4) =  1._rp  
-               er(5,4) =  0._rp 
-               er(1,5) =  h  - vv * c
-               er(2,5) =  b3 
-               er(3,5) =  h  + vv * c
-               er(4,5) =  ww     
-               er(5,5) =  -uu    
-
-               !$acc loop seq
-               do m=1,5
-                dwc_dn(m) = 0._rp
-                !$acc loop seq
-                 do mm=1,5 
-                  dwc_dn(m) = dwc_dn(m) + el(mm,m) * dw_dn(mm)
-                 enddo
-               enddo
-
-               ! Compute eigenvalues
-               ev(1) = vv-c
-               ev(2) = vv
-               ev(3) = vv+c
-               ev(4) = ev(2)
-               ev(5) = ev(2)
-
-               !$acc loop seq
-               do m=1,5
-                dwc_dn(m) = ev(m) * dwc_dn(m)
-               enddo
-
-               dwc_dn(2) = 0._rp
-               if(bface.eq.'S') then
-                 dwc_dn(3) = dwc_dn(1)
-               elseif(bface.eq.'N') then
-                 dwc_dn(1) = dwc_dn(3)
-               endif
-               dwc_dn(4) = 0._rp
-               dwc_dn(5) = 0._rp
-
-               !$acc loop seq
-               do m=1,5
-                df = 0._rp
-                !$acc loop seq
-                do mm=1,5
-                 df = df + er(mm,m) * dwc_dn(mm)
-                enddo
-                RHS(i,j1,k,m) = RHS(i,j1,k,m) - bnorm * df*idy !- RHS(i,j0,k,1) 
-               enddo
-
-           enddo
+           endif
         enddo
-        !$acc end parallel
-        
-        case default 
-          print*, 'refl_wall is not implemented for face ', trim(bface)
+
+        call EndProfRange
+
+        return
+end subroutine set_nscbc_boundary_conditions
+
+subroutine nscbc_outflow(RHS,bface,bnode,bnorm)
+
+        implicit none
+        real(rp), dimension(:,:,:,:), allocatable, intent(inout) :: RHS
+        character(1)                             , intent(in)    :: bface
+        integer                                  , intent(in)    :: bnode, bnorm
+
+        real(rp), dimension(5,5) :: Rmatrix, Lmatrix
+        real(rp), dimension(5) :: uxi, uxi_char, lambda_i
+
+        real(rp) :: idx, idy, FU
+        real(rp) :: r_, ir, u_, v_, w_, ek, p_, T_, c, cc, g_, h_
+        real(rp) :: nx_, ny_, un
+        real(rp) :: ddye, ddxe, ddyx, ddxx, jc, ru, rv, rEp
+        integer  :: i,j,k, mm, kk, jj, b1, b2
+
+        call StartProfRange("nscbc_outflow")
+
+        select case(bface)
+          case('E','W')
+
+          !$acc parallel default(present)
+          !$acc loop gang, vector collapse(2) private(Rmatrix,Lmatrix,uxi,uxi_char,lambda_i)
+          do k    = sz,ez
+             do j = sy,ey
+
+                b1 = bnode - bnorm
+                b2 = bnode - 2*bnorm
+
+                r_ = phi(bnode,j,k,1)
+                ir = 1.0_rp/r_
+                u_ = U(bnode,j,k)
+                v_ = V(bnode,j,k)
+                w_ = W(bnode,j,k)
+                p_ = P(bnode,j,k)
+                g_ = GAMMA_T(bnode,j,k)
+
+                ek = 0.5_rp*(u_*u_ + v_*v_ + w_*w_)
+                h_ = ENTHALPY(bnode,j,k) + ek
+                T_ = p_*ir
+                c  = sqrt(g_ * T_)
+                cc = c*c
+
+                nx_ = nx_xi(bnode,j)
+                ny_ = ny_xi(bnode,j)
+                idx = m_xi (bnode,j)
+                un  = nx_*u_ + ny_*v_
+
+                call euler_system_n(nx_, ny_, u_, v_, w_, T_, g_, h_, Rmatrix, Lmatrix)
+                uxi(1) =   bnorm * (0.5_rp*phi(b2,j,k,1)-2.0_rp*phi(b1,j,k,1)+1.5_rp*phi(bnode,j,k,1))*idx
+                uxi(2) =   bnorm * (0.5_rp*phi(b2,j,k,2)-2.0_rp*phi(b1,j,k,2)+1.5_rp*phi(bnode,j,k,2))*idx
+                uxi(3) =   bnorm * (0.5_rp*phi(b2,j,k,3)-2.0_rp*phi(b1,j,k,3)+1.5_rp*phi(bnode,j,k,3))*idx
+                uxi(4) =   bnorm * (0.5_rp*phi(b2,j,k,4)-2.0_rp*phi(b1,j,k,4)+1.5_rp*phi(bnode,j,k,4))*idx
+                uxi(5) =   bnorm * (0.5_rp*phi(b2,j,k,5)-2.0_rp*phi(b1,j,k,5)+1.5_rp*phi(bnode,j,k,5))*idx
+                do kk = 1, 5
+                    uxi_char(kk) = 0.0_rp
+                      do jj = 1, 5
+                          uxi_char(kk) = uxi_char(kk) + Lmatrix(kk, jj) * uxi(jj)
+                      end do
+                end do
+                lambda_i(1) = 0.5_rp * (un - c + bnorm * abs(un - c))
+                lambda_i(2) = 0.5_rp * (un     + bnorm * abs(un)    )
+                lambda_i(3) = lambda_i(2)
+                lambda_i(4) = lambda_i(2)
+                lambda_i(5) = 0.5_rp * (un + c + bnorm * abs(un + c))
+
+                uxi_char = lambda_i * uxi_char
+
+                do mm = 1, 5
+                  FU = 0.0_rp
+                    !$acc loop seq
+                    do kk = 1, 5
+                      FU = FU + Rmatrix(mm,kk) * uxi_char(kk)
+                    end do
+                  RHS(bnode,j,k,mm) = RHS(bnode,j,k,mm) - FU
+                end do
+
+                ddye = central_1(1)*(dy_deta(bnode+1,j)-dy_deta(bnode-1,j)) &
+                     + central_1(2)*(dy_deta(bnode+2,j)-dy_deta(bnode-2,j)) &
+                     + central_1(3)*(dy_deta(bnode+3,j)-dy_deta(bnode-3,j))
+                ddxe = central_1(1)*(dx_deta(bnode+1,j)-dx_deta(bnode-1,j)) &
+                     + central_1(2)*(dx_deta(bnode+2,j)-dx_deta(bnode-2,j)) &
+                     + central_1(3)*(dx_deta(bnode+3,j)-dx_deta(bnode-3,j))
+                jc   = Jac2D(bnode,j)
+                ru   = phi(bnode,j,k,2)
+                rv   = phi(bnode,j,k,3)
+                rEp  = phi(bnode,j,k,5) + p_
+                RHS(bnode,j,k,1) = RHS(bnode,j,k,1) - jc*( ru        *ddye - rv        *ddxe)
+                RHS(bnode,j,k,2) = RHS(bnode,j,k,2) - jc*((ru*u_+p_) *ddye - (rv*u_)   *ddxe)
+                RHS(bnode,j,k,3) = RHS(bnode,j,k,3) - jc*((ru*v_)    *ddye - (rv*v_+p_)*ddxe)
+                RHS(bnode,j,k,4) = RHS(bnode,j,k,4) - jc*((ru*w_)    *ddye - (rv*w_)   *ddxe)
+                RHS(bnode,j,k,5) = RHS(bnode,j,k,5) - jc*((u_*rEp)   *ddye - (v_*rEp)  *ddxe)
+
+             enddo
+          enddo
+          !$acc end parallel
+
+        case('N','S')
+
+          !$acc parallel default(present)
+          !$acc loop gang, vector collapse(2) private(Rmatrix,Lmatrix,uxi,uxi_char,lambda_i)
+          do k    = sz,ez
+             do i = sx,ex
+
+                b1 = bnode - bnorm
+                b2 = bnode - 2*bnorm
+
+                r_ = phi(i,bnode,k,1)
+                ir = 1.0_rp/r_
+                u_ = U(i,bnode,k)
+                v_ = V(i,bnode,k)
+                w_ = W(i,bnode,k)
+                p_ = P(i,bnode,k)
+                g_ = GAMMA_T(i,bnode,k)
+
+                ek = 0.5_rp*(u_*u_ + v_*v_ + w_*w_)
+                h_ = ENTHALPY(i,bnode,k) + ek
+                T_ = p_*ir
+                c  = sqrt(g_* T_)
+                cc = c*c
+
+                nx_ = nx_eta(i,bnode)
+                ny_ = ny_eta(i,bnode)
+                idy = m_eta (i,bnode)
+                un  = nx_*u_ + ny_*v_
+
+                call euler_system_n(nx_, ny_, u_, v_, w_, T_, g_, h_, Rmatrix, Lmatrix)
+
+                uxi(1) =   bnorm * (0.5_rp*phi(i,b2,k,1)-2.0_rp*phi(i,b1,k,1)+1.5_rp*phi(i,bnode,k,1))*idy
+                uxi(2) =   bnorm * (0.5_rp*phi(i,b2,k,2)-2.0_rp*phi(i,b1,k,2)+1.5_rp*phi(i,bnode,k,2))*idy
+                uxi(3) =   bnorm * (0.5_rp*phi(i,b2,k,3)-2.0_rp*phi(i,b1,k,3)+1.5_rp*phi(i,bnode,k,3))*idy
+                uxi(4) =   bnorm * (0.5_rp*phi(i,b2,k,4)-2.0_rp*phi(i,b1,k,4)+1.5_rp*phi(i,bnode,k,4))*idy
+                uxi(5) =   bnorm * (0.5_rp*phi(i,b2,k,5)-2.0_rp*phi(i,b1,k,5)+1.5_rp*phi(i,bnode,k,5))*idy
+                do kk = 1, 5
+                    uxi_char(kk) = 0.0_rp
+                    do jj = 1, 5
+                        uxi_char(kk) = uxi_char(kk) + Lmatrix(kk, jj) * uxi(jj)
+                    end do
+                end do
+                lambda_i(1) = 0.5_rp * (un - c + bnorm * abs(un - c))
+                lambda_i(2) = 0.5_rp * (un     + bnorm * abs(un)    )
+                lambda_i(3) = lambda_i(2)
+                lambda_i(4) = lambda_i(2)
+                lambda_i(5) = 0.5_rp * (un + c + bnorm * abs(un + c))
+
+                uxi_char = lambda_i * uxi_char
+
+                do mm = 1, 5
+                  FU = 0.0_rp
+                    !$acc loop seq
+                    do kk = 1, 5
+                      FU = FU + Rmatrix(mm,kk) * uxi_char(kk)
+                    end do
+                  RHS(i,bnode,k,mm) = RHS(i,bnode,k,mm) - FU
+                end do
+
+                ddyx = central_1(1)*(dy_dxi(i,bnode+1)-dy_dxi(i,bnode-1)) &
+                     + central_1(2)*(dy_dxi(i,bnode+2)-dy_dxi(i,bnode-2)) &
+                     + central_1(3)*(dy_dxi(i,bnode+3)-dy_dxi(i,bnode-3))
+                ddxx = central_1(1)*(dx_dxi(i,bnode+1)-dx_dxi(i,bnode-1)) &
+                     + central_1(2)*(dx_dxi(i,bnode+2)-dx_dxi(i,bnode-2)) &
+                     + central_1(3)*(dx_dxi(i,bnode+3)-dx_dxi(i,bnode-3))
+                jc   = Jac2D(i,bnode)
+                ru   = phi(i,bnode,k,2)
+                rv   = phi(i,bnode,k,3)
+                rEp  = phi(i,bnode,k,5) + p_
+                RHS(i,bnode,k,1) = RHS(i,bnode,k,1) - jc*( rv        *ddxx - ru        *ddyx)
+                RHS(i,bnode,k,2) = RHS(i,bnode,k,2) - jc*((rv*u_)    *ddxx - (ru*u_+p_)*ddyx)
+                RHS(i,bnode,k,3) = RHS(i,bnode,k,3) - jc*((rv*v_+p_) *ddxx - (ru*v_)   *ddyx)
+                RHS(i,bnode,k,4) = RHS(i,bnode,k,4) - jc*((rv*w_)    *ddxx - (ru*w_)   *ddyx)
+                RHS(i,bnode,k,5) = RHS(i,bnode,k,5) - jc*((v_*rEp)   *ddxx - (u_*rEp)  *ddyx)
+
+             enddo
+          enddo
+          !$acc end parallel
+
+        case default
+          print*, 'nscbc_outflow is not implemented for face ', trim(bface)
           stop
+          continue
 
         endselect
 
-        return
-end subroutine refl_wall
-        
+        call EndProfRange
 
+        return
+end subroutine nscbc_outflow
+
+subroutine nscbc_inflow_generalized(RHS,bface,bnode,bnorm)
+        implicit none
+
+        real(rp), dimension(:,:,:,:), allocatable, intent(inout) :: RHS
+        character(1)                             , intent(in)    :: bface
+        integer                                  , intent(in)    :: bnode, bnorm
+
+        real(rp), dimension(5,5) :: Rmatrix, Lmatrix
+        real(rp), dimension(5) :: uxi,uxi_char, uxo, uxo_char, lambda_o, lambda_i
+
+        real(rp) :: idx, r0, u0, v0, w0, p0, T0, FU
+        real(rp) :: rm, um, vm, wm, Tm
+        real(rp) ::     uf, vf, wf, th, sg
+        real(rp) :: q1, q2, q3, q4, q5
+        real(rp) :: r_, ir, u_, v_, w_, ek, p_, T_, c, g_, h_, cc
+        real(rp) :: igm1
+        real(rp) :: nx_, ny_, un
+        real(rp) :: ddye, ddxe, jc, ru, rv, rEp
+        integer  :: j,k, mm, kk, jj, b1, b2
+
+        call StartProfRange("nscbc_inflow_generalized")
+
+        igm1  = 1.0_rp/(gamma_Tref - 1.0_rp)
+
+        if(turb_inflow) call inflow_turbulent_update()
+
+        select case(bface)
+          case('W')
+
+          !$acc parallel default(present)
+          !$acc loop gang, vector collapse(2) private(Rmatrix,Lmatrix,uxi,uxi_char,uxo,uxo_char,lambda_o,lambda_i)
+          do k    = sz,ez
+             do j = sy,ey
+
+                rm = iflow_mean(j,1)
+                um = iflow_mean(j,2)
+                vm = iflow_mean(j,3)
+                wm = iflow_mean(j,4)
+                Tm = iflow_mean(j,5)
+
+                uf = 0.0_rp
+                vf = 0.0_rp
+                wf = 0.0_rp
+                T0 = Tm
+                if(j > sy) then
+                  uf = u_inf*iflow_turb(1,j,k)
+                  vf = u_inf*iflow_turb(2,j,k)
+                  wf = u_inf*iflow_turb(3,j,k)
+                  th = iflow_dTdu(j)*uf/Tm
+                  sg = iflow_dTdu(j)*u_inf*iflow_urms(j)/Tm
+                  T0 = Tm*exp(th - 0.5_rp*sg*sg)
+                endif
+
+                p0 = rm * Tm
+                u0 = um + uf
+                v0 = vm + vf
+                w0 = wm + wf
+                r0 = p0/T0
+
+                q1 = r0
+                q2 = r0*u0
+                q3 = r0*v0
+                q4 = r0*w0
+                if (thermally_perfect_gas > 0 ) then
+                  q5 = r0 * enthalpy_t(T0) - p0 + 0.5_rp*r0*(u0*u0 + v0*v0 + w0*w0)
+                else
+                  q5 = p0*igm1 + 0.5_rp*r0*(u0*u0 + v0*v0 + w0*w0)
+                endif
+
+                b1 = bnode - bnorm
+                b2 = bnode - 2*bnorm
+
+                r_ = phi(bnode,j,k,1)
+                ir = 1.0_rp/r_
+                u_ = U(bnode,j,k)
+                v_ = V(bnode,j,k)
+                w_ = W(bnode,j,k)
+                p_ = P(bnode,j,k)
+
+                g_ = GAMMA_T(bnode,j,k)
+
+                ek = 0.5_rp*(u_*u_ + v_*v_ + w_*w_)
+                h_ = ENTHALPY(bnode,j,k) + ek
+                T_ = p_*ir
+                c  = sqrt(g_ * T_)
+                cc = c*c
+
+                nx_ = nx_xi(bnode,j)
+                ny_ = ny_xi(bnode,j)
+                idx = m_xi (bnode,j)
+                un  = nx_*u_ + ny_*v_
+
+                call euler_system_n(nx_, ny_, u_, v_, w_, T_, g_, h_, Rmatrix, Lmatrix)
+
+                uxi(1) =   bnorm * (0.5_rp*phi(b2,j,k,1)-2.0_rp*phi(b1,j,k,1)+1.5_rp*phi(bnode,j,k,1))*idx
+                uxi(2) =   bnorm * (0.5_rp*phi(b2,j,k,2)-2.0_rp*phi(b1,j,k,2)+1.5_rp*phi(bnode,j,k,2))*idx
+                uxi(3) =   bnorm * (0.5_rp*phi(b2,j,k,3)-2.0_rp*phi(b1,j,k,3)+1.5_rp*phi(bnode,j,k,3))*idx
+                uxi(4) =   bnorm * (0.5_rp*phi(b2,j,k,4)-2.0_rp*phi(b1,j,k,4)+1.5_rp*phi(bnode,j,k,4))*idx
+                uxi(5) =   bnorm * (0.5_rp*phi(b2,j,k,5)-2.0_rp*phi(b1,j,k,5)+1.5_rp*phi(bnode,j,k,5))*idx
+                uxo(1) = - bnorm * (phi(bnode,j,k,1)-q1)*idx
+                uxo(2) = - bnorm * (phi(bnode,j,k,2)-q2)*idx
+                uxo(3) = - bnorm * (phi(bnode,j,k,3)-q3)*idx
+                uxo(4) = - bnorm * (phi(bnode,j,k,4)-q4)*idx
+                uxo(5) = - bnorm * (phi(bnode,j,k,5)-q5)*idx
+                do kk = 1, 5
+                    uxi_char(kk) = 0.0_rp
+                    uxo_char(kk) = 0.0_rp
+                    do jj = 1, 5
+                      uxi_char(kk) = uxi_char(kk) + Lmatrix(kk, jj) * uxi(jj)
+                      uxo_char(kk) = uxo_char(kk) + Lmatrix(kk, jj) * uxo(jj)
+                    end do
+                end do
+                lambda_i(1) = 0.5_rp * (un - c + bnorm * abs(un - c))
+                lambda_i(2) = 0.5_rp * (un     + bnorm * abs(un)    )
+                lambda_i(3) = lambda_i(2)
+                lambda_i(4) = lambda_i(2)
+                lambda_i(5) = 0.5_rp * (un + c + bnorm * abs(un + c))
+
+                lambda_o(1) = 0.5_rp * (un - c - bnorm * abs(un - c))
+                lambda_o(2) = 0.5_rp * (un     - bnorm * abs(un)    )
+                lambda_o(3) = lambda_o(2)
+                lambda_o(4) = lambda_o(2)
+                lambda_o(5) = 0.5_rp * (un + c - bnorm * abs(un + c))
+
+                uxi_char = lambda_i * uxi_char
+                uxo_char = lambda_o * uxo_char
+                do mm = 1, 5
+                  FU = 0.0_rp
+                    !$acc loop seq
+                    do kk = 1, 5
+                      FU = FU + Rmatrix(mm,kk) * (uxi_char(kk) + uxo_char(kk))
+                    end do
+                  RHS(bnode,j,k,mm) = RHS(bnode,j,k,mm) - FU
+                end do
+
+                ddye = central_1(1)*(dy_deta(bnode+1,j)-dy_deta(bnode-1,j)) &
+                     + central_1(2)*(dy_deta(bnode+2,j)-dy_deta(bnode-2,j)) &
+                     + central_1(3)*(dy_deta(bnode+3,j)-dy_deta(bnode-3,j))
+                ddxe = central_1(1)*(dx_deta(bnode+1,j)-dx_deta(bnode-1,j)) &
+                     + central_1(2)*(dx_deta(bnode+2,j)-dx_deta(bnode-2,j)) &
+                     + central_1(3)*(dx_deta(bnode+3,j)-dx_deta(bnode-3,j))
+                jc   = Jac2D(bnode,j)
+                ru   = phi(bnode,j,k,2)
+                rv   = phi(bnode,j,k,3)
+                rEp  = phi(bnode,j,k,5) + p_
+                RHS(bnode,j,k,1) = RHS(bnode,j,k,1) - jc*( ru        *ddye - rv        *ddxe)
+                RHS(bnode,j,k,2) = RHS(bnode,j,k,2) - jc*((ru*u_+p_) *ddye - (rv*u_)   *ddxe)
+                RHS(bnode,j,k,3) = RHS(bnode,j,k,3) - jc*((ru*v_)    *ddye - (rv*v_+p_)*ddxe)
+                RHS(bnode,j,k,4) = RHS(bnode,j,k,4) - jc*((ru*w_)    *ddye - (rv*w_)   *ddxe)
+                RHS(bnode,j,k,5) = RHS(bnode,j,k,5) - jc*((u_*rEp)   *ddye - (v_*rEp)  *ddxe)
+
+             enddo
+          enddo
+          !$acc end parallel
+
+        case default
+          print*, 'nscbc_inflow_generalized is not implemented for face ', trim(bface)
+          stop
+          continue
+
+        endselect
+
+        call EndProfRange
+
+        return
+end subroutine nscbc_inflow_generalized
 
 end module nscbc_boundary_conditions

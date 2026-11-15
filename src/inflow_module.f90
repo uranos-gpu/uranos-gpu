@@ -6,634 +6,119 @@ use profiling_module
 implicit none
 private
 
-real(rp), allocatable, dimension(:,:,:), public :: iflow_mean               !< mean      inflow field
-real(rp), allocatable, dimension(:,:,:), public :: iflow_turb               !< turbulent inflow field
-real(rp), allocatable, dimension(:,:,:), public :: iflow_vf_old             !< old velocity fluctuations
-real(rp), allocatable, dimension(:,:,:), public :: iflow_vf_new             !< new velocity fluctuations
-logical                                , public :: iflow_TurbFlag = .false.
-logical                                , public :: iflow_smthFlag = .false.
+integer, parameter :: DF_STATE_VERSION = 1
 
-public init_inflow_profile, init_turbulent_inflow, turbulent_inflow
+real(rp), allocatable, dimension(:,:)  , public :: iflow_mean
+real(rp), allocatable, dimension(:,:,:), public :: iflow_turb
+real(rp), allocatable, dimension(:)    , public :: iflow_dTdu
+real(rp), allocatable, dimension(:)    , public :: iflow_urms
+real(rp), allocatable, dimension(:,:,:), public :: iflow_vf_old
+real(rp), allocatable, dimension(:,:,:), public :: iflow_vf_new
 
+public :: init_inflow_profile
+public :: inflow_turbulent_update
+public :: inflow_turbulent_dump_state
+public :: inflow_turbulent_load_state
+
+private :: inflow_TurbulentBoundaryLayer
+private :: inflow_turbulent_init
+private :: dump_inflow_mean_profile
 
 contains
 
 subroutine init_inflow_profile
-
         implicit none
-        integer :: err = 0
-        real(rp) :: stepH 
 
-        !
-        ! === set the Inflow flags
-        !
-        if(smooth_inflow) iflow_SmthFlag = .true.
-        if(turb_inflow  ) iflow_turbflag = .true.
-        !
-        ! === allocate the mean and turb inflow profiles
-        !
-        allocate(iflow_mean(-GN:0  , lby:uby,1:5), &
-                 iflow_turb(1:3,sy:ey, sz:ez), stat=err)
-        if(err.ne.0) stop ' Allocation error in init_inflow_profile!' 
+        if(trim(bc(1)) /= 'nscbc_inflow_generalized') return
 
-        iflow_mean = 0.0_rp
-        iflow_turb = 0.0_rp
+        call AllocateReal(iflow_mean, sy,ey, 1,5)
+        call AllocateReal(iflow_turb, 1,3,    sy,ey, sz,ez)
+        call AllocateReal(iflow_dTdu, sy,ey)
+        call AllocateReal(iflow_urms, sy,ey)
 
-        selectcase(inflow_profile)
-          case('constant')
-          call inflow_constant()
-
-          case('parabolic')
-          call inflow_parabolic()
-
-          case('blasius')
-          call inflow_blasius()
-
-          case('pohlhausen')
-          call inflow_pohlhausen()
+        selectcase(trim(inflow_profile))
 
           case('TurbulentBoundaryLayerInflow')
-          call inflow_TurbulentBoundaryLayer()
-
-          case('shock_inflow')
-          call shock_inflow()
-
-          case('smooth_body_inflow')
-          stepH = 0.0_rp
-          call inflow_step(stepH)
-
-          case('supersonic_ramp')
-          if(     viscous) call inflow_step(0.0_rp)
-          if(.not.viscous) call inflow_constant()
+             call inflow_TurbulentBoundaryLayer()
 
           case default
-
-          if(rank == root) print*, 'Inflow profile ', trim(inflow_profile), ' is not implemented.'
-          call secure_stop
+             if(rank == root) write(*,'(A)') &
+                " init_inflow_profile: inflow_profile '"//trim(inflow_profile)//"' is not implemented"
+             call secure_stop
 
         end select
 
-        if(iflow_turbFlag) call init_turbulent_inflow
+        call dump_inflow_mean_profile()
+
+        if(turb_inflow) call inflow_turbulent_init
 
         return
 end subroutine init_inflow_profile
 
-
-
-
-subroutine inflow_constant()
-
-        implicit none
-        real(rp) :: Ttot, Trat, T_
-
-        Ttot = total_temperature_inlet
-        Trat = (1.0_rp + 0.5_rp*(gamma0-1.0_rp)*Mach**2)
-        T_   = Ttot/Trat
-
-        iflow_mean(:,:,1) = 1.0_rp
-        iflow_mean(:,:,2) = u_inf
-        iflow_mean(:,:,3) = 0.0_rp
-        iflow_mean(:,:,4) = 0.0_rp
-        iflow_mean(:,:,5) = T_
-
-        return
-end subroutine inflow_constant
-
-subroutine inflow_parabolic()
-        implicit none
-
-        ! local declaration
-        real(rp) :: u_, T_, a, b, c
-        integer  :: i,j
-
-        ! parameter
-        a = -u_inf/(ymin**2)
-        b = 0.0_rp
-        c = u_inf
-
-        do    j = lby,uby
-           do i = -GN,0
-              
-              u_ = a*y(j)**2 + b*y(j) + c
-              T_ = 1.0_rp - 0.5_rp* (gamma0-1.0_rp)/gamma0 * Prandtl * u_**2
-
-              iflow_mean(i,j,1) = 1.0_rp
-              iflow_mean(i,j,2) = u_
-              iflow_mean(i,j,3) = 0.0_rp
-              iflow_mean(i,j,4) = 0.0_rp
-              iflow_mean(i,j,5) = T_
-
-           enddo
-        enddo
-
-        return
-end subroutine inflow_parabolic
-
-
-subroutine inflow_blasius()
-        
-        use fluid_functions_module, only: BlasiusProfile
-        implicit none
-        ! local declaration
-        real(rp), dimension(1-GN:ny+GN) :: VelY
-        real(rp), dimension(1-GN:ny+GN) :: RhoY
-        real(rp), dimension(1-GN:ny+GN) :: TmpY
-        integer                         :: i,j
-
-        ! === get the nominal uncompressible inflow profile
-        call BlasiusProfile(VelY,TmpY,RhoY)
-        
-        do j    = lby,uby
-           do i = -GN,0
-
-              iflow_mean(i,j,1) = RhoY(j)
-              iflow_mean(i,j,2) = VelY(j)
-              iflow_mean(i,j,3) = 0.0_rp
-              iflow_mean(i,j,4) = 0.0_rp
-              iflow_mean(i,j,5) = TmpY(j)
-
-           enddo
-        enddo
-       
-        return
-end subroutine inflow_blasius
-
-
-subroutine inflow_pohlhausen()
-        
-        use fluid_functions_module, only: pohlhausenProfile, CompressibleCorrection
-
-        implicit none
-
-        ! local declaration
-        real(rp), dimension(1-GN:ny+GN) :: u_inc
-        real(rp), dimension(1-GN:ny+GN) :: u_cmp, u_cmp_old
-        real(rp), dimension(1-GN:ny+GN) :: RhoY
-        real(rp), dimension(1-GN:ny+GN) :: TmpY
-        real(rp)                        :: Tw, Rw,RecFac
-        real(rp)                        :: alf, uu, du, fuu, Tr, uci, err
-        real(rp), parameter             :: s      = 1.1_rp 
-        integer , parameter             :: itmx   = 100
-        real(rp), parameter             :: toll   = 1.0E-14_rp
-        integer                         :: i,j, itr
-
-
-        call PohlhausenProfile(u_inc)
-        !call CompressibleCorrection(ny,.false.,Mach,Prandtl,Trat,Tw,Rw,VelY_inc,VelY_cmp,RhoY,TmpY)
-
-        RecFac = sqrt(Prandtl)
-        Tr  = 1.0_rp + 0.5_rp*RecFac*(gamma0-1.0_rp)*Mach**2
-        Tw  = TRat*Tr
-        Rw  = 1.0_rp/Tw
-        alf = s*Prandtl
-        
-        RhoY = 1.0_rp
-        tmpY = 1.0_rp
-
-        itr   = 0
-        err   = 2*toll
-        u_cmp = u_inc
-        do while(err > toll .and. itr < itmx)
-
-           u_cmp_old = u_cmp
-                
-           ! compute Temperature and Density profiles
-           do j = 0,ny+GN
-              uu      = u_cmp(j)/u_cmp(ny)
-              fuu     = alf*uu+(1.0_rp-alf)*uu**2
-              TmpY(j) = tw+(tr-tw)*fuu+(1.0_rp-tr)*uu**2           !< Zhang
-              RhoY(j) = 1.0_rp/TmpY(j)
-           enddo
-        
-           ! apply the correction to uPlus_i according to VAN DRIEST
-           do j = 1,ny+GN
-              du       = u_inc(j)-u_inc(j-1)
-              uci      = 0.5_rp*(sqrt(Rw/RhoY(j))+sqrt(Rw/RhoY(j-1))) 
-              u_cmp(j) = u_cmp(j-1)+uci*du
-           enddo
-
-           err = sum(abs(u_cmp - u_cmp_old))
-           itr = itr + 1
-
-        enddo
-
-        do j    = lby,uby
-           do i = -GN,0
-
-              iflow_mean(i,j,1) = RhoY(j)
-              iflow_mean(i,j,2) = u_inc(j)
-              iflow_mean(i,j,3) = 0.0_rp
-              iflow_mean(i,j,4) = 0.0_rp
-              iflow_mean(i,j,5) = TmpY(j)
-
-           enddo
-        enddo
-       
-        return
-end subroutine inflow_pohlhausen
-
-
-
-subroutine inflow_step(stepH)
-
-        use fluid_functions_module, only: CompressibleCorrection
-
-        implicit none
-        real(rp) , intent(in)    :: stepH
-
-        real(rp), parameter                 :: pi_wake = 0.434_rp
-        real(rp), parameter                 :: toll    = 1.0E-14_rp
-        real(rp), dimension(:), allocatable :: y_tmp, uPlus
-        real(rp), dimension(1-GN:ny+GN)     :: VelY_inc, VelY_cmp, RhoY, TmpY
-        real(rp), dimension(1-GN:ny+GN)     :: VelY_cmp_old
-        real(rp) :: yj, eta,yp,up, ue, iReTau, Tr, Tw, Rw, alf, err
-        real(rp) :: uu, fuu, du, uci
-        integer  :: j, jw, itr, itmx = 100
-
-        allocate(y_tmp(1-GN:ny+GN))
-        allocate(UPlus(1-GN:ny+GN))
-        call compute_grid_point(y_tmp,ny,lbound(y_tmp,1),ubound(y_tmp,1),&
-                                ymin,ymax,stretching_par,gridpoint_y)
-        
-        !
-        ! === find wall location
-        !
-        jw = 1-GN
-        do j = 1-GN, ny+GN
-           if(y_tmp(j) > stepH) then
-             jw = j-1
-             exit
-           endif
-        enddo
-        !
-        ! === get musker profile as a function of ReTau
-        !
-        iReTau = 1.0_rp/ReTau
-        uPlus  = 0.0_rp
-        do j = jw, ny+GN
-        
-             yj  = y_tmp(j) - y_tmp(jw)
-             yp  = yj * ReTau
-
-             eta = yp*iReTau
-             eta = min(1.0_rp,eta)
-             yp  = eta*retau
-
-             up = 5.424_rp*atan((2*yp-8.15_rp)/16.7_rp)&
-                     +log10((yp+10.6_rp)**9.6_rp/(yp**2-8.15_rp*yp+86)**2)-3.51132976630723_rp+&
-                      2.44_rp*(pi_wake*(6*eta**2-4*eta**3)+(eta**2*(1-eta)))
-
-             UPlus(j) = up
-
-        enddo
-        !
-        ! === rescale Musker profile to get physical speed
-        !
-        ue = maxval(UPlus)
-        do j = 1-GN,ny+GN
-           VelY_inc(j) = uPlus(j)/ue*u_inf
-        enddo
-        !
-        ! === get temperature and density profiles via SRA
-        !
-        Tr  = 1.0_rp + 0.5_rp*(Prandtl)**(1.0_rp/3.0_rp)*(gamma0-1.0_rp)*Mach**2
-        Tw  = TRat*Tr
-        Rw  = 1.0_rp/Tw
-        alf = 1.1_rp*Prandtl
-
-        itr = 0
-        err = 2.0_rp*toll
-        VelY_cmp = VelY_inc
-        TmpY     = 1.0_rp
-        RhoY     = 1.0_rp
-        do while(err > toll .and. itr < itmx)
-           
-           VelY_cmp_old = VelY_cmp
-           ! compute Temperature and Density profiles
-           do j = jw,ny+GN
-                uu      = VelY_cmp(j)/VelY_cmp(ny)
-                fuu     = alf*uu+(1.0_rp-alf)*uu**2
-                TmpY(j) = tw+(tr-tw)*fuu+(1.0_rp-tr)*uu**2           !< Zhang
-                RhoY(j) = 1.0_rp/TmpY(j)
-           enddo
-
-           do j = jw+1,ny+GN
-              du       = VelY_inc(j)-VelY_inc(j-1)
-              uci      = 0.5_rp*(sqrt(Rw/RhoY(j))+sqrt(Rw/RhoY(j-1))) 
-              VelY_cmp(j) = VelY_cmp(j-1)+uci*du
-           enddo
-        
-           err = sum(abs(VelY_cmp - VelY_cmp_old))
-           itr = itr + 1
-        enddo
-
-        !
-        ! === assign to inflow
-        !
-        do j    = lby,uby
-           do i = -GN,0
-
-              iflow_mean(i,j,1) = RhoY(j)
-              iflow_mean(i,j,2) = VelY_inc(j)
-              iflow_mean(i,j,3) = 0.0_rp
-              iflow_mean(i,j,4) = 0.0_rp
-              iflow_mean(i,j,5) = TmpY(j)
-
-           enddo
-        enddo
-        
-        deallocate(y_tmp,uPlus)
-        return
-end subroutine inflow_step
-
-
-subroutine shock_inflow()
-! ----------------------------------------------------------------------------------
-!       
-!       This subroutine provides the exact inflow condition of a inflowing shock wave
-!
-! ----------------------------------------------------------------------------------
-        
-        use parameters_module     , only: rp, Mach
-        use fluid_functions_module, only: inverse_rankine_hugoniot, rankine_hugoniot
-        use math_tools_module     , only: newton_raphson
-
-        implicit none
-
-        ! === local declarations
-        ! ambient conditions
-        real(rp), parameter :: r1     =  1.0_rp 
-        real(rp), parameter :: p1     =  1.0_rp
-        real(rp), parameter :: T1     =  p1/r1
-        ! other parameters
-        real(rp), parameter :: gamma0 =  1.4_rp        
-        real(rp), parameter :: toll   =  1.0E-14_rp
-        integer , parameter :: itmax  =  10000
-        ! post-shocked flow variables
-        real(rp)            :: r2, p2, T2, u2, v2, w2, M2, M1
-
-        ! compute post-shocked field based on the post shock Mach number
-        call newton_raphson(inverse_rankine_hugoniot,itmax,toll, Mach+1.0_rp, M1)
-        call Rankine_Hugoniot(r1,p1,T1,M1,r2,p2,T2,M2)
-
-        u2 = Mach*sqrt(gamma0*T2)
-        v2 = 0.0_rp
-        w2 = 0.0_rp
-
-        ! set variable inflow profile
-        iflow_mean(:,:,1) = r2
-        iflow_mean(:,:,2) = u2
-        iflow_mean(:,:,3) = v2
-        iflow_mean(:,:,4) = w2
-        iflow_mean(:,:,5) = p2/r2
-
-        if(rank == root) then
-          write(*,'(A,e18.6)') ' The flow  is inflowing  at Mach: ', Mach
-          write(*,'(A,e18.6)') ' The shock is travelling at Mach: ', M1
-          write(*,'(A)')       ' ------------------------------------------------------ '
-        endif
-
-        return
-end subroutine shock_inflow
-
-
-
-
 subroutine inflow_TurbulentBoundaryLayer()
-        
-        use fluid_functions_module, only: MuskerProfile, CompressibleCorrection, laminar_viscosity, BoundaryLayerQuantities
-        use real_to_integer_module, only: locate
-        use interpolation_module  , only: polint
-        use parameters_module     , only: ReTau
-        use FileModule          
+        use fluid_functions_module, only: MuskerProfile, CompressibleCorrection, GRATemperatureSlope
+        use mesh_module           , only: west_wall_normal_distance, nx_xi, ny_xi
 
         implicit none
 
-        ! local declarations
-        real(rp), dimension(:,:,:), allocatable :: tempPrim
-        real(rp), dimension(:)    , allocatable :: delta_array
-        real(rp), dimension(:)    , allocatable :: deltaVArray
-        real(rp), dimension(:)    , allocatable :: frict_array
-        real(rp), dimension(:)    , allocatable :: theta_array
-        real(rp), dimension(:)    , allocatable :: y_tmp
-        real(rp), dimension(0:ny)               :: UPlusInc, UplusCmp, RhoY, TmpY, velY
-        real(rp), parameter                     :: toll = 1.0E-14_rp
-        real(rp)                                :: tWall, rWall
-        real(rp)                                :: delta, deltaV, thrat, deltaStar, theta, cf
-        real(rp)                                :: dx, dy, ReTau_new, ReTau_old, err
-        real(rp)                                :: ue, ReTauI, yl, errR, errU
-        real(rp)                                :: ri, ui, vi_j00, vi_jm1, vi_j
-        integer                                 :: i,j,jj,jjj, m, jg, ji
-        integer                                 :: itr, itrmax = 30, ierr = 0
+        real(rp), dimension(0:ny)           :: UPlusInc, UPlusCmp, RhoY, TmpY, velY
+        real(rp), dimension(0:ny)           :: wdist, vbl
+        real(rp), dimension(:), allocatable :: y_tmp
+        real(rp) :: tWall, rWall, ue, cf, theta, dddx, rui
+        integer  :: j
 
-        real(rp) :: delta_REF, theta_REF, deltaVREF, frict_REF
-        
-        character(7)   :: crank
-        type(FileType) :: inflow
+        call AllocateReal(y_tmp, 0, ny)
+        call west_wall_normal_distance(wdist)
+        y_tmp(0:ny) = ymin + wdist(0:ny)
 
-        !
-        ! === allocate temporary variables
-        !
-        allocate(delta_array(-GN:0), &
-                 deltaVArray(-GN:0), &
-                 frict_Array(-GN:0), &
-                 theta_array(-GN:0), stat = ierr)
-        if(ierr.ne.0) stop ' Allocation error'
-        
-        allocate(tempPrim(-GN:0, 1-GN:ny+GN, 3), y_tmp(0:ny), stat = ierr)
-        if(ierr.ne.0) stop ' Allocation error'
-        
-        call compute_grid_point(y_tmp,ny,0,ny,ymin,ymax,stretching_par,gridpoint_y)
-        y_tmp(0) = 0.0_rp
-        
-        !
-        ! === getting the REFERENCE inflow profile
-        !
-        call MuskerProfile(ny,y_tmp,ReTau,UplusInc)
-        call CompressibleCorrection(ny,.true.,Mach,Prandtl,Trat,tWall,rWall,UPlusInc,UPlusCmp,RhoY,TmpY)
+        call MuskerProfile         (ny, y_tmp, ReTau, UPlusInc)
+        call CompressibleCorrection(ny, UPlusInc, UPlusCmp, RhoY, TmpY, tWall, rWall)
 
-        !
-        ! === computing the growth of the boundary layer
-        !
-        call BoundaryLayerQuantities(y_tmp,RhoY,UPlusCmp,rWall,thrat,deltaStar,cf)
-        delta_REF = 1.0_rp
-        deltaVREF = delta_REF/ReTau
-        frict_REF = cf
-        theta_REF = thrat*delta_REF
+        ue   = maxval(UPlusCmp)
+        velY = UPlusCmp/ue
 
-        ReTau_old = ReTau - 1.0_rp
-        ReTau_new = ReTau
-        dx        = Lx/real(nx,rp)
-
-        ! get the node-0 values integrating from REF in half cell space
-        itr = 0
-        err = huge(1.0_rp)
-        do while(err > toll .and. itr < itrmax)
-
-           call MuskerProfile(ny,y_tmp,ReTau_new,UplusInc)
-           call CompressibleCorrection(ny,.true.,Mach,Prandtl,Trat,tWall,rWall,UPlusInc,UPlusCmp,RhoY,TmpY)
-           call BoundaryLayerQuantities(y_tmp,RhoY,UPlusCmp,rWall,thrat,deltaStar,cf)
-
-           theta     = theta_REF - 0.25_rp*0.5_rp*dx*(cf+frict_REF)
-           delta     = theta/thrat
-           deltaV    = deltaVREF*sqrt(frict_REF/cf)
-           reTau_new = delta/deltaV
-
-           err = abs(ReTau_new - ReTau_old) 
-
-           ReTau_old = ReTau_new
-           itr = itr + 1
-
+        cf    = 2.0_rp*rWall/(RhoY(ny)*ue*ue)
+        theta = 0.0_rp
+        do j = 1,ny
+           theta = theta + 0.5_rp*(wdist(j) - wdist(j-1))                    &
+                 * ( RhoY(j  )*velY(j  )*(1.0_rp - velY(j  ))               &
+                   + RhoY(j-1)*velY(j-1)*(1.0_rp - velY(j-1)) )
         enddo
-        theta_array(0) = theta
-        frict_array(0) = cf
-        delta_array(0) = delta
-        deltaVArray(0) = deltaV
+        theta = theta/RhoY(ny)
+        dddx  = 0.5_rp*cf/theta
 
-        !
-        ! integrating from -1 to -GN
-        !
-        do i = -1,-GN,-1
-
-           itr = 0
-           err = huge(1.0_rp)
-           do while(err > toll .and. itr < itrmax)
-
-              call MuskerProfile(ny,y_tmp,ReTau_new,UplusInc)
-              call CompressibleCorrection(ny,.true.,Mach,Prandtl,Trat,tWall,rWall,UPlusInc,UPlusCmp,RhoY,TmpY)
-              call BoundaryLayerQuantities(y_tmp,RhoY,UPlusCmp,rWall,thrat,deltaStar,cf)
-
-              theta     = theta_array(i+1) - 0.25_rp*dx*(cf+frict_array(i+1))
-              delta     = theta/thrat
-              deltaV    = deltaVArray(i+1)*sqrt(frict_array(i+1)/cf)
-              reTau_new = delta/deltaV
-
-              err = abs(ReTau_new - ReTau_old) 
-
-              ReTau_old = ReTau_new
-              itr = itr + 1
-
-           enddo
-           theta_array(i) = theta
-           frict_array(i) = cf
-           delta_array(i) = delta
-           deltaVArray(i) = deltaV
-
+        rui    = 0.0_rp
+        vbl(0) = 0.0_rp
+        do j = 1,ny
+           rui    = rui + 0.5_rp*(wdist(j) - wdist(j-1))                     &
+                  * (RhoY(j)*velY(j) + RhoY(j-1)*velY(j-1))
+           vbl(j) = dddx*u_inf*(wdist(j)*RhoY(j)*velY(j) - rui)/RhoY(j)
         enddo
 
-        !
-        ! === interpolation on the mesh
-        !
-        do i = -GN,0
-           delta  = delta_array(i)
-           deltaV = deltaVArray(i)
-           ReTauI = delta/deltaV
-
-           call MuskerProfile(ny,y_tmp,ReTauI,UplusInc)
-           call CompressibleCorrection(ny,.true.,Mach,Prandtl,Trat,tWall,rWall,UPlusInc,UPlusCmp,RhoY,TmpY)
-
-           ue = maxval(UPlusCmp)
-           VelY = UPlusCmp/ue
-
-           do j = 0, ny
-
-              yl = y_tmp(j)/delta
-              call locate(y_tmp,0,ny,yl,jj)
-
-              m = 4
-              jjj = min(max(jj-(m-1)/2,1),ny+1-m)
-              call polint(y_tmp(jjj),rhoY(jjj),m,yl,ri,errR)
-              call polint(y_tmp(jjj),velY(jjj),m,yl,ui,errU)
-
-              tempPrim(i,j,1) = ri
-              tempPrim(i,j,2) = ri*ui
-              tempPrim(i,j,3) = 0.0_rp
-
-           enddo
+        do j = sy, ey
+           iflow_mean(j,1) = RhoY(j)
+           iflow_mean(j,2) = u_inf*velY(j)*nx_xi(sx,j) - vbl(j)*ny_xi(sx,j)
+           iflow_mean(j,3) = u_inf*velY(j)*ny_xi(sx,j) + vbl(j)*nx_xi(sx,j)
+           iflow_mean(j,4) = 0.0_rp
+           iflow_mean(j,5) = TmpY(j)
+           iflow_dTdu(j)   = GRATemperatureSlope(velY(j), TmpY(j))/u_inf
         enddo
 
-        ! === integrate rhov
-        do j    = 1   , ny
-           do i = 1-GN, 0
-
-              dy = y_tmp(j) - y_tmp(j-1)
-
-              vi_j00 = (tempPrim(i,j  ,2) - tempPrim(i-1,j  ,2))/dx
-              vi_jm1 = (tempPrim(i,j-1,2) - tempPrim(i-1,j-1,2))/dx
-              vi_j   = 0.5_rp*(vi_j00 + vi_jm1)
-
-              tempPrim(i,j,3) = tempPrim(i,j-1,3) - vi_j * dy
-
-           enddo
-        enddo
-
-        ! extapolation on north face ghosts
-        do    j = 1,GN
-           do i = -GN,0
-
-              jg = ny + j      !< ghost node
-              ji = ny - (j-1)  !< inner node
-
-              tempPrim(i,jg,1) =  tempPrim(i,ji,1)
-              tempPrim(i,jg,2) =  tempPrim(i,ji,2)
-              tempPrim(i,jg,3) =  tempPrim(i,ji,3)
-
-           enddo
-        enddo
-
-        ! extapolation on south face ghosts
-        do    j = 1,GN
-           do i = -GN,0
-
-              jg = 1 - j      !< ghost node
-              ji = 1 + (j-1)  !< inner node
-
-              tempPrim(i,jg,1) =  tempPrim(i,ji,1)
-              tempPrim(i,jg,2) = -tempPrim(i,ji,2)
-              tempPrim(i,jg,3) = -tempPrim(i,ji,3)
-
-           enddo
-        enddo
-
-
-        do j = lby,uby
-           do i = 1-GN,0
-
-              iflow_mean(i,j,1) = tempPrim(i,j,1)
-              iflow_mean(i,j,2) = u_inf*tempPrim(i,j,2)/tempPrim(i,j,1)
-              iflow_mean(i,j,3) = u_inf*tempPrim(i,j,3)/tempPrim(i,j,1)
-              iflow_mean(i,j,4) = 0.0_rp
-              iflow_mean(i,j,5) = 1.0_rp/tempPrim(i,j,1)
-
-           enddo
-        enddo
-
-        write(crank, '(i7.7)') rank
-        inflow%name = 'InflowData'//trim(crank)
-        inflow%dir  = trim(data_dir)//'/INITIAL_CONDITION'
-        call OpenNewFile(inflow,it)
-        do j = lby,uby
-           write(inflow%unit,*) y(j), iflow_mean(0,j,1), iflow_mean(0,j,2)/u_inf, &
-                                      iflow_mean(0,j,3)/u_inf, iflow_mean(0,j,5)
-        enddo
-        call CloseFile(inflow)
-
-
-        deallocate(delta_array,deltaVArray,frict_Array,theta_array)
-        deallocate(y_tmp,tempPrim)
-
+        call DeallocateReal(y_tmp)
 
         return
 end subroutine inflow_TurbulentBoundaryLayer
 
-
-subroutine init_turbulent_inflow
+subroutine inflow_turbulent_init
 
         use df_module
         use fileModule
+        use mesh_module, only: west_wall_normal_distance
 
         implicit none
         real(rp), dimension(:), allocatable :: y_tmp
+        real(rp), dimension(0:ny)           :: wdist
+        integer                             :: j
         integer                             :: err = 0
 #ifdef DEBUG
         type(FileType)         :: reyStressFile
@@ -641,93 +126,66 @@ subroutine init_turbulent_inflow
         real(rp)               :: rey12, rey13, rey23
         integer                :: m
 #endif
-        
-        ! allocations
-        allocate(y_tmp(0:ny), stat = err)
-        if(err .ne. 0) stop ' Allocation error in init_turbulent_inflow'
 
-        allocate(DF_ylen(3,0:ny), DF_zlen(3,0:ny), stat = err)
-        if(err .ne. 0) stop ' Allocation error in init_turbulent_inflow'
+        allocate(y_tmp(0:ny), stat = err)
+        if(err .ne. 0) stop ' Allocation error in inflow_turbulent_init'
+
+        allocate(DF_ylen(3,0:ny), DF_zlen(3,0:ny), DF_uconv(0:ny), stat = err)
+        if(err .ne. 0) stop ' Allocation error in inflow_turbulent_init'
+        DF_uconv = 1.0_rp
 
         allocate(DF_By(3,-DF_N:DF_N, 0:ny), DF_Bz(3,-DF_N:DF_N, 0:ny), stat = err)
-        if(err .ne. 0) stop ' Allocation error in init_turbulent_inflow'
+        if(err .ne. 0) stop ' Allocation error in inflow_turbulent_init'
 
         allocate(DF_Rnd2D(3, 1-DF_N:ny+DF_N, 1-DF_N:nz+DF_N), stat = err)
-#ifdef AMD
-        rnd2Dnumshape = shape(DF_Rnd2D)
-        rnd2Dnumsize = rnd2Dnumshape(1) * rnd2Dnumshape(2) * rnd2Dnumshape(3)
-        allocate(rnd2Dnum(rnd2Dnumsize), stat = err)
-#endif
-        if(err .ne. 0) stop ' Allocation error in init_turbulent_inflow'
+        if(err .ne. 0) stop ' Allocation error in inflow_turbulent_init'
 
         allocate(iflow_vf_old(3, sy:ey, sz:ez), stat = err)
-        if(err .ne. 0) stop ' Allocation error in init_turbulent_inflow'
+        if(err .ne. 0) stop ' Allocation error in inflow_turbulent_init'
 
         allocate(iflow_vf_new(3, sy:ey, sz:ez), stat = err)
-        if(err .ne. 0) stop ' Allocation error in init_turbulent_inflow'
+        if(err .ne. 0) stop ' Allocation error in inflow_turbulent_init'
 
-        ! step 1) create a temporary grid 
-        call compute_grid_point(y_tmp,ny,0,ny,ymin,ymax,stretching_par,gridpoint_y)
-        y_tmp(0) = 0.0_rp
-        
+        call west_wall_normal_distance(wdist)
+        y_tmp(0:ny) = ymin + wdist(0:ny)
+
         selectcase(inflow_profile)
 
-          case('TurbulentBoundaryLayerInflow', 'smooth_body_inflow', 'supersonic_ramp')
-          ! step 2) Read input data from database
+          case('TurbulentBoundaryLayerInflow')
           call DFInputData_TBL(ReTau,Mach,Prandtl,y_tmp,ny)
 
-          ! step 3) Get integral lenght scale
           call DFIntegralLenght_TBL(y_tmp,ny)
-        
-          case('constant')
-          ! step 2) Read input data from database
-          call DFInputData_HTURB(y_tmp,ny)
-
-          ! step 3) Get integral lenght scale
-          call DFIntegralLenght_HTURB(Lz)
 
         case default
           print*, 'Turbulent inflow is not implemented for inflow "', trim(inflow_profile), '"'
           stop
         endselect
 
-
-        ! step 4) compute DF coefficients
         call DFCoefficients(y_tmp,ny,gbl_min_step)
-#ifdef AMD
-        !$acc data copy(rnd2Dnum, rnd2Dnumshape,rnd2Dnumptr) &
-        !$acc copy(DF_Rnd2D,DF_N,DF_ylen,DF_zlen,DF_By,DF_Bz,DF_Fy,DF_LundMatrix) &
-        !$acc copy(iflow_vf_old, iflow_vf_new, iflow_turb)
-#endif
-#ifdef NVIDIA
-        !$acc data copy(DF_Rnd2D,DF_ylen,DF_zlen,DF_By,DF_Bz,DF_Fy,DF_LundMatrix) &
-        !$acc copy(iflow_vf_old, iflow_vf_new, iflow_turb)
-#endif
 
+        do j = sy,ey
+           iflow_urms(j) = DF_LundMatrix(1,1,j)
+        enddo
+        !$acc data copy(DF_Rnd2D,DF_ylen,DF_zlen,DF_uconv,DF_By,DF_Bz,DF_Fy,DF_LundMatrix) &
+        !$acc copy(iflow_vf_old, iflow_vf_new, iflow_turb)
 
-        ! step 5) get a random slice
         call DFRandomField2D(ny,nz)
 
-        ! step 6) compute velocity flunctuations based on the extracted random slice
         call DFConvolution2D(sy,ey,sz,ez,iflow_vf_old)
 
-        ! step 7) get a new random slice
         call DFRandomField2D(ny,nz)
-        
-        ! step 8) compute a new velocity fluctuation based on the extracted random slice
+
         call DFConvolution2D(sy,ey,sz,ez,iflow_vf_new)
 
-        ! step 9) provide time-correlation via Castro's formula
-        call DFCastroTimeCorrelation(ik,c_rk,u_inf,dt,sy,ey,sz,ez,iflow_vf_old,iflow_turb)
+        call DFCastroTimeCorrelation(ik,c_rk,u_inf,dt,sy,ey,sz,ez,iflow_vf_old,iflow_vf_new)
 
-        ! step 6) Enforce Reynolds stress and obtain turb inflow profile
         call DFEnforceReynoldsStresses2D(sy,ey,sz,ez,iflow_vf_new,iflow_turb)
 
         !$acc end data
 
 #ifdef DEBUG
         if(nprocs == 1) then
-        reyStressFile%name = 'rey_computed_inflow' 
+        reyStressFile%name = 'rey_computed_inflow'
         reyStressFile%dir  = trim(data_dir)//'/INFLOW_REYNOLDS_STRESS'
         call OpenNewFile(ReyStressFile,it)
         do j=1,ny
@@ -763,19 +221,17 @@ subroutine init_turbulent_inflow
         deallocate(y_tmp)
 
         return
-end subroutine init_turbulent_inflow
+end subroutine inflow_turbulent_init
 
+subroutine inflow_turbulent_update()
 
-
-
-
-subroutine turbulent_inflow()
-        
         use df_module
         use FileModule
+        use mesh_module, only: nx_xi, ny_xi
 
         implicit none
-        integer :: j,k,l
+        real(rp) :: fs, fn
+        integer  :: j,k,l
 
 #ifdef DEBUG
         type(fileType)         :: turbInflow
@@ -786,21 +242,29 @@ subroutine turbulent_inflow()
         integer                :: err = 0
 #endif
 
-        call StartProfRange('turbulent_inflow')
+        call StartProfRange('inflow_turbulent_update')
 
-        if(iflow_TurbFlag) then
+        if(turb_inflow) then
 
-          ! step 1) extract a new random slice
           call DFRandomField2D(ny,nz)
 
-          ! step 2) get velocity flunctuations based on the new random slice
           call DFConvolution2D(sy,ey,sz,ez,iflow_vf_new)
 
-          ! step 3) provide time correlation of the inflow slices
           call DFCastroTimeCorrelation(ik,c_rk,u_inf,dt,sy,ey,sz,ez,iflow_vf_old,iflow_vf_new)
 
-          ! step 4) enforce Reynolds Stress
           call DFEnforceReynoldsStresses2D(sy,ey,sz,ez,iflow_vf_new,iflow_turb)
+
+          !$acc parallel default(present)
+          !$acc loop gang, vector collapse(2)
+          do    k = sz,ez
+             do j = sy,ey
+                fs = iflow_turb(1,j,k)
+                fn = iflow_turb(2,j,k)
+                iflow_turb(1,j,k) = nx_xi(sx,j)*fs - ny_xi(sx,j)*fn
+                iflow_turb(2,j,k) = ny_xi(sx,j)*fs + nx_xi(sx,j)*fn
+             enddo
+          enddo
+          !$acc end parallel
 
         else
 
@@ -826,7 +290,7 @@ subroutine turbulent_inflow()
         lcl_pts     = 0
         lcl_ekt_max = 0.0_rp
         do k    = sz,ez
-           do j = sy,ey 
+           do j = sy,ey
               ek = (u_inf*iflow_turb(1,j,k))**2 + (u_inf*iflow_turb(2,j,k))**2 + (u_inf*iflow_turb(3,j,k))**2
 
               lcl_ekt     = lcl_ekt + ek
@@ -857,11 +321,257 @@ subroutine turbulent_inflow()
         call EndProfRange
 
         return
-end subroutine turbulent_inflow
+end subroutine inflow_turbulent_update
 
+subroutine dump_inflow_mean_profile()
+        implicit none
 
+        character(len=512) :: fdir, fpath
+        integer            :: j, iunit, ios
+        logical            :: dir_exist
 
+        if(rank /= root) return
 
+        fdir = 'DATA/'//trim(data_dir)//'/INITIAL_CONDITION'
+        inquire(file = trim(fdir), exist = dir_exist)
+        if(.not. dir_exist) call execute_command_line('mkdir -p '//trim(fdir))
 
+        fpath = trim(fdir)//'/inflow_mean_profile.dat'
+        open(newunit = iunit, file = trim(fpath), status = 'replace', &
+             action = 'write', iostat = ios)
+        if(ios /= 0) then
+           write(*,'(A)') ' dump_inflow_mean_profile: cannot open '//trim(fpath)
+           return
+        endif
+
+        write(iunit, '(A)') '# inflow mean profile ('//trim(inflow_profile)//')'
+        write(iunit, '(A)') '# y  rho  u/u_inf  v/u_inf  w/u_inf  T'
+        do j = sy, ey
+           write(iunit, *) y(j), iflow_mean(j,1),        &
+                                 iflow_mean(j,2)/u_inf,  &
+                                 iflow_mean(j,3)/u_inf,  &
+                                 iflow_mean(j,4)/u_inf,  &
+                                 iflow_mean(j,5)
+        enddo
+        close(iunit)
+
+        return
+end subroutine dump_inflow_mean_profile
+
+subroutine df_state_filename(iter, fname)
+        implicit none
+        integer      , intent(in)  :: iter
+        character(dl), intent(out) :: fname
+
+        character(dl) :: iteration
+
+        write(iteration,'(i0.7)') iter
+        fname = 'DATA/'//trim(data_dir)//'/BINARY_DF/df'//trim(iteration)//'.bin'
+
+        return
+end subroutine df_state_filename
+
+subroutine inflow_turbulent_dump_state
+        use mpi
+        use mpi_module, only: cart_coord, comm2Dyz, check_mpi_vec
+        use df_module , only: DF_ndraw, DF_N
+
+        implicit none
+
+        character(dl) :: fname
+        logical       :: is_writer
+        integer       :: fh, int_size, int8_size, rp_size, header_count, ne
+        integer       :: err, open_err_max, alr_err, hdr(6)
+        integer       :: type_view
+        integer(kind=MPI_OFFSET_KIND) :: disp
+        integer, parameter :: array_rank = 3
+        integer, dimension(array_rank) :: shp_view, shp_sub, start_view
+
+        integer, parameter                :: NIO = 10
+        integer, dimension(NIO)           :: errs
+        character(len=28), dimension(NIO) :: lbls
+
+        call StartProfRange('inflow_turbulent_dump_state')
+
+        call df_state_filename(it, fname)
+
+        is_writer = (cart_coord(1) == 0)
+        errs = 0
+        ne   = 0
+
+        if(is_writer) then
+
+        call MPI_FILE_OPEN(comm2Dyz, fname, MPI_MODE_WRONLY + MPI_MODE_CREATE, &
+                           MPI_INFO_NULL, fh, err)
+
+        call MPI_Allreduce(err, open_err_max, 1, MPI_INTEGER, MPI_MAX, comm2Dyz, alr_err)
+        if(open_err_max /= 0) then
+          if(rank == root) write(*,'(1x,A,A)') ' WARNING: cannot write DF state ', trim(fname)
+        else
+
+        ne=ne+1; lbls(ne)='file_set_size'
+        call MPI_FILE_SET_SIZE(fh, 0_MPI_OFFSET_KIND, errs(ne))
+
+        ne=ne+1; lbls(ne)='type_size MPI_INTEGER'
+        call MPI_TYPE_SIZE(MPI_INTEGER , int_size , errs(ne))
+        ne=ne+1; lbls(ne)='type_size MPI_INTEGER8'
+        call MPI_TYPE_SIZE(MPI_INTEGER8, int8_size, errs(ne))
+        ne=ne+1; lbls(ne)='type_size MPI_RP'
+        call MPI_TYPE_SIZE(MPI_RP      , rp_size  , errs(ne))
+
+        hdr = (/DF_STATE_VERSION, ny, nz, DF_N, rp_size, it/)
+
+        header_count = 0
+        if(rank == root) header_count = 1
+
+        ne=ne+1; lbls(ne)='write_at_all header'
+        call MPI_FILE_WRITE_AT_ALL(fh, 0_MPI_OFFSET_KIND, hdr, 6*header_count, &
+                                   MPI_INTEGER, MPI_STATUS_IGNORE, errs(ne))
+        ne=ne+1; lbls(ne)='write_at_all ndraw'
+        disp = 6*int_size
+        call MPI_FILE_WRITE_AT_ALL(fh, disp, DF_ndraw, header_count, &
+                                   MPI_INTEGER8, MPI_STATUS_IGNORE, errs(ne))
+
+        shp_view   = (/3, ny, nz/)
+        shp_sub    = (/3, ey-sy+1, ez-sz+1/)
+        start_view = (/0, sy-1, sz-1/)
+
+        ne=ne+1; lbls(ne)='type_create_subarray view'
+        call MPI_TYPE_CREATE_SUBARRAY(array_rank, shp_view, shp_sub, start_view, &
+                                      MPI_ORDER_FORTRAN, MPI_RP, type_view, errs(ne))
+        call MPI_TYPE_COMMIT(type_view, err)
+
+        disp = 6*int_size + int8_size
+        ne=ne+1; lbls(ne)='file_set_view'
+        call MPI_FILE_SET_VIEW(fh, disp, MPI_RP, type_view, "native", MPI_INFO_NULL, errs(ne))
+
+        ne=ne+1; lbls(ne)='write_all plane'
+        call MPI_FILE_WRITE_ALL(fh, iflow_vf_old, product(shp_sub), MPI_RP, &
+                                MPI_STATUS_IGNORE, errs(ne))
+
+        ne=ne+1; lbls(ne)='file_close'
+        call MPI_FILE_CLOSE(fh, errs(ne))
+        call MPI_TYPE_FREE(type_view, err)
+
+        endif
+        endif
+
+        call check_mpi_vec('inflow_turbulent_dump_state', errs(1:ne), lbls(1:ne))
+
+        call EndProfRange
+
+        return
+end subroutine inflow_turbulent_dump_state
+
+subroutine inflow_turbulent_load_state
+        use mpi
+        use mpi_module, only: cart_coord, comm2Dyz, mpi_comm_cart, check_mpi_vec
+        use df_module , only: DF_ndraw, DF_N
+
+        implicit none
+
+        character(dl) :: fname
+        logical       :: is_writer, have_file
+        integer       :: fh, int_size, int8_size, rp_size, ne
+        integer       :: err, ok, ok_gbl, hdr(6)
+        integer       :: type_view
+        integer(kind=MPI_OFFSET_KIND) :: disp
+        integer, parameter :: array_rank = 3
+        integer, dimension(array_rank) :: shp_view, shp_sub, start_view
+
+        integer, parameter                :: NIO = 8
+        integer, dimension(NIO)           :: errs
+        character(len=28), dimension(NIO) :: lbls
+
+        if(len_trim(restart_file) == 0) return
+
+        call df_state_filename(it, fname)
+
+        have_file = .false.
+        if(rank == root) inquire(file = trim(fname), exist = have_file)
+        call MPI_BCAST(have_file, 1, MPI_LOGICAL, root, mpi_comm_cart, err)
+
+        if(.not. have_file) then
+          if(rank == root) then
+            write(*,'(1x,A)')   ' WARNING: no digital-filter state next to this restart.'
+            write(*,'(1x,A,A)') '          expected ', trim(fname)
+            write(*,'(1x,A)')   '          the synthetic inflow restarts from a fresh slice.'
+          endif
+          return
+        endif
+
+        is_writer = (cart_coord(1) == 0)
+        errs = 0
+        ne   = 0
+        ok   = 1
+
+        call MPI_TYPE_SIZE(MPI_INTEGER , int_size , err)
+        call MPI_TYPE_SIZE(MPI_INTEGER8, int8_size, err)
+        call MPI_TYPE_SIZE(MPI_RP      , rp_size  , err)
+
+        if(is_writer) then
+          call MPI_FILE_OPEN(comm2Dyz, fname, MPI_MODE_RDONLY, MPI_INFO_NULL, fh, err)
+          if(err /= 0) ok = 0
+        endif
+
+        hdr = 0
+        if(rank == root .and. ok == 1) then
+          call MPI_FILE_READ_AT(fh, 0_MPI_OFFSET_KIND, hdr, 6, MPI_INTEGER, MPI_STATUS_IGNORE, err)
+          if(err /= 0) ok = 0
+          disp = 6*int_size
+          call MPI_FILE_READ_AT(fh, disp, DF_ndraw, 1, MPI_INTEGER8, MPI_STATUS_IGNORE, err)
+          if(err /= 0) ok = 0
+        endif
+        call MPI_BCAST(hdr, 6, MPI_INTEGER, root, mpi_comm_cart, err)
+        call MPI_ALLREDUCE(ok, ok_gbl, 1, MPI_INTEGER, MPI_MIN, mpi_comm_cart, err)
+        ok = ok_gbl
+
+        if(ok == 1) then
+          if(hdr(1) /= DF_STATE_VERSION .or. hdr(2) /= ny .or. hdr(3) /= nz .or. &
+             hdr(4) /= DF_N             .or. hdr(5) /= rp_size .or. hdr(6) /= it) ok = 0
+        endif
+
+        if(ok == 0) then
+          if(rank == root) then
+            write(*,'(1x,A,A)') ' WARNING: unusable digital-filter state ', trim(fname)
+            write(*,'(1x,A)')   '          the synthetic inflow restarts from a fresh slice.'
+          endif
+          if(is_writer) call MPI_FILE_CLOSE(fh, err)
+          return
+        endif
+
+        if(is_writer) then
+
+        shp_view   = (/3, ny, nz/)
+        shp_sub    = (/3, ey-sy+1, ez-sz+1/)
+        start_view = (/0, sy-1, sz-1/)
+
+        ne=ne+1; lbls(ne)='type_create_subarray view'
+        call MPI_TYPE_CREATE_SUBARRAY(array_rank, shp_view, shp_sub, start_view, &
+                                      MPI_ORDER_FORTRAN, MPI_RP, type_view, errs(ne))
+        call MPI_TYPE_COMMIT(type_view, err)
+
+        disp = 6*int_size + int8_size
+        ne=ne+1; lbls(ne)='file_set_view'
+        call MPI_FILE_SET_VIEW(fh, disp, MPI_RP, type_view, "native", MPI_INFO_NULL, errs(ne))
+
+        ne=ne+1; lbls(ne)='read_all plane'
+        call MPI_FILE_READ_ALL(fh, iflow_vf_old, product(shp_sub), MPI_RP, &
+                               MPI_STATUS_IGNORE, errs(ne))
+
+        ne=ne+1; lbls(ne)='file_close'
+        call MPI_FILE_CLOSE(fh, errs(ne))
+        call MPI_TYPE_FREE(type_view, err)
+
+        endif
+
+        call MPI_BCAST(DF_ndraw, 1, MPI_INTEGER8, root, mpi_comm_cart, err)
+
+        if(rank == root) write(*,'(1x,A,A)') ' Digital-filter state resumed from ', trim(fname)
+
+        call check_mpi_vec('inflow_turbulent_load_state', errs(1:ne), lbls(1:ne))
+
+        return
+end subroutine inflow_turbulent_load_state
 
 end module inflow_module

@@ -1,0 +1,86 @@
+&input_list
+
+! Mach 2.91 / 24-deg compression ramp (URANOS-3.0 paper, Sec. 3.5): dns_aec_tp, init
+
+! --- body-fitted mesh (x-y from mesh_file, z uniform) ---
+mesh_file = 'DATA/07_supersonic_compression_ramp/mesh/dns/MeshXY_ramp.txt'
+xmin = -29.0
+xmax = 12.0
+ymin = 0.0
+ymax = 6.0
+zmin = -1.1
+zmax = 1.1
+gridpoint_x = 'uniform'
+gridpoint_y = 'uniform'
+gridpoint_z = 'uniform'
+dims = 3
+nx = 2560
+ny = 384
+nz = 192
+! cart_dims(2) = 1 is required by the turbulent-inflow wall helper
+cart_dims(1) = 8
+cart_dims(2) = 1
+cart_dims(3) = 4
+
+CFL  = 0.5
+Dt   = 1.E-04
+logical_CFL = .true.
+n_step = 3
+
+bc(1) = 'nscbc_inflow_generalized'
+bc(2) = 'nscbc_outflow'
+bc(3) = 'diabatic_wall'
+bc(4) = 'extrapolation'
+bc(5) = 'periodic'
+bc(6) = 'periodic'
+
+! isothermal wall: Tw = Trat*T_recovery = 2.87 T_inf
+Trat = 1.14
+
+! digital-filter turbulent inflow
+inflow_profile = 'TurbulentBoundaryLayerInflow'
+smooth_inflow  = .false.
+turb_inflow    = .true.
+turbulent_intensity = 0.03
+
+! for ic = 'turbulent_BL' Reynolds is the INFLOW Re_tau
+Reynolds = 380.0
+Mach     = 2.91
+Prandtl  = 0.72
+
+thermally_perfect_gas = 1
+Tref     = 107.1
+vis_flag = 1
+
+scheme           = 'hybrid_wenoEP'
+ep_type          = 'AEC'
+weno_order       = 7
+diffusion_scheme = 'conservative'
+sensor           = 'ducros'
+ducrosToll       = 0.2
+fd_order         = 6
+
+enable_limiter     = .true.
+limiter_rho_floor  = 0.001
+limiter_e_floor    = 0.0001
+limiter_abort_frac = 0.0001
+
+LES       = .false.
+sgs_model = 'WALE'
+viscous   = .true.
+
+tmax  = 1.E9
+itmax = 400000
+StFlg = .false.
+restartStat = .false.
+itout = 5000
+StOut = 2000
+rsOut = 1000
+
+ic = 'turbulent_BL'
+output_file_name = 'ramp'
+data_dir = '07_supersonic_compression_ramp/dns_aec_tp'
+
+
+
+&end
