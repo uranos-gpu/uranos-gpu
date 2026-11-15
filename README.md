@@ -51,7 +51,7 @@ It solves the compressible Navier–Stokes equations in **generalized curvilinea
 - **Three viscous operators**: Laplacian, staggered and a conservative formulation in which total energy telescopes exactly.
 - **LES**: Smagorinsky, WALE, sigma and mixed-time-scale subgrid models.
 - **Inflow turbulence**: digital-filter synthetic turbulence with non-reflecting characteristic boundaries.
-- **Scalable**: MPI 3D domain decomposition, CUDA-aware halo exchange, 88–98 % weak-scaling efficiency up to 1024 NVIDIA A100; results are bitwise independent of the decomposition.
+- **Scalable**: MPI 3D domain decomposition, CUDA-aware halo exchange, 87–98 % weak-scaling efficiency up to 1024 NVIDIA A100; results are bitwise independent of the decomposition.
 
 ---
 
@@ -502,7 +502,7 @@ DATA/                     paper cases
 ## Performance
 
 - **One GPU**: a spatially developing hypersonic boundary layer (Ma = 5.86, 50 million nodes) advances at about 0.76 s per iteration on one NVIDIA A100 with the reference setup (JP flux, WENO-Z 5, staggered viscous scheme, WALE).
-- **Many GPUs**: on CINECA Leonardo (4 A100 per node) the weak-scaling efficiency is 88–98 % at 256 nodes (1024 GPUs) and the strong-scaling efficiency 79–86 % at 64 nodes for the shock-capturing configurations.
+- **Many GPUs**: on CINECA Leonardo (4 A100 per node) the weak-scaling efficiency is 87–97 % at 256 nodes (1024 GPUs) and the strong-scaling efficiency 79–86 % at 64 nodes for the shock-capturing configurations.
 
 The full analysis, including the cost of each numerical choice, is in the URANOS-3.0 paper.
 
